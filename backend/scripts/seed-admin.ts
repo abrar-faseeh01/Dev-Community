@@ -4,7 +4,8 @@ import mongoose from 'mongoose';
 import { User, UserSchema } from '../src/users/schemas/user.schema';
 
 async function seedAdmin() {
-  const { MONGODB_URI, ADMIN_EMAIL, ADMIN_PASSWORD } = process.env;
+  const { MONGODB_URI, ADMIN_FULLNAME, ADMIN_EMAIL, ADMIN_PASSWORD } =
+    process.env;
 
   if (!MONGODB_URI) {
     console.error('Missing MONGODB_URI in .env');
@@ -22,10 +23,11 @@ async function seedAdmin() {
   }
 
   // Only required at this point — a fresh database with no admin yet.
-  if (!ADMIN_EMAIL || !ADMIN_PASSWORD) {
+  if (!ADMIN_FULLNAME || !ADMIN_EMAIL || !ADMIN_PASSWORD) {
     console.error(
-      'No admin exists yet, but ADMIN_EMAIL/ADMIN_PASSWORD are missing from .env. ' +
-        'Add them temporarily to bootstrap the first admin, then they can be removed.',
+      'No admin exists yet, but ADMIN_FULLNAME/ADMIN_EMAIL/ADMIN_PASSWORD are ' +
+        'missing from .env. Add them temporarily to bootstrap the first admin, ' +
+        'then they can be removed.',
     );
     await mongoose.disconnect();
     process.exit(1);
@@ -33,6 +35,7 @@ async function seedAdmin() {
 
   const passwordHash = await bcrypt.hash(ADMIN_PASSWORD, 12);
   const admin = await UserModel.create({
+    fullName: ADMIN_FULLNAME,
     email: ADMIN_EMAIL.toLowerCase(),
     passwordHash,
     role: 'admin',

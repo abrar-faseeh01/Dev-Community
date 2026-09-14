@@ -5,6 +5,11 @@ export class UpdateCredentialsDto {
   currentPassword: string;
 
   @IsOptional()
+  @IsString()
+  @MinLength(2)
+  newFullName?: string;
+
+  @IsOptional()
   @IsEmail()
   newEmail?: string;
 

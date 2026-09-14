@@ -34,6 +34,7 @@ export class AuthService {
 
     // role is never passed from dto — always defaults to 'user' in UsersService.
     const user = await this.usersService.create({
+      fullName: dto.fullName,
       email: dto.email,
       passwordHash,
     });
@@ -77,8 +78,15 @@ export class AuthService {
       throw new BadRequestException('Current password is incorrect');
     }
 
-    if (!dto.newEmail && !dto.newPassword) {
-      throw new BadRequestException('Provide newEmail and/or newPassword');
+    if (!dto.newFullName && !dto.newEmail && !dto.newPassword) {
+      throw new BadRequestException(
+        'Provide newFullName, newEmail, and/or newPassword',
+      );
+    }
+
+    // Unlike email (admin-only), full name may be changed by anyone.
+    if (dto.newFullName) {
+      user.fullName = dto.newFullName;
     }
 
     // Only admins may change their email — regular users can only change their password.

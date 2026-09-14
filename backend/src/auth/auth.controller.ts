@@ -8,6 +8,7 @@ import {
   Res,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Throttle } from '@nestjs/throttler';
 import type { Response } from 'express';
 import ms from 'ms';
 import { AuthService } from './auth.service';
@@ -35,14 +36,18 @@ export class AuthController {
   @Public()
   @Post('signup')
   @HttpCode(201)
+  // Prevents rapid spam-account creation.
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   async signup(@Body() dto: SignupDto) {
     const user = await this.authService.signup(dto);
-    return { email: user.email, role: user.role };
+    return { id: String(user._id), fullName: user.fullName, email: user.email, role: user.role };
   }
 
   @Public()
   @Post('login')
   @HttpCode(200)
+  // Classic password-guessing target — the tightest limit in the app.
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   async login(
     @Body() dto: LoginDto,
     @Res({ passthrough: true }) res: Response,
@@ -56,7 +61,12 @@ export class AuthController {
       maxAge: this.getAccessTokenCookieMaxAge(),
     });
 
-    return { email: user.email, role: user.role };
+    return {
+      id: String(user._id),
+      fullName: user.fullName,
+      email: user.email,
+      role: user.role,
+    };
   }
 
   // Public: clearing a cookie must not require a still-valid one — an
@@ -71,12 +81,23 @@ export class AuthController {
   }
 
   @Get('me')
-  me(@CurrentUser() user: { userId: string; email: string; role: string }) {
-    return { email: user.email, role: user.role };
+  me(
+    @CurrentUser()
+    user: { userId: string; fullName: string; email: string; role: string },
+  ) {
+    return {
+      id: user.userId,
+      fullName: user.fullName,
+      email: user.email,
+      role: user.role,
+    };
   }
 
   @Patch('me')
   @HttpCode(200)
+  // Also checks currentPassword (a guessing target), but legitimate users
+  // may reasonably mistype a few times — more headroom than login/signup.
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   async updateMe(
     @CurrentUser() user: { userId: string },
     @Body() dto: UpdateCredentialsDto,
@@ -92,6 +113,11 @@ export class AuthController {
       maxAge: this.getAccessTokenCookieMaxAge(),
     });
 
-    return { email: updated.email, role: updated.role };
+    return {
+      id: String(updated._id),
+      fullName: updated.fullName,
+      email: updated.email,
+      role: updated.role,
+    };
   }
 }

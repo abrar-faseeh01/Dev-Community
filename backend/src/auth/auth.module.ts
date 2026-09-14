@@ -26,7 +26,11 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     }),
 
     ThrottlerModule.forRoot([
-      { ttl: 60000, limit: 10 }, // 10 requests per minute per IP
+      // Global default: a sanity ceiling against runaway bugs/scripts, not
+      // a real constraint on normal authenticated use — the genuinely
+      // brute-force-sensitive routes (login/signup/credential changes) get
+      // their own much tighter @Throttle() override in auth.controller.ts.
+      { ttl: 60000, limit: 100 }, // 100 requests per minute per IP
     ]),
   ],
 
