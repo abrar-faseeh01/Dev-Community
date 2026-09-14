@@ -1,11 +1,12 @@
 "use client";
-import { useAuth } from "@/lib/auth/auth-context";
 import { PasswordInput } from "@/components/ui/password-input";
+import { useAuth } from "@/lib/auth/auth-context";
 import { useState } from "react";
 
 export default function SettingsPage() {
   const { user, updateCredentials } = useAuth();
   const [currentPassword, setCurrentPassword] = useState("");
+  const [newFullName, setNewFullName] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [error, setError] = useState("");
@@ -18,11 +19,13 @@ export default function SettingsPage() {
     try {
       await updateCredentials(
         currentPassword,
+        newFullName || undefined,
         newEmail || undefined,
         newPassword || undefined,
       );
       setSuccess("Account updated.");
       setCurrentPassword("");
+      setNewFullName("");
       setNewEmail("");
       setNewPassword("");
     } catch (err) {
@@ -46,7 +49,7 @@ export default function SettingsPage() {
         <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
           <div className="border-b border-border px-5 py-4 sm:px-6">
             <p className="mt-1 text-sm text-muted">
-              Signed in as {user?.email}
+              Signed in as {user?.fullName}
             </p>
           </div>
 
@@ -68,6 +71,17 @@ export default function SettingsPage() {
                 {success}
               </p>
             )}
+
+            <label className="flex flex-col gap-2 text-sm font-medium">
+              <span>Full name</span>
+              <input
+                type="text"
+                value={newFullName}
+                onChange={(e) => setNewFullName(e.target.value)}
+                placeholder={user?.fullName}
+                className="h-11 rounded-lg border border-border bg-surface px-3.5 text-sm text-foreground outline-none transition-shadow placeholder:text-gray-400 focus:border-accent focus:ring-2 focus:ring-accent/15"
+              />
+            </label>
 
             <label className="flex flex-col gap-2 text-sm font-medium">
               <span>Current password</span>

@@ -10,16 +10,22 @@ import {
 } from "react";
 import { apiFetch } from "../api-client";
 
-type User = { email: string; role: "admin" | "user" } | null;
+type User = {
+  id: string;
+  fullName: string;
+  email: string;
+  role: "admin" | "user";
+} | null;
 
 type AuthContextType = {
   user: User;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  signup: (email: string, password: string) => Promise<void>;
+  signup: (fullName: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   updateCredentials: (
     currentPassword: string,
+    newFullName?: string,
     newEmail?: string,
     newPassword?: string,
   ) => Promise<void>;
@@ -63,10 +69,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(res.data);
   }
 
-  async function signup(email: string, password: string) {
+  async function signup(fullName: string, email: string, password: string) {
     await apiFetch("/auth/signup", {
       method: "POST",
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ fullName, email, password }),
     });
     await login(email, password); // auto-login after signup
   }
@@ -85,6 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function updateCredentials(
     currentPassword: string,
+    newFullName?: string,
     newEmail?: string,
     newPassword?: string,
   ) {
@@ -92,6 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       method: "PATCH",
       body: JSON.stringify({
         currentPassword,
+        newFullName,
         newEmail,
         newPassword,
       }),

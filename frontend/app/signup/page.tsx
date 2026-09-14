@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 export default function SignupPage() {
+  const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -16,12 +17,16 @@ export default function SignupPage() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    if (fullName.trim().length < 2) {
+      setError("Full name must be at least 2 characters");
+      return;
+    }
     if (password !== confirmPassword) {
       setError("Passwords do not match");
       return;
     }
     try {
-      await signup(email, password);
+      await signup(fullName.trim(), email, password);
       router.push("/");
     } catch {
       setError("Signup failed — email may already be in use");
@@ -50,6 +55,16 @@ export default function SignupPage() {
                 {error}
               </p>
             )}
+
+            <label className="flex flex-col gap-2 text-sm font-medium">
+              <span>Full name</span>
+              <input
+                type="text"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                className="h-11 rounded-lg border border-border bg-surface px-3.5 text-sm text-foreground outline-none transition-shadow focus:border-accent focus:ring-2 focus:ring-accent/15"
+              />
+            </label>
 
             <label className="flex flex-col gap-2 text-sm font-medium">
               <span>Email</span>
