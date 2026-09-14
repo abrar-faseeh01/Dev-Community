@@ -1,12 +1,38 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Document, Types } from 'mongoose';
 
 export type UserRole = 'admin' | 'user';
 
-// optimisticConcurrency: a `.save()` on a stale copy of the document fails
-// instead of silently overwriting concurrent changes (see AuthService.updateCredentials).
+// from/to are free-text strings ("2019", "Jan 2021", "Q3 2022"), not Date.
+// Resumes rarely carry day-level precision, and requiring a parseable date
+// would reject the vague-but-common ways people actually describe when a
+// role started or ended. `to` is simply absent for an ongoing role — no
+// sentinel value needed.
+@Schema({ _id: true }) // Mongoose's default for a subdocument array anyway — explicit here since each experience needs its own targetable _id.
+export class Experience {
+  @Prop({ required: true })
+  title: string;
+
+  @Prop({ required: true })
+  company: string;
+
+  @Prop({ required: true })
+  from: string;
+
+  @Prop()
+  to?: string;
+
+  @Prop()
+  description?: string;
+}
+
+export const ExperienceSchema = SchemaFactory.createForClass(Experience);
+
 @Schema({ timestamps: true, optimisticConcurrency: true })
 export class User extends Document {
+  @Prop({ required: true, trim: true })
+  fullName: string;
+
   @Prop({
     required: true,
     unique: true,
@@ -27,8 +53,8 @@ export class User extends Document {
   @Prop({ default: [] })
   skills: string[];
 
-  @Prop({ default: [] })
-  experiences: Record<string, any>[];
+  @Prop({ type: [ExperienceSchema], default: [] })
+  experiences: Types.DocumentArray<Experience>;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
