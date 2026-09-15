@@ -342,24 +342,25 @@ export function Header() {
                         </Link>
                       </>
                     ) : (
-                      <Link
-                        href={`/profile/${user.id}`}
-                        onClick={() => setMenuOpen(false)}
-                        role="menuitem"
-                        className="rounded-lg px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-background"
-                      >
-                        Profile
-                      </Link>
+                      <>
+                        <Link
+                          href={`/profile/${user.id}`}
+                          onClick={() => setMenuOpen(false)}
+                          role="menuitem"
+                          className="rounded-lg px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-background"
+                        >
+                          Profile
+                        </Link>
+                        <Link
+                          href="/posts/create"
+                          onClick={() => setMenuOpen(false)}
+                          role="menuitem"
+                          className="rounded-lg px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-background"
+                        >
+                          Create post
+                        </Link>
+                      </>
                     )}
-
-                    <Link
-                      href="/posts/create"
-                      onClick={() => setMenuOpen(false)}
-                      role="menuitem"
-                      className="rounded-lg px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-background"
-                    >
-                      Create post
-                    </Link>
 
                     <Link
                       href="/settings"
