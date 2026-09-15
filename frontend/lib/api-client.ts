@@ -38,9 +38,23 @@ apiClient.interceptors.response.use(
   },
 );
 
-export async function apiFetch(path: string, options: RequestInit = {}) {
+// The envelope every successful backend response follows (see
+// backend/src/common/interceptors/response.interceptor.ts). apiFetch always
+// throws on a {success:false, ...} error response (see below), so callers
+// only ever see the success shape.
+export type ApiSuccess<T> = { success: true; data: T };
+
+// T defaults to `any` (not `unknown`) so existing untyped call sites
+// (`apiFetch("/path")`) keep working without every caller needing to
+// annotate a type — pass `apiFetch<MyDataType>("/path")` to get `res.data`
+// typed.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function apiFetch<T = any>(
+  path: string,
+  options: RequestInit = {},
+): Promise<ApiSuccess<T>> {
   try {
-    const response = await apiClient.request({
+    const response = await apiClient.request<ApiSuccess<T>>({
       url: path,
       method: options.method as Method | undefined,
       data: options.body,
