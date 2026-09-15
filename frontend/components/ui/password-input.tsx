@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type InputHTMLAttributes } from "react";
+import { forwardRef, useState, type InputHTMLAttributes } from "react";
 
 type PasswordInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type">;
 
@@ -45,25 +45,32 @@ function EyeOffIcon() {
 // Password input with a show/hide toggle. Each instance keeps its own
 // visibility state, so multiple password fields on the same page (e.g.
 // settings' current/new password) never affect each other.
-export function PasswordInput({ className, ...props }: PasswordInputProps) {
-  const [visible, setVisible] = useState(false);
+//
+// forwardRef so react-hook-form's register() can attach its ref directly
+// to the underlying <input> (needed for RHF to read/focus the field) —
+// existing callers that never pass a ref (settings/page.tsx) are unaffected.
+export const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
+  function PasswordInput({ className, ...props }, ref) {
+    const [visible, setVisible] = useState(false);
 
-  return (
-    <div className="relative">
-      <input
-        type={visible ? "text" : "password"}
-        className={`w-full pr-10 ${className ?? ""}`}
-        {...props}
-      />
-      <button
-        type="button"
-        onClick={() => setVisible((v) => !v)}
-        aria-label={visible ? "Hide password" : "Show password"}
-        aria-pressed={visible}
-        className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted transition-colors hover:text-foreground"
-      >
-        {visible ? <EyeOffIcon /> : <EyeIcon />}
-      </button>
-    </div>
-  );
-}
+    return (
+      <div className="relative">
+        <input
+          ref={ref}
+          type={visible ? "text" : "password"}
+          className={`w-full pr-10 ${className ?? ""}`}
+          {...props}
+        />
+        <button
+          type="button"
+          onClick={() => setVisible((v) => !v)}
+          aria-label={visible ? "Hide password" : "Show password"}
+          aria-pressed={visible}
+          className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted transition-colors hover:text-foreground"
+        >
+          {visible ? <EyeOffIcon /> : <EyeIcon />}
+        </button>
+      </div>
+    );
+  },
+);

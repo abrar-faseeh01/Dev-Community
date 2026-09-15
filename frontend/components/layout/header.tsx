@@ -310,9 +310,14 @@ export function Header() {
                   }`}
                 >
                   <div className="border-b border-border px-4 py-3">
-                    <p className="truncate text-sm font-semibold text-foreground">
-                      {user.fullName || user.email}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <p className="truncate text-sm font-semibold text-foreground">
+                        {user.fullName || user.email}
+                      </p>
+                      <span className="shrink-0 rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent">
+                        {isAdmin ? "Admin" : "User"}
+                      </span>
+                    </div>
                     <p className="truncate text-xs text-muted">{user.email}</p>
                   </div>
 
