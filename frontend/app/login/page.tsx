@@ -1,26 +1,42 @@
 "use client";
-import { useAuth } from "@/lib/auth/auth-context";
 import { PasswordInput } from "@/components/ui/password-input";
+import { useAuth } from "@/lib/auth/auth-context";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useMutation } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+
+const loginSchema = z.object({
+  email: z
+    .string()
+    .min(1, "Email is required")
+    .email("Enter a valid email address"),
+  password: z.string().min(1, "Password is required"),
+});
+
+type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
   const { login } = useAuth();
   const router = useRouter();
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError("");
-    try {
-      await login(email, password);
-      router.push("/");
-    } catch {
-      setError("Invalid email or password");
-    }
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<LoginFormValues>({ resolver: zodResolver(loginSchema) });
+
+  const loginMutation = useMutation({
+    mutationFn: (values: LoginFormValues) =>
+      login(values.email, values.password),
+    onSuccess: () => router.push("/"),
+  });
+
+  function onSubmit(values: LoginFormValues) {
+    if (loginMutation.isPending) return;
+    loginMutation.mutate(values);
   }
 
   return (
@@ -36,13 +52,19 @@ export default function LoginPage() {
         </div>
 
         <div className="rounded-xl border border-border bg-surface shadow-sm">
-          <form onSubmit={onSubmit} className="flex flex-col gap-5 p-6 sm:p-8">
-            {error && (
+          <form
+            onSubmit={handleSubmit(onSubmit)}
+            noValidate
+            className="flex flex-col gap-5 p-6 sm:p-8"
+          >
+            {loginMutation.isError && (
               <p
                 role="alert"
                 className="rounded-lg border border-red-200 bg-red-50 px-3.5 py-3 text-sm text-red-700"
               >
-                {error}
+                {loginMutation.error instanceof Error
+                  ? loginMutation.error.message
+                  : "Login failed."}
               </p>
             )}
 
@@ -50,29 +72,37 @@ export default function LoginPage() {
               <span>Email</span>
               <input
                 type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                aria-invalid={errors.email ? "true" : "false"}
+                {...register("email")}
                 className="h-11 rounded-lg border border-border bg-surface px-3.5 text-sm text-foreground outline-none transition-shadow placeholder:text-gray-400 focus:border-accent focus:ring-2 focus:ring-accent/15"
               />
+              {errors.email && (
+                <span role="alert" className="text-sm text-red-600">
+                  {errors.email.message}
+                </span>
+              )}
             </label>
 
             <label className="flex flex-col gap-2 text-sm font-medium">
               <span>Password</span>
               <PasswordInput
-                required
-                minLength={8}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                aria-invalid={errors.password ? "true" : "false"}
+                {...register("password")}
                 className="h-11 rounded-lg border border-border bg-surface px-3.5 text-sm text-foreground outline-none transition-shadow focus:border-accent focus:ring-2 focus:ring-accent/15"
               />
+              {errors.password && (
+                <span role="alert" className="text-sm text-red-600">
+                  {errors.password.message}
+                </span>
+              )}
             </label>
 
             <button
               type="submit"
-              className="h-11 rounded-lg bg-accent px-4 text-sm font-semibold text-accent-foreground transition-colors hover:bg-accent/90 focus:outline-none focus:ring-2 focus:ring-accent/30"
+              disabled={loginMutation.isPending}
+              className="h-11 rounded-lg bg-accent px-4 text-sm font-semibold text-accent-foreground transition-colors hover:bg-accent/90 focus:outline-none focus:ring-2 focus:ring-accent/30 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Log in
+              {loginMutation.isPending ? "Logging in…" : "Log in"}
             </button>
 
             <p className="border-t border-border pt-5 text-center text-sm text-muted">
