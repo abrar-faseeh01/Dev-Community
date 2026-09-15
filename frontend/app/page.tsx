@@ -1,22 +1,12 @@
-export default async function Home() {
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/health`, {
-    cache: "no-store",
-  });
+import { SystemStatus } from "@/components/system-status";
 
-  const health = await response.json();
-
+export default function Home() {
   return (
-    <main>
-      <h1>Developer Community</h1>
-
-      {health.success ? (
-        <>
-          <p>API: {health.data.api}</p>
-          <p>Database: {health.data.database}</p>
-        </>
-      ) : (
-        <p>API: {health.message ?? "unreachable"}</p>
-      )}
+    <main className="mx-auto flex max-w-5xl flex-col gap-4 px-4 py-8 sm:px-6">
+      <h1 className="text-2xl font-bold text-foreground">
+        Developer Community
+      </h1>
+      <SystemStatus />
     </main>
   );
 }
