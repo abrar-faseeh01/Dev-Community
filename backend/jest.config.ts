@@ -14,8 +14,18 @@ const config: Config = {
   moduleFileExtensions: ['js', 'json', 'ts'],
   rootDir: '.',
   testRegex: '.*\\.spec\\.ts$',
+  // NestJS 12's packages (e.g. @nestjs/testing) ship ESM-only — Jest's
+  // default CommonJS runtime can't require() them. Running Jest itself in
+  // ESM mode (see the "test" script's --experimental-vm-modules flag) is
+  // the documented fix, rather than trying to force the package back to
+  // CommonJS, which it no longer ships at all.
+  extensionsToTreatAsEsm: ['.ts'],
   transform: {
-    '^.+\\.(t|j)s$': 'ts-jest',
+    // Force real ESM output for the test compile — the base tsconfig's
+    // "nodenext" module setting emits CommonJS for this CJS package
+    // (no "type": "module" in package.json), which useESM's runtime
+    // registration can't load ("exports is not defined").
+    '^.+\\.(t|j)s$': ['ts-jest', { useESM: true, tsconfig: { module: 'ES2022' } }],
   },
   moduleNameMapper: pathsToModuleNameMapper(paths, { prefix: '<rootDir>/' }),
   collectCoverageFrom: [
