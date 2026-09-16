@@ -21,7 +21,7 @@ export default function ProfilePage() {
       setLoading(true);
       setError("");
       try {
-        const res = await apiFetch(`/users/${id}`);
+        const res = await apiFetch(`/profile/${id}`);
         if (!cancelled) setProfile(res.data);
       } catch (err) {
         if (!cancelled) {

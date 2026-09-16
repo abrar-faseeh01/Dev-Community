@@ -7,28 +7,18 @@ import {
   HttpCode,
   Param,
   Patch,
-  Post,
 } from '@nestjs/common';
-import { AuditAction } from '../audit/schemas/audit-log.schema';
 import { AuditService } from '../audit/audit.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { recordAdminOverride } from '../common/authorization/owner-or-admin';
+import type { RequestUser } from '../common/authorization/owner-or-admin';
+import { ReasonDto } from '../common/dto/reason.dto';
 import { ParseObjectIdPipe } from '../common/pipes/parse-object-id.pipe';
 import { NotificationsService } from '../notifications/notifications.service';
-import { AddExperienceDto } from './dto/add-experience.dto';
-import { ReasonDto } from './dto/reason.dto';
-import { UpdateExperienceDto } from './dto/update-experience.dto';
 import { UpdateFullNameDto } from './dto/update-fullname.dto';
-import { UpdateSkillsDto } from './dto/update-skills.dto';
 import { User } from './schemas/user.schema';
 import { UsersService } from './users.service';
-
-type RequestUser = {
-  userId: string;
-  fullName: string;
-  email: string;
-  role: string;
-};
 
 @Controller('users')
 export class UsersController {
@@ -85,47 +75,12 @@ export class UsersController {
     return null;
   }
 
-  // No @Public() — protected by the global default, per the design
-  // decision that viewing a profile requires being logged in (any
-  // authenticated user may view any profile; a logged-out visitor may not).
-  @Get(':id')
-  async getProfile(@Param('id', ParseObjectIdPipe) id: string) {
-    const user = await this.usersService.getProfileById(id);
-    return this.toProfile(user);
-  }
-
-  @Patch(':id/skills')
-  @HttpCode(200)
-  async updateSkills(
-    @Param('id', ParseObjectIdPipe) id: string,
-    @CurrentUser() requester: RequestUser,
-    @Body() dto: UpdateSkillsDto,
-  ) {
-    this.assertOwnerOrAdmin(requester, id);
-    const isOverride = this.isAdminOverride(requester, id);
-    const before = isOverride ? await this.usersService.getProfileById(id) : null;
-
-    const user = await this.usersService.updateSkills(id, dto.skills);
-
-    if (isOverride) {
-      await this.recordAdminOverride(
-        requester,
-        { id, fullName: user.fullName },
-        'update_skills',
-        { skills: before!.skills },
-        { skills: user.skills },
-        dto.reason,
-      );
-    }
-    return this.toProfile(user);
-  }
-
-  // Admin-only, not owner-or-admin like the routes around it: self-editing
-  // your own name already has a dedicated, password-gated path
-  // (PATCH /auth/me — see AuthService.updateCredentials). This route exists
-  // specifically for an admin acting on someone else, so it deliberately
-  // doesn't offer a weaker duplicate way to rename yourself without
-  // proving your password.
+  // Admin-only, not owner-or-admin like the skills/experience routes (now
+  // in ProfilesController): self-editing your own name already has a
+  // dedicated, password-gated path (PATCH /auth/me — see
+  // AuthService.updateCredentials). This route exists specifically for an
+  // admin acting on someone else, so it deliberately doesn't offer a
+  // weaker duplicate way to rename yourself without proving your password.
   @Patch(':id/fullname')
   @HttpCode(200)
   @Roles('admin')
@@ -146,7 +101,8 @@ export class UsersController {
     // Every successful call here is, by construction, an admin acting on
     // someone else (admin-only route, self-edits rejected above) — always
     // record, same as deleteUser above.
-    await this.recordAdminOverride(
+    await recordAdminOverride(
+      { auditService: this.auditService, notificationsService: this.notificationsService },
       requester,
       { id, fullName: before.fullName },
       'update_fullname',
@@ -156,178 +112,6 @@ export class UsersController {
     );
 
     return this.toProfile(user);
-  }
-
-  @Post(':id/experiences')
-  @HttpCode(201)
-  async addExperience(
-    @Param('id', ParseObjectIdPipe) id: string,
-    @CurrentUser() requester: RequestUser,
-    @Body() dto: AddExperienceDto,
-  ) {
-    this.assertOwnerOrAdmin(requester, id);
-    const isOverride = this.isAdminOverride(requester, id);
-    const { reason, ...experienceData } = dto;
-
-    const user = await this.usersService.addExperience(id, experienceData);
-
-    if (isOverride) {
-      // $push appends — the just-added entry is always the last element.
-      const added = user.experiences[user.experiences.length - 1];
-      await this.recordAdminOverride(
-        requester,
-        { id, fullName: user.fullName },
-        'add_experience',
-        null,
-        {
-          title: added.title,
-          company: added.company,
-          from: added.from,
-          to: added.to,
-          description: added.description,
-        },
-        reason,
-      );
-    }
-    return this.toProfile(user);
-  }
-
-  @Patch(':id/experiences/:experienceId')
-  @HttpCode(200)
-  async updateExperience(
-    @Param('id', ParseObjectIdPipe) id: string,
-    @Param('experienceId', ParseObjectIdPipe) experienceId: string,
-    @CurrentUser() requester: RequestUser,
-    @Body() dto: UpdateExperienceDto,
-  ) {
-    this.assertOwnerOrAdmin(requester, id);
-    const isOverride = this.isAdminOverride(requester, id);
-    const { reason, ...updateFields } = dto;
-
-    const before = isOverride ? await this.usersService.getProfileById(id) : null;
-    const previousExperience = before?.experiences.find(
-      (exp) => String(exp._id) === experienceId,
-    );
-
-    const user = await this.usersService.updateExperience(
-      id,
-      experienceId,
-      updateFields,
-    );
-
-    if (isOverride) {
-      const updated = user.experiences.find(
-        (exp) => String(exp._id) === experienceId,
-      );
-      await this.recordAdminOverride(
-        requester,
-        { id, fullName: user.fullName },
-        'update_experience',
-        previousExperience
-          ? {
-              title: previousExperience.title,
-              company: previousExperience.company,
-              from: previousExperience.from,
-              to: previousExperience.to,
-              description: previousExperience.description,
-            }
-          : null,
-        updated
-          ? {
-              title: updated.title,
-              company: updated.company,
-              from: updated.from,
-              to: updated.to,
-              description: updated.description,
-            }
-          : null,
-        reason,
-      );
-    }
-    return this.toProfile(user);
-  }
-
-  @Delete(':id/experiences/:experienceId')
-  @HttpCode(200)
-  async removeExperience(
-    @Param('id', ParseObjectIdPipe) id: string,
-    @Param('experienceId', ParseObjectIdPipe) experienceId: string,
-    @CurrentUser() requester: RequestUser,
-    @Body() dto: ReasonDto,
-  ) {
-    this.assertOwnerOrAdmin(requester, id);
-    const isOverride = this.isAdminOverride(requester, id);
-
-    const before = isOverride ? await this.usersService.getProfileById(id) : null;
-    const removed = before?.experiences.find(
-      (exp) => String(exp._id) === experienceId,
-    );
-
-    const user = await this.usersService.removeExperience(id, experienceId);
-
-    if (isOverride) {
-      await this.recordAdminOverride(
-        requester,
-        { id, fullName: user.fullName },
-        'remove_experience',
-        removed
-          ? {
-              title: removed.title,
-              company: removed.company,
-              from: removed.from,
-              to: removed.to,
-              description: removed.description,
-            }
-          : null,
-        null,
-        dto.reason,
-      );
-    }
-    return this.toProfile(user);
-  }
-
-  // Reused by every owner-or-admin write route above — same check, one
-  // place, rather than four copies of the same if-statement.
-  private assertOwnerOrAdmin(requester: RequestUser, targetUserId: string) {
-    if (requester.userId !== targetUserId && requester.role !== 'admin') {
-      throw new ForbiddenException('You can only edit your own profile');
-    }
-  }
-
-  // Distinguishes "an admin acting on someone else" (audit-logged and
-  // notified) from "you editing your own data" (neither) — assertOwnerOrAdmin
-  // above only tells us the request is *allowed*, not which of those two
-  // allowed cases it actually is.
-  private isAdminOverride(requester: RequestUser, targetUserId: string) {
-    return requester.userId !== targetUserId && requester.role === 'admin';
-  }
-
-  // Shared by every skills/experience write above once isAdminOverride is
-  // true — one place for "log it, and notify the target unless they no
-  // longer exist" rather than four near-identical call sites.
-  private async recordAdminOverride(
-    requester: RequestUser,
-    target: { id: string; fullName: string },
-    action: AuditAction,
-    previousState: Record<string, unknown> | null,
-    newState: Record<string, unknown> | null,
-    reason?: string,
-  ) {
-    await this.auditService.log({
-      adminId: requester.userId,
-      adminFullName: requester.fullName,
-      targetUserId: target.id,
-      targetFullName: target.fullName,
-      action,
-      previousState,
-      newState,
-      reason,
-    });
-
-    const message = reason
-      ? `An administrator updated your profile. Reason: ${reason}`
-      : 'An administrator updated your profile.';
-    await this.notificationsService.create(target.id, message);
   }
 
   // Hand-picked shape — never return the raw document. passwordHash is

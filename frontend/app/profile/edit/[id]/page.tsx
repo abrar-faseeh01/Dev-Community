@@ -97,7 +97,7 @@ export default function EditProfilePage() {
       setLoading(true);
       setLoadError("");
       try {
-        const res = await apiFetch(`/users/${targetId}`);
+        const res = await apiFetch(`/profile/${targetId}`);
         if (!cancelled) {
           setProfile(res.data);
           setSkills(res.data.skills);
@@ -163,7 +163,7 @@ export default function EditProfilePage() {
     setSkillsError("");
     setSkillsSuccess("");
     try {
-      const res = await apiFetch(`/users/${targetId}/skills`, {
+      const res = await apiFetch(`/profile/${targetId}/skills`, {
         method: "PATCH",
         body: JSON.stringify({
           skills,
@@ -187,7 +187,7 @@ export default function EditProfilePage() {
     setAddingExperience(true);
     setAddExperienceError("");
     try {
-      const res = await apiFetch(`/users/${targetId}/experiences`, {
+      const res = await apiFetch(`/profile/${targetId}/experiences`, {
         method: "POST",
         body: JSON.stringify({
           title: newExperience.title,
@@ -237,7 +237,7 @@ export default function EditProfilePage() {
     setExperiencesError("");
     try {
       const res = await apiFetch(
-        `/users/${targetId}/experiences/${experienceId}`,
+        `/profile/${targetId}/experiences/${experienceId}`,
         {
           method: "PATCH",
           body: JSON.stringify({
@@ -278,7 +278,7 @@ export default function EditProfilePage() {
     setExperiencesError("");
     try {
       const res = await apiFetch(
-        `/users/${targetId}/experiences/${experienceId}`,
+        `/profile/${targetId}/experiences/${experienceId}`,
         { method: "DELETE", body: JSON.stringify({ reason }) },
       );
       setProfile(res.data);

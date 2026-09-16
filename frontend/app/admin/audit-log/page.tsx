@@ -17,6 +17,9 @@ type AuditLogEntry = {
     | "update_experience"
     | "remove_experience"
     | "update_fullname"
+    | "update_headline"
+    | "update_bio"
+    | "update_portfolio_projects"
     | "delete_user";
   previousState: Record<string, unknown> | null;
   newState: Record<string, unknown> | null;
@@ -30,6 +33,9 @@ const ACTION_LABELS: Record<AuditLogEntry["action"], string> = {
   update_experience: "Updated experience",
   remove_experience: "Removed experience",
   update_fullname: "Updated full name",
+  update_headline: "Updated headline",
+  update_bio: "Updated bio",
+  update_portfolio_projects: "Updated portfolio projects",
   delete_user: "Deleted user",
 };
 

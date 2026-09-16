@@ -28,6 +28,41 @@ export class Experience {
 
 export const ExperienceSchema = SchemaFactory.createForClass(Experience);
 
+// Storage shape only — the conditional isCurrent/endDate/startDate rules
+// are enforced by PortfolioProjectDto's custom validator (class-validator),
+// not here. Keeping the schema "dumb" means there's exactly one place
+// (the DTO) that decides what a bad payload looks like and how it's
+// rejected; the schema just describes what a valid document contains.
+@Schema({ _id: true }) // each project needs its own targetable _id, same reasoning as Experience.
+export class PortfolioProject {
+  @Prop({ required: true, trim: true, maxlength: 120 })
+  title: string;
+
+  @Prop({ trim: true, maxlength: 1000 })
+  description?: string;
+
+  @Prop({ required: true })
+  liveUrl: string;
+
+  @Prop({ required: true })
+  githubUrl: string;
+
+  @Prop({ type: [String], default: [] })
+  technologies: string[];
+
+  @Prop({ required: true })
+  startDate: Date;
+
+  @Prop()
+  endDate?: Date;
+
+  @Prop({ required: true, default: false })
+  isCurrent: boolean;
+}
+
+export const PortfolioProjectSchema =
+  SchemaFactory.createForClass(PortfolioProject);
+
 @Schema({ timestamps: true, optimisticConcurrency: true })
 export class User extends Document {
   @Prop({ required: true, trim: true })
@@ -55,6 +90,18 @@ export class User extends Document {
 
   @Prop({ type: [ExperienceSchema], default: [] })
   experiences: Types.DocumentArray<Experience>;
+
+  // headline/bio/portfolioProjects are the Day 5 "developer profile" fields —
+  // they coexist with the older skills/experiences fields rather than
+  // replacing them; nothing here removes or repurposes experiences.
+  @Prop({ trim: true, maxlength: 120 })
+  headline?: string;
+
+  @Prop({ trim: true, maxlength: 1000 })
+  bio?: string;
+
+  @Prop({ type: [PortfolioProjectSchema], default: [] })
+  portfolioProjects: Types.DocumentArray<PortfolioProject>;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

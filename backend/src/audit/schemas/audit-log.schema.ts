@@ -7,6 +7,9 @@ export type AuditAction =
   | 'update_experience'
   | 'remove_experience'
   | 'update_fullname'
+  | 'update_headline'
+  | 'update_bio'
+  | 'update_portfolio_projects'
   | 'delete_user';
 
 const AUDIT_ACTIONS: AuditAction[] = [
@@ -15,6 +18,9 @@ const AUDIT_ACTIONS: AuditAction[] = [
   'update_experience',
   'remove_experience',
   'update_fullname',
+  'update_headline',
+  'update_bio',
+  'update_portfolio_projects',
   'delete_user',
 ];
 
