@@ -24,7 +24,7 @@ export class UpdateExperienceDto {
 
   // Only meaningful when an admin edits someone else's profile — recorded
   // on the audit log entry. The controller strips this before calling
-  // UsersService.updateExperience(), which otherwise treats every present
+  // ProfilesService.updateExperience(), which otherwise treats every present
   // key in the dto as a field to $set on the experience subdocument.
   @IsOptional()
   @IsString()

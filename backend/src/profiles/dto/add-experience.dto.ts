@@ -21,7 +21,7 @@ export class AddExperienceDto {
 
   // Only meaningful when an admin edits someone else's profile — recorded
   // on the audit log entry, never persisted onto the experience itself
-  // (the controller strips it before calling UsersService).
+  // (the controller strips it before calling ProfilesService).
   @IsOptional()
   @IsString()
   reason?: string;
