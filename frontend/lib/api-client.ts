@@ -44,6 +44,22 @@ apiClient.interceptors.response.use(
 // only ever see the success shape.
 export type ApiSuccess<T> = { success: true; data: T };
 
+// On a validation failure, backend/src/common/filters/http-exception.filter.ts
+// puts class-validator's per-field messages in `errors` and a generic
+// "Validation failed" in `message`. Plain `Error` (below) only ever kept
+// `message`, so callers had no way to map a specific message back onto the
+// form field it concerns — ApiError carries `errors` through instead.
+// Still an instanceof Error, so every existing `catch` block is unaffected.
+export class ApiError extends Error {
+  errors: string[];
+
+  constructor(message: string, errors: string[] = []) {
+    super(message);
+    this.name = "ApiError";
+    this.errors = errors;
+  }
+}
+
 // T defaults to `any` (not `unknown`) so existing untyped call sites
 // (`apiFetch("/path")`) keep working without every caller needing to
 // annotate a type — pass `apiFetch<MyDataType>("/path")` to get `res.data`
@@ -63,10 +79,10 @@ export async function apiFetch<T = any>(
     return response.data;
   } catch (err) {
     if (isAxiosError(err)) {
-      const message = (
-        err.response?.data as { message?: string } | undefined
-      )?.message;
-      throw new Error(message || "Request failed");
+      const body = err.response?.data as
+        | { message?: string; errors?: string[] }
+        | undefined;
+      throw new ApiError(body?.message || "Request failed", body?.errors ?? []);
     }
     throw err;
   }
