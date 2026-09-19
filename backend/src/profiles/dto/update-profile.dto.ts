@@ -1,3 +1,4 @@
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
@@ -17,16 +18,19 @@ import { PortfolioProjectDto } from './portfolio-project.dto';
 // than being silently accepted, even though portfolioProjects itself is
 // optional here.
 export class UpdateProfileDto {
+  @ApiPropertyOptional({ maxLength: 120, example: 'Senior Backend Engineer @ Acme' })
   @IsOptional()
   @IsString()
   @MaxLength(120)
   headline?: string;
 
+  @ApiPropertyOptional({ maxLength: 1000, example: 'I build backend systems and enjoy mentoring junior engineers.' })
   @IsOptional()
   @IsString()
   @MaxLength(1000)
   bio?: string;
 
+  @ApiPropertyOptional({ type: [String], maxItems: 50, example: ['typescript', 'nestjs', 'mongodb'] })
   @IsOptional()
   @IsArray()
   @ArrayMaxSize(50)
@@ -36,6 +40,7 @@ export class UpdateProfileDto {
 
   // Full replace, same convention as the existing UpdateSkillsDto/
   // updateSkills route: the whole array is sent and stored as-is.
+  @ApiPropertyOptional({ type: [PortfolioProjectDto], maxItems: 20 })
   @IsOptional()
   @IsArray()
   @ArrayMaxSize(20)

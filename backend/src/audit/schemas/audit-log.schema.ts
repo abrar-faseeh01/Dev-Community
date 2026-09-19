@@ -10,7 +10,9 @@ export type AuditAction =
   | 'update_headline'
   | 'update_bio'
   | 'update_portfolio_projects'
-  | 'delete_user';
+  | 'delete_user'
+  | 'update_post'
+  | 'delete_post';
 
 const AUDIT_ACTIONS: AuditAction[] = [
   'update_skills',
@@ -22,6 +24,8 @@ const AUDIT_ACTIONS: AuditAction[] = [
   'update_bio',
   'update_portfolio_projects',
   'delete_user',
+  'update_post',
+  'delete_post',
 ];
 
 // Append-only: entries are never updated or deleted, so only createdAt is

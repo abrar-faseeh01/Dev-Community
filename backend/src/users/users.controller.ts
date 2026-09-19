@@ -8,18 +8,34 @@ import {
   Param,
   Patch,
 } from '@nestjs/common';
+import {
+  ApiCookieAuth,
+  ApiForbiddenResponse,
+  ApiNotFoundResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiParam,
+  ApiTags,
+  ApiUnauthorizedResponse,
+} from '@nestjs/swagger';
 import { AuditService } from '../audit/audit.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { recordAdminOverride } from '../common/authorization/owner-or-admin';
 import type { RequestUser } from '../common/authorization/owner-or-admin';
+import { ErrorResponseDto } from '../common/dto/error-response.dto';
+import { NullDataResponseDto } from '../common/dto/null-data-response.dto';
 import { ReasonDto } from '../common/dto/reason.dto';
 import { ParseObjectIdPipe } from '../common/pipes/parse-object-id.pipe';
 import { NotificationsService } from '../notifications/notifications.service';
 import { UpdateFullNameDto } from './dto/update-fullname.dto';
+import { UpdateFullNameResponseDto, UsersListResponseDto } from './dto/users-response.dto';
 import { User } from './schemas/user.schema';
 import { UsersService } from './users.service';
 
+@ApiTags('users')
+@ApiCookieAuth('access_token')
+@ApiUnauthorizedResponse({ description: 'Missing, invalid, or expired session cookie.', type: ErrorResponseDto })
 @Controller('users')
 export class UsersController {
   constructor(
@@ -32,6 +48,9 @@ export class UsersController {
   // an :id param and 400 on ParseObjectIdPipe.
   @Get()
   @Roles('admin')
+  @ApiOperation({ summary: 'List all users (admin only)' })
+  @ApiOkResponse({ type: UsersListResponseDto })
+  @ApiForbiddenResponse({ description: 'Caller is not an admin.', type: ErrorResponseDto })
   async listUsers() {
     const users = await this.usersService.findAll();
     return users.map((user) => ({
@@ -46,6 +65,11 @@ export class UsersController {
   @Delete(':id')
   @Roles('admin')
   @HttpCode(200)
+  @ApiOperation({ summary: 'Permanently delete a user (admin only)', description: 'Hard delete — not soft delete. Admin accounts cannot be deleted through this route, including by themselves.' })
+  @ApiParam({ name: 'id', example: '64f1c2e5a1b2c3d4e5f6a7b8' })
+  @ApiOkResponse({ type: NullDataResponseDto })
+  @ApiForbiddenResponse({ description: 'Caller is not an admin, or the target is an admin account.', type: ErrorResponseDto })
+  @ApiNotFoundResponse({ description: 'User not found.', type: ErrorResponseDto })
   async deleteUser(
     @Param('id', ParseObjectIdPipe) id: string,
     @CurrentUser() requester: RequestUser,
@@ -84,6 +108,15 @@ export class UsersController {
   @Patch(':id/fullname')
   @HttpCode(200)
   @Roles('admin')
+  @ApiOperation({
+    summary: "Rename another user's account (admin only)",
+    description:
+      "For editing your own name, use PATCH /auth/me instead — this route exists specifically for an admin acting on someone else and rejects self-targeting.",
+  })
+  @ApiParam({ name: 'id', example: '64f1c2e5a1b2c3d4e5f6a7b8' })
+  @ApiOkResponse({ type: UpdateFullNameResponseDto })
+  @ApiForbiddenResponse({ description: 'Caller is not an admin, or is targeting their own account.', type: ErrorResponseDto })
+  @ApiNotFoundResponse({ description: 'User not found.', type: ErrorResponseDto })
   async updateFullName(
     @Param('id', ParseObjectIdPipe) id: string,
     @CurrentUser() requester: RequestUser,
@@ -108,6 +141,7 @@ export class UsersController {
       'update_fullname',
       { fullName: before.fullName },
       { fullName: user.fullName },
+      'An administrator updated your profile.',
       dto.reason,
     );
 

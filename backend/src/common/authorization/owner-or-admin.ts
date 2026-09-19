@@ -11,13 +11,16 @@ export type RequestUser = {
 };
 
 // Shared by every owner-or-admin write route across controllers — same
-// check, one place, rather than a copy per controller.
+// check, one place, rather than a copy per controller. `resource` defaults
+// to 'profile' so every existing caller (which never passed a third arg)
+// keeps its exact original message; PostsController passes 'post'.
 export function assertOwnerOrAdmin(
   requester: RequestUser,
   targetUserId: string,
+  resource: string = 'profile',
 ) {
   if (requester.userId !== targetUserId && requester.role !== 'admin') {
-    throw new ForbiddenException('You can only edit your own profile');
+    throw new ForbiddenException(`You can only edit your own ${resource}`);
   }
 }
 
@@ -47,6 +50,10 @@ export async function recordAdminOverride(
   action: AuditAction,
   previousState: Record<string, unknown> | null,
   newState: Record<string, unknown> | null,
+  // Base message only — callers never build the reason suffix themselves,
+  // so every caller's wording stays consistent and this stays the one
+  // place that decides how a reason is appended.
+  message: string,
   reason?: string,
 ) {
   await services.auditService.log({
@@ -60,8 +67,6 @@ export async function recordAdminOverride(
     reason,
   });
 
-  const message = reason
-    ? `An administrator updated your profile. Reason: ${reason}`
-    : 'An administrator updated your profile.';
-  await services.notificationsService.create(target.id, message);
+  const notificationMessage = reason ? `${message} Reason: ${reason}` : message;
+  await services.notificationsService.create(target.id, notificationMessage);
 }
