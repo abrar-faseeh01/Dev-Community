@@ -8,6 +8,17 @@ import {
   Patch,
   Post,
 } from '@nestjs/common';
+import {
+  ApiCookieAuth,
+  ApiCreatedResponse,
+  ApiForbiddenResponse,
+  ApiNotFoundResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiParam,
+  ApiTags,
+  ApiUnauthorizedResponse,
+} from '@nestjs/swagger';
 import { AuditService } from '../audit/audit.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import {
@@ -16,11 +27,13 @@ import {
   recordAdminOverride,
 } from '../common/authorization/owner-or-admin';
 import type { RequestUser } from '../common/authorization/owner-or-admin';
+import { ErrorResponseDto } from '../common/dto/error-response.dto';
 import { ReasonDto } from '../common/dto/reason.dto';
 import { ParseObjectIdPipe } from '../common/pipes/parse-object-id.pipe';
 import { NotificationsService } from '../notifications/notifications.service';
 import { User } from '../users/schemas/user.schema';
 import { AddExperienceDto } from './dto/add-experience.dto';
+import { ProfileResponseDto } from './dto/profile-response.dto';
 import { UpdateBioDto } from './dto/update-bio.dto';
 import { UpdateExperienceDto } from './dto/update-experience.dto';
 import { UpdateHeadlineDto } from './dto/update-headline.dto';
@@ -28,6 +41,13 @@ import { UpdatePortfolioProjectsDto } from './dto/update-portfolio-projects.dto'
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UpdateSkillsDto } from './dto/update-skills.dto';
 import { ProfilesService } from './profiles.service';
+
+const ID_PARAM = { name: 'id', example: '64f1c2e5a1b2c3d4e5f6a7b8' };
+const NOT_FOUND = { description: 'User not found.', type: ErrorResponseDto };
+const FORBIDDEN = {
+  description: 'Caller is neither the profile owner nor an admin.',
+  type: ErrorResponseDto,
+};
 
 // Two identity models, by design: /profile/me is always JWT-derived
 // (@CurrentUser(), backed by payload.sub) and never accepts a client-
@@ -37,6 +57,9 @@ import { ProfilesService } from './profiles.service';
 // assertOwnerOrAdmin) for the skills/experience write routes below, mirroring
 // how those same actions worked on UsersController before this module
 // absorbed them.
+@ApiTags('profiles')
+@ApiCookieAuth('access_token')
+@ApiUnauthorizedResponse({ description: 'Missing, invalid, or expired session cookie.', type: ErrorResponseDto })
 @Controller('profile')
 export class ProfilesController {
   constructor(
@@ -49,6 +72,8 @@ export class ProfilesController {
   // open to any authenticated user (viewing/editing your own profile
   // doesn't require a role beyond "logged in").
   @Get('me')
+  @ApiOperation({ summary: 'Get your own profile' })
+  @ApiOkResponse({ type: ProfileResponseDto })
   async getMyProfile(@CurrentUser() requester: RequestUser) {
     const user = await this.profilesService.getProfile(requester.userId);
     return this.toProfileResponse(user);
@@ -56,6 +81,11 @@ export class ProfilesController {
 
   @Patch('me')
   @HttpCode(200)
+  @ApiOperation({
+    summary: 'Update your own profile',
+    description: 'Partial update — only the fields present in the body are changed. Each provided array field (skills, portfolioProjects) is fully replaced, not merged.',
+  })
+  @ApiOkResponse({ type: ProfileResponseDto })
   async updateMyProfile(
     @CurrentUser() requester: RequestUser,
     @Body() dto: UpdateProfileDto,
@@ -70,6 +100,10 @@ export class ProfilesController {
   // Any authenticated user may view any other user's profile — same access
   // level as the old GET /users/:id it replaces.
   @Get(':id')
+  @ApiOperation({ summary: "Get another user's profile", description: 'Any authenticated user may view any other user\'s profile.' })
+  @ApiParam(ID_PARAM)
+  @ApiOkResponse({ type: ProfileResponseDto })
+  @ApiNotFoundResponse(NOT_FOUND)
   async getProfileById(@Param('id', ParseObjectIdPipe) id: string) {
     const user = await this.profilesService.getProfile(id);
     return this.toProfileResponse(user);
@@ -79,6 +113,14 @@ export class ProfilesController {
   // audit+notify only when an admin acts on someone else.
   @Patch(':id/skills')
   @HttpCode(200)
+  @ApiOperation({
+    summary: 'Replace a user\'s skills',
+    description: 'Owner-or-admin. When an admin edits someone else\'s skills, the change is audit-logged and the user is notified.',
+  })
+  @ApiParam(ID_PARAM)
+  @ApiOkResponse({ type: ProfileResponseDto })
+  @ApiForbiddenResponse(FORBIDDEN)
+  @ApiNotFoundResponse(NOT_FOUND)
   async updateSkills(
     @Param('id', ParseObjectIdPipe) id: string,
     @CurrentUser() requester: RequestUser,
@@ -98,6 +140,7 @@ export class ProfilesController {
         'update_skills',
         { skills: before!.skills },
         { skills: user.skills },
+        'An administrator updated your profile.',
         dto.reason,
       );
     }
@@ -110,6 +153,14 @@ export class ProfilesController {
   // previously had no admin path at all (self-only via PATCH /profile/me).
   @Patch(':id/headline')
   @HttpCode(200)
+  @ApiOperation({
+    summary: 'Replace a user\'s headline',
+    description: 'Owner-or-admin. When an admin edits someone else\'s headline, the change is audit-logged and the user is notified.',
+  })
+  @ApiParam(ID_PARAM)
+  @ApiOkResponse({ type: ProfileResponseDto })
+  @ApiForbiddenResponse(FORBIDDEN)
+  @ApiNotFoundResponse(NOT_FOUND)
   async updateHeadline(
     @Param('id', ParseObjectIdPipe) id: string,
     @CurrentUser() requester: RequestUser,
@@ -135,6 +186,7 @@ export class ProfilesController {
         // object keys on insert).
         { headline: before!.headline ?? null },
         { headline: user.headline },
+        'An administrator updated your profile.',
         dto.reason,
       );
     }
@@ -143,6 +195,14 @@ export class ProfilesController {
 
   @Patch(':id/bio')
   @HttpCode(200)
+  @ApiOperation({
+    summary: 'Replace a user\'s bio',
+    description: 'Owner-or-admin. When an admin edits someone else\'s bio, the change is audit-logged and the user is notified.',
+  })
+  @ApiParam(ID_PARAM)
+  @ApiOkResponse({ type: ProfileResponseDto })
+  @ApiForbiddenResponse(FORBIDDEN)
+  @ApiNotFoundResponse(NOT_FOUND)
   async updateBio(
     @Param('id', ParseObjectIdPipe) id: string,
     @CurrentUser() requester: RequestUser,
@@ -164,6 +224,7 @@ export class ProfilesController {
         // default either.
         { bio: before!.bio ?? null },
         { bio: user.bio },
+        'An administrator updated your profile.',
         dto.reason,
       );
     }
@@ -172,6 +233,14 @@ export class ProfilesController {
 
   @Patch(':id/portfolio-projects')
   @HttpCode(200)
+  @ApiOperation({
+    summary: 'Replace a user\'s portfolio projects',
+    description: 'Owner-or-admin. Full replace of the array. When an admin edits someone else\'s projects, the change is audit-logged and the user is notified.',
+  })
+  @ApiParam(ID_PARAM)
+  @ApiOkResponse({ type: ProfileResponseDto })
+  @ApiForbiddenResponse(FORBIDDEN)
+  @ApiNotFoundResponse(NOT_FOUND)
   async updatePortfolioProjects(
     @Param('id', ParseObjectIdPipe) id: string,
     @CurrentUser() requester: RequestUser,
@@ -194,6 +263,7 @@ export class ProfilesController {
         'update_portfolio_projects',
         { portfolioProjects: before!.portfolioProjects },
         { portfolioProjects: user.portfolioProjects },
+        'An administrator updated your profile.',
         dto.reason,
       );
     }
@@ -202,6 +272,14 @@ export class ProfilesController {
 
   @Post(':id/experiences')
   @HttpCode(201)
+  @ApiOperation({
+    summary: 'Add a work experience entry',
+    description: 'Owner-or-admin. Appends to the experiences array. When an admin adds an entry for someone else, it is audit-logged and the user is notified.',
+  })
+  @ApiParam(ID_PARAM)
+  @ApiCreatedResponse({ type: ProfileResponseDto })
+  @ApiForbiddenResponse(FORBIDDEN)
+  @ApiNotFoundResponse(NOT_FOUND)
   async addExperience(
     @Param('id', ParseObjectIdPipe) id: string,
     @CurrentUser() requester: RequestUser,
@@ -229,6 +307,7 @@ export class ProfilesController {
           to: added.to,
           description: added.description,
         },
+        'An administrator updated your profile.',
         reason,
       );
     }
@@ -237,6 +316,15 @@ export class ProfilesController {
 
   @Patch(':id/experiences/:experienceId')
   @HttpCode(200)
+  @ApiOperation({
+    summary: 'Update a work experience entry',
+    description: 'Owner-or-admin. Partial update — only the fields present are changed. When an admin edits an entry for someone else, it is audit-logged and the user is notified.',
+  })
+  @ApiParam(ID_PARAM)
+  @ApiParam({ name: 'experienceId', example: '64f1c2e5a1b2c3d4e5f6a7b9' })
+  @ApiOkResponse({ type: ProfileResponseDto })
+  @ApiForbiddenResponse(FORBIDDEN)
+  @ApiNotFoundResponse({ description: 'User or experience not found.', type: ErrorResponseDto })
   async updateExperience(
     @Param('id', ParseObjectIdPipe) id: string,
     @Param('experienceId', ParseObjectIdPipe) experienceId: string,
@@ -285,6 +373,7 @@ export class ProfilesController {
               description: updated.description,
             }
           : null,
+        'An administrator updated your profile.',
         reason,
       );
     }
@@ -293,6 +382,15 @@ export class ProfilesController {
 
   @Delete(':id/experiences/:experienceId')
   @HttpCode(200)
+  @ApiOperation({
+    summary: 'Remove a work experience entry',
+    description: 'Owner-or-admin. When an admin removes an entry for someone else, it is audit-logged and the user is notified.',
+  })
+  @ApiParam(ID_PARAM)
+  @ApiParam({ name: 'experienceId', example: '64f1c2e5a1b2c3d4e5f6a7b9' })
+  @ApiOkResponse({ type: ProfileResponseDto })
+  @ApiForbiddenResponse(FORBIDDEN)
+  @ApiNotFoundResponse({ description: 'User or experience not found.', type: ErrorResponseDto })
   async removeExperience(
     @Param('id', ParseObjectIdPipe) id: string,
     @Param('experienceId', ParseObjectIdPipe) experienceId: string,
@@ -325,6 +423,7 @@ export class ProfilesController {
             }
           : null,
         null,
+        'An administrator updated your profile.',
         dto.reason,
       );
     }
