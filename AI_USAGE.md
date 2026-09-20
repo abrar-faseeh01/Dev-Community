@@ -33,11 +33,19 @@ of doing the whole thing in one uninterrupted pass, specifically so I
 could catch a wrong turn early rather than after everything was already
 built on top of it.
 
-## What I reviewed, caught, and corrected
+## What I reviewed, caught, and corrected, day by day
 
 This is the part I want to be specific and honest about, because a
 write-up that implies everything went smoothly on the first try isn't
-useful evidence of anything.
+useful evidence of anything. I'm only itemizing the days below where
+something specific actually came up worth disclosing — Days 1-4 and 6
+followed the same review discipline described above (I read the plan,
+watched execution in checkpoints, and tested before accepting), but I
+don't have a specific incident from those days detailed enough to write
+up honestly, so I'd rather leave them out than pad this section with
+generic filler.
+
+### Day 5 — Developer profile API (profile-routes consolidation)
 
 **I caught a wrong assumption in my own first version of the plan.**
 Before writing the corrected consolidation plan, I asked for a read-only
@@ -100,6 +108,20 @@ exist and always had — my earlier grep pattern had a syntax error that
 silently matched nothing. The route itself was never affected by this;
 it was purely a gap in my own record of the codebase, and I corrected it
 before writing it into the documentation.
+
+### Day 7 — Posts API with ownership and pagination
+
+I kept the same checkpointed, verify-before-code process for Day 7, and it kept paying off — twice before any code was written, and twice more during testing.
+
+**I asked for a fresh check of a given implementation prompt before letting it touch code, and the check turned up two real gaps.** The prompt for wiring admin-moderation into the posts routes explicitly claimed one prerequisite already existed (`AuditAction` already had `'update_post'`/`'delete_post'` values from an earlier step). A fresh grep showed that was false — those values had never actually been added. The same check also showed that the post-deletion path didn't populate the author's name, which the admin-notification code needed and had no other source for. Both went into a corrected version of the prompt before any code changed.
+
+**Live testing surfaced a real bug that code review alone hadn't caught.** An admin editing a post with a reason attached returned a bare 500. Since the app's global exception filter silently swallows the details of any unexpected error, I had it add a temporary debug log, reproduce the failure, and read the real error: a Mongoose validation failure caused by passing a populated author *object* where a plain user-id string was expected. The root cause was that `.populate()` mutates the post document in place, so a variable read a second time after that call no longer held what it held the first time. I had it fix this by capturing the id once, before the mutating call, then revert the temporary debug logging and confirm via `git diff` that nothing else in that file had changed.
+
+**That same bug exposed a real, still-open architectural gap, which I asked it to document rather than silently fix.** The first (buggy) admin request had already saved its change to the database before the failure happened — meaning a real edit went through with zero audit trail while the client saw a 500 implying nothing had happened. This isn't unique to posts; the same admin-override pattern is used across profiles and users, and none of it is wrapped in a database transaction. I chose not to have it fixed now, since a real fix means introducing Mongoose sessions across every controller that uses this pattern — bigger than one day's scope — but had it recorded as a known limitation rather than left undocumented.
+
+**A full final verification pass, run deliberately as its own step against the original plan's checklist, found one more thing worth knowing rather than "fixing."** Forcing genuine concurrent requests at the same post to test optimistic-concurrency handling, I noticed the delete path sometimes returned `404` instead of the expected `409` for a losing request. That turned out to be correct, not a bug — a request whose read happens after a competing delete has already committed correctly gets filtered out as "not found" before it ever reaches the version-conflict check. I had it explain why, rather than accept the first plausible-looking explanation.
+
+**I also had it audit the Swagger documentation for correctness, not just trust that adding decorators was enough.** After annotating every route, I had it fetch the actual generated OpenAPI document and diff that against real HTTP responses instead of eyeballing the source. That caught two real problems that would otherwise have shipped invisibly: a `null`-typed response field that crashed the server on boot with a circular-schema error, and a cookie-auth security scheme registered under the wrong internal name (`addCookieAuth` defaults to `'cookie'`, not the cookie's own name), which would have made Swagger UI's Authorize button silently non-functional for every protected route in the document.
 
 ## Where this leaves me
 
