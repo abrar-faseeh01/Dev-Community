@@ -1,6 +1,8 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import { IsNotEmpty, IsOptional, IsString, MaxLength, Validate } from 'class-validator';
 import { TitleOrBodyConstraint } from './title-or-body.validator';
+import { trimString } from './trim.transform';
 
 export class UpdatePostDto {
   // No standard-precedent "at least one of these" validator exists in
@@ -12,10 +14,12 @@ export class UpdatePostDto {
     description: 'At least one of title or body is required.',
     example: 'Why we switched to cursor pagination (updated)',
   })
+  @Transform(trimString)
   @Validate(TitleOrBodyConstraint)
   title?: string;
 
   @ApiPropertyOptional({ maxLength: 20000, example: 'Updated with benchmark numbers from production.' })
+  @Transform(trimString)
   @IsOptional()
   @IsString()
   @IsNotEmpty()
