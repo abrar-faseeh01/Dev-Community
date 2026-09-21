@@ -1,6 +1,8 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNotEmpty, IsOptional, IsString, MaxLength, Validate } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsNotEmpty, IsOptional, IsString, MaxLength, Validate, ValidateIf } from 'class-validator';
 import { TitleOrBodyConstraint } from './title-or-body.validator';
+import { trimString } from './trim.transform';
 
 export class UpdatePostDto {
   // No standard-precedent "at least one of these" validator exists in
@@ -12,11 +14,22 @@ export class UpdatePostDto {
     description: 'At least one of title or body is required.',
     example: 'Why we switched to cursor pagination (updated)',
   })
+  @Transform(trimString)
   @Validate(TitleOrBodyConstraint)
   title?: string;
 
   @ApiPropertyOptional({ maxLength: 20000, example: 'Updated with benchmark numbers from production.' })
-  @IsOptional()
+  // ValidateIf, not @IsOptional(): @IsOptional() skips validation for null as
+  // well as undefined, so `{"body": null}` passed every check here (and
+  // TitleOrBodyConstraint, which only asks whether body is undefined), then
+  // the service assigned null to a required field and Mongoose threw — a
+  // bare 500. This skips validation only when body is genuinely absent (a
+  // partial update that leaves body alone), so an explicit null gets the same
+  // "body should not be empty" / "body must be a string" 400 as any other
+  // bad value. title needs no equivalent: it has no @IsOptional(), and
+  // TitleOrBodyConstraint already rejects a null title.
+  @Transform(trimString)
+  @ValidateIf((dto: UpdatePostDto) => dto.body !== undefined)
   @IsString()
   @IsNotEmpty()
   @MaxLength(20000)

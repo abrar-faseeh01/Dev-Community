@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsInt, IsMongoId, IsOptional, IsString, Max, Min } from 'class-validator';
 
 export class ListPostsDto {
   // No default/max is decided anywhere in plan.md or spec.md — 10/50
@@ -26,4 +26,12 @@ export class ListPostsDto {
   @IsOptional()
   @IsString()
   cursor?: string;
+
+  @ApiPropertyOptional({
+    description: 'Only list posts written by this user. Same ordering, paging and soft-delete rules as the unfiltered feed.',
+    example: '64f1c2e5a1b2c3d4e5f6a7b8',
+  })
+  @IsOptional()
+  @IsMongoId()
+  authorId?: string;
 }

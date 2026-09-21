@@ -133,8 +133,16 @@ export class PostsService {
   async list(
     limit: number,
     cursor?: string,
+    authorId?: string,
   ): Promise<{ items: PostWithAuthor[]; nextCursor: string | null }> {
     const filter: Record<string, unknown> = { deletedAt: null };
+
+    // Optional per-author listing ("posts made by you"). Same _id ordering
+    // and cursor, just narrowed to one author; the DTO has already
+    // validated it as an ObjectId.
+    if (authorId) {
+      filter.authorId = new Types.ObjectId(authorId);
+    }
 
     if (cursor) {
       filter._id = { $lt: this.decodeCursor(cursor) };

@@ -1,0 +1,17 @@
+export const ROUTES = {
+  HOME: "/",
+  LOGIN: "/login",
+  SIGNUP: "/signup",
+  SETTINGS: "/settings",
+  POSTS: "/posts",
+  POSTS_CREATE: "/posts/create",
+  POSTS_MINE: "/posts/mine",
+  PROFILE_EDIT: "/profile/edit",
+  ADMIN_USERS: "/admin/users",
+  ADMIN_AUDIT_LOG: "/admin/audit-log",
+  post: (id: string) => `/posts/${id}`,
+  postEdit: (id: string) => `/posts/${id}/edit`,
+  profile: (id: string) => `/profile/${id}`,
+  profileEdit: (id: string) => `/profile/edit/${id}`,
+  profileEditExperience: (id: string) => `/profile/edit/${id}/experience`,
+} as const;

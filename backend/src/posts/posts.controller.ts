@@ -27,6 +27,7 @@ import {
 import { AuditService } from '../audit/audit.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Public } from '../auth/decorators/public.decorator';
+import { Roles } from '../auth/decorators/roles.decorator';
 import {
   assertOwnerOrAdmin,
   isAdminOverride,
@@ -55,6 +56,10 @@ const CONFLICT = {
   type: ErrorResponseDto,
 };
 const UNAUTHORIZED = { description: 'Missing, invalid, or expired session cookie.', type: ErrorResponseDto };
+const ADMIN_CANNOT_CREATE = {
+  description: 'Administrator accounts cannot create posts (role check: only the `user` role may). Admins can still edit or delete any post.',
+  type: ErrorResponseDto,
+};
 
 @ApiTags('posts')
 @Controller('posts')
@@ -68,12 +73,24 @@ export class PostsController {
   // No @Public() — protected by the global JwtAuthGuard default. The
   // creator is trivially the author, so there's no ownership branching
   // here the way there is on update/delete.
+  //
+  // @Roles('user'): admins moderate posts (edit/delete any of them) but do
+  // not author them, so the rule lives here in the API rather than only in
+  // the UI hiding the button. The global RolesGuard rejects an admin with a
+  // 403 before the body is even validated. The role is re-read from the
+  // database on every request (JwtStrategy.validate), so this applies
+  // immediately even to a cookie issued before someone was promoted.
   @Post()
+  @Roles('user')
   @HttpCode(201)
   @ApiCookieAuth('access_token')
-  @ApiOperation({ summary: 'Create a post', description: 'The author is always the authenticated caller — never client-supplied.' })
+  @ApiOperation({
+    summary: 'Create a post',
+    description: 'Regular (`user`-role) accounts only. The author is always the authenticated caller — never client-supplied. Administrators get 403: they can moderate any post but cannot create one.',
+  })
   @ApiCreatedResponse({ type: PostResponseDto })
   @ApiUnauthorizedResponse(UNAUTHORIZED)
+  @ApiForbiddenResponse(ADMIN_CANNOT_CREATE)
   async create(
     @CurrentUser() requester: RequestUser,
     @Body() dto: CreatePostDto,
@@ -98,11 +115,13 @@ export class PostsController {
     type: PostListResponseDto,
     description: 'Requesting past the last page returns { items: [], nextCursor: null } rather than an error.',
   })
-  @ApiBadRequestResponse({ description: 'Malformed cursor (bad encoding or not a valid post id).', type: ErrorResponseDto })
+  @ApiQuery({ name: 'authorId', required: false, description: 'Only posts written by this user (a valid user id). Used for the "posts made by you" page.' })
+  @ApiBadRequestResponse({ description: 'Malformed cursor (bad encoding or not a valid post id), or a malformed authorId.', type: ErrorResponseDto })
   async list(@Query() dto: ListPostsDto) {
     const { items, nextCursor } = await this.postsService.list(
       dto.limit,
       dto.cursor,
+      dto.authorId,
     );
     return { items: items.map((post) => this.toPostResponse(post)), nextCursor };
   }
