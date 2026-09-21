@@ -1,8 +1,7 @@
-@"
 Agentic Engineering Intern Assignement.md
 Agentic Engineering Intern Task - 20-Day Phase Plan.md
+Frontend Architecture & Folder Structure.md
 CLAUDE.md
 PROJECT_REPORT.md
 docs/
 design/
-"@ | Out-File -FilePath .gitignore -Encoding utf8NoBOM
