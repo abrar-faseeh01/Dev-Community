@@ -115,11 +115,13 @@ export class PostsController {
     type: PostListResponseDto,
     description: 'Requesting past the last page returns { items: [], nextCursor: null } rather than an error.',
   })
-  @ApiBadRequestResponse({ description: 'Malformed cursor (bad encoding or not a valid post id).', type: ErrorResponseDto })
+  @ApiQuery({ name: 'authorId', required: false, description: 'Only posts written by this user (a valid user id). Used for the "posts made by you" page.' })
+  @ApiBadRequestResponse({ description: 'Malformed cursor (bad encoding or not a valid post id), or a malformed authorId.', type: ErrorResponseDto })
   async list(@Query() dto: ListPostsDto) {
     const { items, nextCursor } = await this.postsService.list(
       dto.limit,
       dto.cursor,
+      dto.authorId,
     );
     return { items: items.map((post) => this.toPostResponse(post)), nextCursor };
   }

@@ -48,3 +48,9 @@ PostSchema.index({ deletedAt: 1, _id: -1 });
 // Per-author query: filter authorId, sort createdAt desc. Also serves any
 // authorId-only equality lookup via its leftmost prefix.
 PostSchema.index({ authorId: 1, createdAt: -1 });
+
+// One author's live posts, newest first, paged by an _id cursor — the
+// GET /posts?authorId= query. The {authorId, createdAt} index above can't
+// serve an _id sort (it would fetch and sort all of that author's posts),
+// so this one puts _id last, the same shape as the feed index.
+PostSchema.index({ authorId: 1, deletedAt: 1, _id: -1 });
