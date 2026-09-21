@@ -1,7 +1,9 @@
 "use client";
 import { apiFetch } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth/auth-context";
+import { formatRelativeTime } from "@/lib/format-time";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 type NotificationItem = {
@@ -37,26 +39,14 @@ function BellIcon() {
   );
 }
 
-function formatRelativeTime(iso: string): string {
-  const diffSec = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
-  if (diffSec < 60) return "just now";
-  const diffMin = Math.round(diffSec / 60);
-  if (diffMin < 60) return `${diffMin}m ago`;
-  const diffHour = Math.round(diffMin / 60);
-  if (diffHour < 24) return `${diffHour}h ago`;
-  const diffDay = Math.round(diffHour / 24);
-  if (diffDay < 7) return `${diffDay}d ago`;
-  return new Date(iso).toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
-
 export function Header() {
   const { user, loading, logout } = useAuth();
+  const pathname = usePathname();
+  // The feed and every post page (/posts, /posts/<id>, /posts/create, ...).
+  const onFeed = pathname === "/posts" || pathname.startsWith("/posts/");
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
 
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[] | null>(
@@ -66,6 +56,7 @@ export function Header() {
   const [notifError, setNotifError] = useState("");
   const [unreadCount, setUnreadCount] = useState(0);
   const notifRef = useRef<HTMLDivElement>(null);
+  const notifButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -75,8 +66,14 @@ export function Header() {
         setMenuOpen(false);
       }
     }
+    // A closed panel is visibility:hidden, which drops focus from anything
+    // inside it — so Escape hands focus back to the button that opened the
+    // panel, the standard behavior for a menu, instead of leaving it lost.
     function handleEscape(e: KeyboardEvent) {
-      if (e.key === "Escape") setMenuOpen(false);
+      if (e.key === "Escape") {
+        setMenuOpen(false);
+        menuButtonRef.current?.focus();
+      }
     }
 
     document.addEventListener("mousedown", handleClickOutside);
@@ -96,7 +93,10 @@ export function Header() {
       }
     }
     function handleEscape(e: KeyboardEvent) {
-      if (e.key === "Escape") setNotifOpen(false);
+      if (e.key === "Escape") {
+        setNotifOpen(false);
+        notifButtonRef.current?.focus();
+      }
     }
 
     document.addEventListener("mousedown", handleClickOutside);
@@ -197,14 +197,35 @@ export function Header() {
         </Link>
 
         <nav className="flex items-center gap-2 text-sm">
+          {/* Posts are public, so this shows for everyone — including while
+              the session is still loading and for logged-out visitors. */}
+          <Link
+            href="/posts"
+            aria-current={onFeed ? "page" : undefined}
+            className={`rounded-lg px-3 py-2 font-medium transition-colors hover:bg-background ${
+              onFeed ? "text-foreground" : "text-muted hover:text-foreground"
+            }`}
+          >
+            Feed
+          </Link>
+
           {loading ? null : user ? (
             <>
-              <div className="relative" ref={notifRef}>
+              {/* `sm:relative`, not `relative`: below the sm breakpoint the
+                  notifications panel anchors to the header instead of to the
+                  bell (see the panel's classes below). */}
+              <div className="sm:relative" ref={notifRef}>
+                {/* A disclosure, not a menu: the button reveals a panel of
+                    content (a heading and a list of notifications). There are
+                    no menu items in it, so role="menu"/aria-haspopup="menu"
+                    was wrong. It isn't a dialog either — focus doesn't move
+                    into the panel on open, which role="dialog" would imply. */}
                 <button
+                  ref={notifButtonRef}
                   type="button"
                   onClick={() => setNotifOpen((open) => !open)}
-                  aria-haspopup="menu"
                   aria-expanded={notifOpen}
+                  aria-controls="notifications-panel"
                   aria-label="Notifications"
                   className="relative flex h-9 w-9 items-center justify-center rounded-full text-muted transition-colors hover:bg-background hover:text-foreground focus:outline-none focus:ring-2 focus:ring-accent/30"
                 >
@@ -216,12 +237,27 @@ export function Header() {
                   )}
                 </button>
 
+                {/* `invisible` (visibility:hidden) while closed, not just
+                    faded out: opacity/pointer-events leave the panel in the
+                    tab order and the accessibility tree, so keyboard and
+                    screen-reader users met invisible content. Visibility is
+                    animatable here (transition-all), so the fade-out still
+                    plays before it flips to hidden.
+
+                    Position: from the sm breakpoint up it hangs off the bell
+                    (right-0, 20rem wide). Below it, the bell isn't at the
+                    right edge of the header (the avatar sits beside it), so a
+                    20rem panel right-aligned to the bell ran off the left of
+                    the screen — 60px at 320px wide. There the wrapper isn't
+                    `relative`, so the panel anchors to the (sticky) header
+                    instead: 0.5rem in from its right edge, and no wider than
+                    the viewport minus a 0.5rem margin either side. */}
                 <div
-                  role="menu"
-                  className={`absolute right-0 top-[calc(100%+0.5rem)] w-80 origin-top-right overflow-hidden rounded-xl border border-border bg-surface shadow-lg transition-all duration-150 ease-out ${
+                  id="notifications-panel"
+                  className={`absolute right-2 top-[calc(100%+0.5rem)] w-[min(20rem,calc(100vw-1rem))] origin-top-right overflow-hidden rounded-xl border border-border bg-surface shadow-lg transition-all duration-150 ease-out sm:right-0 sm:w-80 ${
                     notifOpen
-                      ? "pointer-events-auto scale-100 opacity-100"
-                      : "pointer-events-none scale-95 opacity-0"
+                      ? "visible scale-100 opacity-100"
+                      : "invisible scale-95 opacity-0"
                   }`}
                 >
                   <div className="border-b border-border px-4 py-3">
@@ -291,22 +327,28 @@ export function Header() {
 
               <div className="relative" ref={menuRef}>
                 <button
+                  ref={menuButtonRef}
                   type="button"
                   onClick={() => setMenuOpen((open) => !open)}
                   aria-haspopup="menu"
                   aria-expanded={menuOpen}
+                  aria-controls="account-menu"
                   aria-label="Account menu"
                   className="flex h-9 w-9 items-center justify-center rounded-full bg-accent text-sm font-bold text-accent-foreground transition-shadow hover:shadow-md focus:outline-none focus:ring-2 focus:ring-accent/30"
                 >
                   {initial}
                 </button>
 
+                {/* This one really is a menu (role="menuitem" links), so its
+                    role stays. Same closed-state fix as the notifications
+                    panel above. */}
                 <div
+                  id="account-menu"
                   role="menu"
                   className={`absolute right-0 top-[calc(100%+0.5rem)] w-64 origin-top-right overflow-hidden rounded-xl border border-border bg-surface shadow-lg transition-all duration-150 ease-out ${
                     menuOpen
-                      ? "pointer-events-auto scale-100 opacity-100"
-                      : "pointer-events-none scale-95 opacity-0"
+                      ? "visible scale-100 opacity-100"
+                      : "invisible scale-95 opacity-0"
                   }`}
                 >
                   <div className="border-b border-border px-4 py-3">

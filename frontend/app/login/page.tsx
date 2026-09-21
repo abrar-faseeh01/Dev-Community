@@ -31,7 +31,7 @@ export default function LoginPage() {
   const loginMutation = useMutation({
     mutationFn: (values: LoginFormValues) =>
       login(values.email, values.password),
-    onSuccess: () => router.push("/"),
+    onSuccess: () => router.push("/posts"),
   });
 
   function onSubmit(values: LoginFormValues) {

@@ -239,6 +239,25 @@ export default function ProfilePage() {
                     </div>
                   )}
                 </section>
+
+                {/* Only on your own profile, and only for accounts that can
+                    write posts. Managing them (edit / delete) happens on the
+                    page this opens. */}
+                {isOwn && user?.role === "user" && (
+                  <section>
+                    <div className="flex items-center justify-between gap-3">
+                      <h3 className="text-sm font-semibold text-foreground">
+                        Posts made by you
+                      </h3>
+                      <Link
+                        href="/posts/mine"
+                        className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground transition-colors hover:bg-accent/90"
+                      >
+                        View your posts
+                      </Link>
+                    </div>
+                  </section>
+                )}
               </div>
             </>
           )}

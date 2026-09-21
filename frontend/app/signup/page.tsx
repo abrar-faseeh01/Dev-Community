@@ -41,7 +41,7 @@ export default function SignupPage() {
   const signupMutation = useMutation({
     mutationFn: (values: SignupFormValues) =>
       signup(values.fullName.trim(), values.email, values.password),
-    onSuccess: () => router.push("/"),
+    onSuccess: () => router.push("/posts"),
   });
 
   function onSubmit(values: SignupFormValues) {
