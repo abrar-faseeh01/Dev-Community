@@ -1,6 +1,6 @@
 # Developer Community Platform
 
-I'm building a Developer Community Platform where members can authenticate, maintain a developer profile, publish posts, and (eventually) comment, react, search, and browse ranked content. This repo covers the platform through Day 7 of my 20-day build plan: project foundations, authentication with role-based access, a full developer profile API and form, and a Posts API with ownership, pagination, and admin moderation.
+I'm building a Developer Community Platform where members can authenticate, maintain a developer profile, publish posts, and (eventually) comment, react, search, and browse ranked content. This repo covers the platform through Day 8 of my 20-day build plan: project foundations, authentication with role-based access, a full developer profile API and form, a Posts API with ownership, pagination, and admin moderation, and the posts UI (infinite-scroll feed, post page, create/edit form). After Day 8 I also restructured the frontend into a feature-first layout (see the Day 8 section under Progress).
 
 ## Stack
 
@@ -10,7 +10,7 @@ I'm building a Developer Community Platform where members can authenticate, main
 ## Project structure
 
 - `backend/` — NestJS API (`src/<feature>/` modules: `auth`, `users`, `profiles`, `posts`, `audit`, `notifications`, `health`; shared code in `src/common/`).
-- `frontend/` — Next.js app (`app/` routes, `components/`, `lib/`).
+- `frontend/` — Next.js app, all source under `frontend/src/`: `app/` (thin routes), `features/<name>/` (auth, posts, profile, users, audit, notifications, health), `services/api/` (the only code that calls the backend), `lib/`, `components/`, `hooks/`, `providers/`, `constants/`. The layout and data flow are described under Day 8 in Progress.
 - `docs/` — per-day spec and plan files, and a product requirements doc (local reference, not part of the public repo).
 - `PROJECT_REPORT.md` — a detailed architecture and decisions write-up of the system as it stands today.
 - `AI_USAGE.md` — how I used AI tooling on this project, and what I personally reviewed and caught.
@@ -97,7 +97,7 @@ Real `.env` files are gitignored in both apps. Use the committed example files a
 
 ## Authentication and roles
 
-- A JWT (`{sub, email, role}`) is issued on login and stored in an **httpOnly cookie** (`access_token`) — never in a client-readable form, and never sent as an `Authorization` header. The frontend just sends `credentials: "include"` on every request.
+- A JWT (`{sub, email, role}`) is issued on login and stored in an **httpOnly cookie** (`access_token`) — never in a client-readable form, and never sent as an `Authorization` header. The frontend's axios client sets `withCredentials: true`, so the browser attaches the cookie on every request.
 - Roles are `admin | user`. Every signup is hard-coded to `role: "user"` server-side — there's no field a client can send to self-promote.
 - Every route requires a valid session by default; only routes explicitly marked `@Public()` (signup, login, logout, health) skip that check.
 - `PATCH /auth/me` (change your own password, full name, or — admin-only — email) always re-verifies your current password before applying any change, and re-issues a fresh cookie on success.
@@ -144,8 +144,8 @@ An admin acting on someone else's profile through any of the write routes above 
 
 | Method & path | Access | Notes |
 |---|---|---|
-| `POST /posts` | Authenticated | Author is always the caller, never client-supplied |
-| `GET /posts` | Public | Cursor-paginated feed, newest first; `?limit=` (1-50, default 10) and `?cursor=` |
+| `POST /posts` | Regular members only | Author is always the caller, never client-supplied. An admin gets `403` — admins moderate but don't author |
+| `GET /posts` | Public | Cursor-paginated feed, newest first; `?limit=` (1-50, default 10), `?cursor=`, and optional `?authorId=` (one author's posts, used by "Posts made by you") |
 | `GET /posts/:id` | Public | A soft-deleted post 404s the same as a nonexistent one |
 | `PATCH /posts/:id` | Owner or admin | Partial update — at least one of `title`/`body` required |
 | `DELETE /posts/:id` | Owner or admin | Soft delete (`deletedAt`) — excluded from every read path afterward, never hard-deleted |
@@ -180,7 +180,7 @@ Beyond the base member experience, an admin can:
 
 - List every user and delete a non-admin account (`/admin/users` page).
 - Edit any member's skills, experiences, headline, bio, and portfolio projects, and rename any non-admin member (`/profile/edit/[id]` page), with an optional reason recorded on each action.
-- Edit or soft-delete any member's post via the API (`PATCH`/`DELETE /posts/:id`), with an optional reason recorded on each action — no dedicated admin UI for this yet, only the API.
+- Edit or soft-delete any member's post from the post page, through the same edit form and delete dialog a member uses (marked "as admin", with an optional reason recorded on each action). There's no separate admin panel for posts.
 - Review a full, append-only audit trail of every override action taken by any admin, with expandable before/after detail (`/admin/audit-log` page).
 
 Every admin-override action creates one audit-log entry (who, what changed, before/after state, optional reason) and one in-app notification for the affected member.
@@ -191,10 +191,12 @@ Every admin-override action creates one audit-log entry (who, what changed, befo
 - No in-app way to promote a user to admin — the only path is the one-time `seed:admin` script or a direct database edit.
 - No pagination on the admin user list, the audit log, or the notification list.
 - No email verification on signup and no password-reset flow.
-- Notifications are polled (every 45 seconds while the app is open), not pushed in real time.
-- The admin audit-log page's action labels don't yet cover the three newest actions (`update_headline`, `update_bio`, `update_portfolio_projects`) — it falls back to showing the raw action name for those instead of a friendly label.
+- Notifications are polled (every 45 seconds while the app is open and the tab is visible), not pushed in real time.
 - No search or filtering on the admin user list or profile viewing — the full list is returned and any narrowing happens client-side, if at all.
-- No frontend UI for posts yet beyond a placeholder "coming soon" create-post page — the Posts API (Day 7) is backend-only until Day 8 builds the feed, post details, and create/edit UI.
+- The posts list response carries every post's full `body` (there's no excerpt field), so a page of long posts is a large response; the feed cards only truncate visually.
+- The feed has no search, filtering, or alternative sort yet (Day 14), and post cards don't show like/dislike/comment counts — those are always 0 until Days 9 and 11, so showing them would imply features that don't exist.
+- There's no frontend test runner yet (Jest and React Testing Library arrive on Day 17); frontend changes are verified with `npm run lint`, `npx tsc --noEmit`, `npm run build`, and manual testing against the running app.
+- `frontend/src/middleware.ts` still uses Next.js 16's deprecated `middleware` name (the current name is `proxy`); it works, and the rename is deliberately left as its own change.
 - Soft-deleted posts are retained in the database indefinitely — there's no scheduled purge (TTL index or cron job) that hard-deletes them after any retention period, and no restore path either.
 - Admin-override actions (profile edits, post edits/deletes) aren't wrapped in a database transaction — if the audit-log/notification write fails after the underlying change already saved, the change persists with no audit trail. Not yet hit in practice; the guard that does fire (optimistic concurrency on a genuine conflicting edit) correctly returns `409`, not `500`.
 - No structured server-side logging for unexpected (non-`HttpException`) errors — the global exception filter returns a generic 500 to the client without logging the real error anywhere, which would make a genuine production bug hard to diagnose from logs alone.
@@ -248,3 +250,56 @@ Every admin-override action creates one audit-log entry (who, what changed, befo
 - `PATCH`/`DELETE /posts/:id` reuse the existing owner-or-admin authorization pattern, extended so an admin editing or deleting someone else's post is audit-logged (the audit entry identifies the specific post, not just the author) and the author is notified — the same `recordAdminOverride` helper now used by profiles, users, and posts.
 - Verified against a real MongoDB Atlas database throughout: forced genuine optimistic-concurrency conflicts via concurrent requests (confirmed `409`, never `500`), traced actual queries to confirm the list endpoint doesn't do N+1 author lookups (one batched query regardless of page size), and confirmed list/detail responses never expose `passwordHash` or `email` on the author.
 - Added full Swagger/OpenAPI documentation across every existing module (auth, users, profiles, posts, audit, notifications) — not just health, which was all that existed before — including a cookie-based auth scheme matching this app's actual httpOnly-cookie transport.
+
+### Day 8 — Feed and reusable post interface
+
+- Built the posts UI: a public feed (`/posts`), a public post page (`/posts/[id]`), create (`/posts/create`), edit (`/posts/[id]/edit`), and "Posts made by you" (`/posts/mine`, reached from your own profile). The middleware protects only the three write pages, so anyone can browse and read; sign-in and sign-up now land on the feed.
+- The feed loads with `useInfiniteQuery`, using the API's `nextCursor` as the next page param. An `IntersectionObserver` sentinel (400px margin) requests the next page before the reader reaches the bottom. Auto-loading runs only when there is a next page, nothing is already in flight, and the last next-page request didn't fail — after a failure the reader gets a "Try again" button instead of a retry loop. The feed shows distinct skeleton, empty, error-with-retry, next-page loading, next-page error, and end-of-list states.
+- One `PostForm` (React Hook Form + Zod, mirroring the API's limits: trimmed title 1-200, body 1-20000) serves both create and edit, with character counters and a submit button locked while the request is in flight. Edit sends only the fields that changed, offers "Reload post" on a `409` conflict, and treats a `404` as "post is gone".
+- After a create, edit, or delete, the feed, the post's detail entry, and the author's "mine" list are updated in the TanStack Query cache directly (new post prepended, edited post patched in place, deleted post removed) instead of refetching everything.
+- One helper, `getPostActor`, decides who sees Edit and Delete (post owner, admin acting on someone else's post, or nobody), so the post page, the "mine" list, the edit page, and the delete flow can't disagree. Admins moderate through the same edit form and delete dialog, marked "as admin", with an optional reason that feeds the existing audit log and author notification. The feed cards carry no edit/delete controls.
+- Admins can't create posts: the API now returns `403` for an admin's `POST /posts`, instead of the UI merely hiding the button.
+- Supporting backend changes: `GET /posts` accepts an optional `authorId` filter (backed by a new `{authorId, deletedAt, _id}` index, so one author's page is an index scan), post title/body are trimmed before validation so whitespace-only input returns `400`, and an explicit `null` body on update is rejected.
+- Verified with `npm run lint`, `npx tsc --noEmit`, `npm run build`, and manual testing against the running app.
+
+#### Frontend restructure (after Day 8)
+
+Once the posts UI was in, I reorganized the whole frontend from a flat `app/`, `lib/`, `components/` layout into a feature-first structure under `frontend/src/`. It changes no URLs, screens, or backend calls — it only changes where code lives and how data moves through it.
+
+**Data flow.** A page never fetches data:
+
+```
+page (app/…/page.tsx)                        which URL renders what — 8-12 lines
+  → feature component (features/x/components)   the screen
+  → query / mutation hook (features/x/queries, mutations)   reads or writes data and keeps the cache correct
+  → service (services/api/x.ts)                 which backend endpoint to call
+  → axios client (lib/axios)                    cookies, error handling
+  → backend
+```
+
+**Layout.**
+
+```
+frontend/src/
+├── app/                routes only (login and signup sit in an (auth) route group)
+├── features/           auth, posts, profile, users, audit, notifications, health
+│   └── <name>/         components/ queries/ mutations/ schemas/ types/ utils/ (each created only when needed)
+├── services/api/       one file per backend resource — the only code that calls the API
+├── lib/                axios/ (client, interceptors, ApiError), tanstack/ (query client), utils/
+├── components/         layout/ (header, user menu), common/ (confirm dialog), forms/ (password input)
+├── hooks/              generic hooks (infinite scroll, dismiss-on-outside-click)
+├── providers/  constants/ (routes, config)  types/  styles/  middleware.ts
+```
+
+**Decisions worth knowing.**
+
+- The current user lives in the TanStack Query cache (`useAuth()` returns `{user, loading}`); login, signup, logout, and settings update it directly. There is no separate auth context provider.
+- The axios interceptor turns every failure into an `ApiError` (message, per-field errors, HTTP status) and redirects to `/login` on a `401`, except for requests that set `skipAuthRedirect` (`/auth/me`, `/auth/login`, `/auth/signup`, where a `401` is expected). The exemption is a flag on the request rather than a URL list inside the interceptor.
+- Forms use React Hook Form with Zod schemas kept in `features/<name>/schemas/`, and form types come from the schema. The settings form moved from plain state to this pattern, so its errors now appear inline instead of as browser pop-ups.
+- Every route is referenced through `constants/routes.ts` instead of typed as a string.
+- An ESLint rule fails the lint if a page or component imports `axios` or anything under `services/`, so the data flow above can't quietly erode.
+- Two behavior notes: the unread-notification badge now stops polling while the browser tab is hidden, and the admin user list and audit log still refetch on every visit.
+
+**Verification.** `npx tsc --noEmit`, `npm run lint` (0 errors, 0 warnings), and `npm run build` all pass, and the ESLint rule was checked against a deliberate violation. I then walked through login, signup, settings, the posts flows, profile and experience editing, notifications, and the admin pages by hand.
+
+**Adding new code.** A new feature gets its own `features/<name>/` folder plus a `services/api/<name>.ts` file; its routes are added to `constants/routes.ts`. Something is moved into a shared folder only once a second feature needs it.
