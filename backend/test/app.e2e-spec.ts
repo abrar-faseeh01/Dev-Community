@@ -1,29 +1,24 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import { App } from 'supertest/types';
-import { AppModule } from './../src/app.module';
+import { createE2eApp, describeE2e } from './helpers/e2e-app';
 
-describe('AppController (e2e)', () => {
-  let app: INestApplication<App>;
+describeE2e('AppController (e2e)', () => {
+  let app: INestApplication;
 
-  beforeEach(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
-
-    app = moduleFixture.createNestApplication();
-    await app.init();
+  beforeAll(async () => {
+    app = await createE2eApp();
   });
 
+  afterAll(async () => {
+    await app?.close();
+  });
+
+  // The greeting comes back inside the response envelope, because the app is
+  // built with the same global setup as production.
   it('/ (GET)', () => {
     return request(app.getHttpServer())
       .get('/')
       .expect(200)
-      .expect('Hello World!');
-  });
-
-  afterEach(async () => {
-    await app.close();
+      .expect({ success: true, data: 'Hello World!' });
   });
 });
