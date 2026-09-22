@@ -143,6 +143,18 @@ After Day 8 I had the whole frontend moved to a feature-first structure. This wa
 
 **Verification was deliberately proportionate.** `tsc`, lint (0 errors, 0 warnings), and a production build after each group of changes, plus one manual walk-through of the flows the change could have affected — not a large ad-hoc test suite, since there's no frontend test runner until Day 17.
 
+### Day 9 — Threaded comments API
+
+I kept the same plan-first, checkpointed process, splitting the work into small steps (harness, then one comment feature at a time, then the post-delete cascade, then editing) and stopping for my go-ahead between each one.
+
+**Planning the harness surfaced a real, unrelated bug before any comment code existed.** While reading the actual current files to plan Day 9 (not trusting an older summary), I found that `UsersService.deleteUser` does a hard delete, and posts by a deleted user crashed `GET /posts` with a bare 500 — a real Day 7/8 defect, not something Day 9 introduced. I had it reproduce all four affected requests (the feed, the detail route, an admin edit, an admin delete) before writing any fix, confirmed the fix against those same four requests afterward, and had it recorded as an incidental fix in `docs/plan/day-07/plan.md` rather than silently folded into Day 9's own work.
+
+**A concurrency claim I accepted turned out to be wrong, and the evidence corrected it, not my assumption about the code.** For the cascade delete (removing a comment and every reply beneath it in one operation), I had it run six simultaneous delete requests against the same comment four times in a row, all landing on "exactly one request succeeds, the other five get 404" — and I accepted that as the guarantee. During a later, unrelated check it failed once. Rather than dismiss that as a flake, I had it measure the real behavior directly: forcing the same six-way race together twenty-five times showed that MongoDB's `updateMany` is atomic per document, not across the whole call, so two overlapping deletes can each flip *part* of the same subtree — eighteen clean single winners and seven split outcomes out of twenty-five. What never broke was the actual guarantee that matters: every row is flipped exactly once, so the counter always ends up exactly right. I had the original test rewritten to assert that real guarantee instead of the false stronger one, and the incorrect claim removed from the plan before it could pass as tested.
+
+**Two library-level gotchas were caught by actually running the code, not by reading it.** Mongoose 9 throws on a pipeline-style update unless `updatePipeline: true` is set explicitly — the counter's clamp logic failed the first time it ran for real, not in review. Separately, `findOneAndUpdate`'s `new: true` option is deprecated in favor of `returnDocument: 'after'`; I only noticed because the deprecation warning showed up in a real test run's output, and had it changed everywhere the pattern was used.
+
+**Adding comment editing exposed test debt from earlier in the same day, and it got fixed rather than left inconsistent.** Comments originally had no `updatedAt` at all, by design, since nothing could edit them. Once editing was added and that changed, three existing tests from earlier in the day still asserted the *old* behavior (that no `updatedAt` existed, or that a specific field list excluded it) — assertions that were correct when written and wrong the moment the schema changed under them. I had these found and corrected as part of the same change that introduced editing, rather than left as silently-stale coverage that happened to keep passing for the wrong reason.
+
 ## Where this leaves me
 
 Nothing here shipped because it "looked right" on the first pass. Every

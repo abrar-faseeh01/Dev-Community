@@ -1,6 +1,6 @@
 # Developer Community Platform
 
-I'm building a Developer Community Platform where members can authenticate, maintain a developer profile, publish posts, and (eventually) comment, react, search, and browse ranked content. This repo covers the platform through Day 8 of my 20-day build plan: project foundations, authentication with role-based access, a full developer profile API and form, a Posts API with ownership, pagination, and admin moderation, and the posts UI (infinite-scroll feed, post page, create/edit form). After Day 8 I also restructured the frontend into a feature-first layout (see the Day 8 section under Progress).
+I'm building a Developer Community Platform where members can authenticate, maintain a developer profile, publish posts, comment (threaded, with replies), and (eventually) react, search, and browse ranked content. This repo covers the platform through Day 9 of my 20-day build plan: project foundations, authentication with role-based access, a full developer profile API and form, a Posts API with ownership, pagination, and admin moderation, the posts UI (infinite-scroll feed, post page, create/edit form), and a threaded comments API (create, reply, list as a tree, cascade delete, and edit). After Day 8 I also restructured the frontend into a feature-first layout (see the Day 8 section under Progress). Day 9 is backend-only per the plan — the comments UI is Day 10.
 
 ## Stack
 
@@ -152,6 +152,17 @@ An admin acting on someone else's profile through any of the write routes above 
 
 The list response shape is `{items, nextCursor}` — pass the previous response's `nextCursor` as `?cursor=` to get the next page; `nextCursor: null` means there are no more posts. Every write on `PATCH`/`DELETE` uses optimistic concurrency: a genuine conflicting concurrent edit returns `409`, never a silent overwrite. An admin editing or deleting someone else's post is audit-logged (identifying the specific post, not just the author) and the author is notified; a self-edit or self-delete produces neither.
 
+### Comments (`/posts/:postId/comments`, `/comments/:id`)
+
+| Method & path | Access | Notes |
+|---|---|---|
+| `POST /posts/:postId/comments` | Regular members only | Creates a top-level comment, or a reply when `parentCommentId` is given. A reply is accepted at any depth — there's no creation-time limit on how many times people can reply to each other |
+| `GET /posts/:postId/comments` | Public | The whole tree for the post: top-level comments newest-first, each with its full reply thread (oldest-first) nested up to 2 levels; anything deeper still appears, flattened under its thread's root, keeping its real `parentCommentId` |
+| `DELETE /comments/:id` | Comment author, the post's author, or an admin | Cascade: deletes the comment and every reply beneath it in one operation. An admin deleting someone else's comment is audit-logged and the author is notified; a post's own author removing someone else's comment is not |
+| `PATCH /comments/:id` | Comment author only | Edits the body. No admin or post-owner override, unlike delete — nobody else may rewrite someone's words. Returns `{id, body, updatedAt}`, not the full comment |
+
+Comments never expose the internal `ancestorIds` path or `deletedAt`. `Post.commentCount` is kept accurate through create and delete, including under concurrent requests. Deleting a post soft-deletes all of its own comments too.
+
 ### Users / admin (`/users`)
 
 | Method & path | Access | Notes |
@@ -194,12 +205,20 @@ Every admin-override action creates one audit-log entry (who, what changed, befo
 - Notifications are polled (every 45 seconds while the app is open and the tab is visible), not pushed in real time.
 - No search or filtering on the admin user list or profile viewing — the full list is returned and any narrowing happens client-side, if at all.
 - The posts list response carries every post's full `body` (there's no excerpt field), so a page of long posts is a large response; the feed cards only truncate visually.
-- The feed has no search, filtering, or alternative sort yet (Day 14), and post cards don't show like/dislike/comment counts — those are always 0 until Days 9 and 11, so showing them would imply features that don't exist.
+- The feed has no search, filtering, or alternative sort yet (Day 14), and post cards don't show like/dislike/comment counts yet — `likeCount`/`dislikeCount` stay 0 until Day 11's reactions; `commentCount` has been accurate since Day 9, but there's no comments UI to show it against until Day 10, so it stays unrendered for now too.
 - There's no frontend test runner yet (Jest and React Testing Library arrive on Day 17); frontend changes are verified with `npm run lint`, `npx tsc --noEmit`, `npm run build`, and manual testing against the running app.
 - `frontend/src/middleware.ts` still uses Next.js 16's deprecated `middleware` name (the current name is `proxy`); it works, and the rename is deliberately left as its own change.
 - Soft-deleted posts are retained in the database indefinitely — there's no scheduled purge (TTL index or cron job) that hard-deletes them after any retention period, and no restore path either.
 - Admin-override actions (profile edits, post edits/deletes) aren't wrapped in a database transaction — if the audit-log/notification write fails after the underlying change already saved, the change persists with no audit trail. Not yet hit in practice; the guard that does fire (optimistic concurrency on a genuine conflicting edit) correctly returns `409`, not `500`.
 - No structured server-side logging for unexpected (non-`HttpException`) errors — the global exception filter returns a generic 500 to the client without logging the real error anywhere, which would make a genuine production bug hard to diagnose from logs alone.
+- `GET /posts/:postId/comments` returns the whole tree with no pagination, so the response is unbounded on a very active post.
+- Editing a comment keeps no history — only the current body is stored, and the "edited" signal is just `createdAt` differing from `updatedAt`.
+- A reply created at the exact instant a concurrent delete cascades past it can end up live under a deleted parent: invisible in the tree but still counted, so `commentCount` can read one higher than what's shown. The count itself isn't wrong; fixing this fully needs multi-document transactions, which this backend doesn't have configured.
+- Two deletes of the same comment subtree that truly overlap can each return a partial `deletedCount`, though the total decrement to `commentCount` is always exact (measured by forcing six simultaneous deletes together 25 times).
+- When a post's own author removes someone else's comment, there's no audit entry and the comment's author isn't told — only an admin's removal is logged.
+- No notification yet when someone comments or replies on a post.
+- No rate limiting on comment routes yet (planned for the security-hardening day).
+- Deleting a user account doesn't yet remove or reassign their comments — they still show up, with the author shown as "Deleted user".
 
 ## Progress
 
@@ -303,3 +322,14 @@ frontend/src/
 **Verification.** `npx tsc --noEmit`, `npm run lint` (0 errors, 0 warnings), and `npm run build` all pass, and the ESLint rule was checked against a deliberate violation. I then walked through login, signup, settings, the posts flows, profile and experience editing, notifications, and the admin pages by hand.
 
 **Adding new code.** A new feature gets its own `features/<name>/` folder plus a `services/api/<name>.ts` file; its routes are added to `constants/routes.ts`. Something is moved into a shared folder only once a second feature needs it.
+
+### Day 9 — Threaded comments API
+
+- Added the `Comment` schema (`postId`, `authorId`, `parentCommentId` — explicitly `null` for a top-level comment, never absent — `ancestorIds` as a materialized path, `body`, `deletedAt`, full timestamps) and built `CommentsModule`: create a top-level comment or a reply, list a post's comments as a tree, cascade delete, and edit.
+- A reply is accepted at **any** depth — creating one is never rejected for how deep the thread already runs. What's bounded is the *returned tree*: it only ever nests 2 levels deep, and anything past that attaches, flattened, under its thread's depth-1 root instead of nesting further, in chronological order, while still carrying its true `parentCommentId`.
+- `DELETE /comments/:id` soft-deletes the comment and every reply beneath it in one atomic operation (matching on the target's id or its presence in a descendant's `ancestorIds`), not a "find then mark" two-step, so a reply created mid-delete can't slip through with a live parent. Allowed for the comment's author, the post's author, or an admin; only an admin's deletion of someone else's comment is audit-logged (`delete_comment`) and notified.
+- `Post.commentCount` is kept accurate through concurrent creates and deletes: an atomic `$inc` on create, a clamped decrement pipeline on delete (so a drifted count can never go negative), and a self-healing recount if either write fails. Verified by forcing bursts of ~20 concurrent creates and deletes, and by mutation-testing each safety rule (temporarily breaking it and confirming the test suite catches it, then reverting).
+- Deleting a post now cascades to soft-delete all of its own comments too, wired through `PostsModule` importing `CommentsModule` — a one-way dependency (`CommentsService` never imports `PostsService`), so no cycle forms.
+- `PATCH /comments/:id` edits a comment's body — the comment's own author only, no admin or post-owner override, unlike delete. No time limit on when a comment may be edited. `updatedAt` exists solely so a client can detect an edit (`updatedAt !== createdAt`); the value itself is never meant to be displayed.
+- Found and fixed an existing Day 7/8 bug while working on this: a post's read/edit/delete routes threw a bare 500 if the post's author account had been hard-deleted. A shared helper now returns `{id: null, fullName: "Deleted user"}` instead, used by both posts and comments; an admin acting on such an account is still audit-logged, just not notified (nobody to notify).
+- Built a committed Jest e2e suite (158 tests across 6 files) against the real database, with throwaway accounts cleaned up after every run, rather than one-off manual scripts.
