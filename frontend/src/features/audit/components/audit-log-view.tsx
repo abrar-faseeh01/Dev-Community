@@ -16,6 +16,7 @@ const ACTION_LABELS: Record<AuditLogEntry["action"], string> = {
   update_portfolio_projects: "Updated portfolio projects",
   update_post: "Updated post",
   delete_post: "Deleted post",
+  delete_comment: "Deleted comment",
   delete_user: "Deleted user",
 };
 

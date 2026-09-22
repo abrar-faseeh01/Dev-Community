@@ -15,6 +15,7 @@ export type AuditLogEntry = {
     | "update_portfolio_projects"
     | "update_post"
     | "delete_post"
+    | "delete_comment"
     | "delete_user";
   previousState: Record<string, unknown> | null;
   newState: Record<string, unknown> | null;

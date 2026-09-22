@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import {
@@ -10,23 +11,26 @@ import {
   Model,
   Types,
 } from 'mongoose';
+import { CommentsService } from '../comments/comments.service';
+import type { PopulatedAuthor } from '../users/author-summary';
 import { CreatePostDto } from './dto/create-post.dto';
 import { Post } from './schemas/post.schema';
 
-// The shape .populate('authorId', 'fullName headline') actually produces
-// at runtime — overrides Post.authorId's declared Types.ObjectId type for
-// callers that know they populated it.
-export type PopulatedAuthor = {
-  _id: Types.ObjectId;
-  fullName: string;
-  headline?: string;
-};
-
-export type PostWithAuthor = Post & { authorId: PopulatedAuthor };
+// authorId is null when the author's account has since been deleted.
+export type PostWithAuthor = Post & { authorId: PopulatedAuthor | null };
 
 @Injectable()
 export class PostsService {
-  constructor(@InjectModel(Post.name) private postModel: Model<Post>) {}
+  private readonly logger = new Logger(PostsService.name);
+
+  // The dependency between posts and comments runs one way: posts asks
+  // comments to clean up after it. CommentsService reads the Post model
+  // directly and never imports this service, so the two modules do not
+  // depend on each other.
+  constructor(
+    @InjectModel(Post.name) private postModel: Model<Post>,
+    private readonly commentsService: CommentsService,
+  ) {}
 
   // authorId comes from the authenticated requester only, never the DTO —
   // same principle as SignupDto never accepting a client-supplied role.
@@ -100,8 +104,32 @@ export class PostsService {
   async remove(post: Post): Promise<PostWithAuthor> {
     post.deletedAt = new Date();
     await this.saveOrThrowConflict(post);
+    // Only after the post's own delete has been saved: if that save loses to
+    // a concurrent edit (a 409), the post is still live and its comments
+    // must be left alone.
+    await this.removeCommentsOf(post);
     await post.populate('authorId', 'fullName headline');
     return post as unknown as PostWithAuthor;
+  }
+
+  // A deleted post takes its comments with it. The post's soft delete is the
+  // real event and has already been saved by the time this runs, so a failure
+  // here is logged and swallowed rather than turning a completed delete into
+  // an error. Nothing is exposed either way: comments are only ever read
+  // through their post, and a deleted post 404s, so any comment this misses is
+  // hidden, not visible. It is simply left live in the collection.
+  private async removeCommentsOf(post: Post): Promise<void> {
+    try {
+      await this.commentsService.removeAllForPost(
+        post._id as Types.ObjectId,
+        post.deletedAt as Date,
+      );
+    } catch (error) {
+      this.logger.error(
+        `comments of deleted post ${String(post._id)} could not be soft-deleted`,
+        error instanceof Error ? error.stack : String(error),
+      );
+    }
   }
 
   // optimisticConcurrency's guard throws a Mongoose VersionError when the

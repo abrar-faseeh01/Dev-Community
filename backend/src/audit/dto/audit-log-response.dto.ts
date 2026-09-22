@@ -32,6 +32,7 @@ export class AuditLogDto {
       'delete_user',
       'update_post',
       'delete_post',
+      'delete_comment',
     ],
     example: 'update_post',
   })
@@ -51,7 +52,7 @@ export class AuditLogDto {
     additionalProperties: true,
     nullable: true,
     example: { postId: '64f1c2e5a1b2c3d4e5f6a7c0', title: 'New title' },
-    description: 'null for delete actions.',
+    description: 'null for delete_user and delete_post. For delete_comment it is `{ deletedCount }` — how many comments the delete removed (the comment plus its replies).',
   })
   newState: Record<string, unknown> | null;
 
