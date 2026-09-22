@@ -7,7 +7,8 @@ type PostBylineProps = {
   post: Post;
   // Whether the author's name links to their profile. /profile/[id]
   // requires a login, so callers only turn this on for signed-in viewers;
-  // for an anonymous one it would just bounce to /login.
+  // for an anonymous one it would just bounce to /login. A deleted author
+  // (id null) has no profile, so the name is plain text either way.
   linkAuthor?: boolean;
 };
 
@@ -22,7 +23,7 @@ export function PostByline({ post, linkAuthor = false }: PostBylineProps) {
   return (
     <>
       <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-muted">
-        {linkAuthor ? (
+        {linkAuthor && author.id ? (
           <Link
             href={ROUTES.profile(author.id)}
             className="font-medium text-foreground hover:text-accent hover:underline"

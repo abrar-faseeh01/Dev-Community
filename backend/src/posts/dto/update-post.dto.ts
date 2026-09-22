@@ -1,8 +1,8 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsNotEmpty, IsOptional, IsString, MaxLength, Validate, ValidateIf } from 'class-validator';
+import { trimString } from '../../common/dto/trim.transform';
 import { TitleOrBodyConstraint } from './title-or-body.validator';
-import { trimString } from './trim.transform';
 
 export class UpdatePostDto {
   // No standard-precedent "at least one of these" validator exists in

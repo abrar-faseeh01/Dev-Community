@@ -1,15 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-
-export class PostAuthorDto {
-  @ApiProperty({ example: '64f1c2e5a1b2c3d4e5f6a7b8' })
-  id: string;
-
-  @ApiProperty({ example: 'Ada Lovelace' })
-  fullName: string;
-
-  @ApiProperty({ required: false, example: 'Senior Backend Engineer @ Acme' })
-  headline?: string;
-}
+import { AuthorSummaryDto } from '../../users/dto/author-summary.dto';
 
 // The shape returned by create/list/detail/update — never the raw
 // document, so authorId (a bare ObjectId on the schema) never leaks
@@ -43,8 +33,8 @@ export class PostDto {
   @ApiProperty({ example: '2026-09-18T09:38:42.598Z' })
   updatedAt: Date;
 
-  @ApiProperty({ type: PostAuthorDto })
-  author: PostAuthorDto;
+  @ApiProperty({ type: AuthorSummaryDto })
+  author: AuthorSummaryDto;
 }
 
 export class PostResponseDto {

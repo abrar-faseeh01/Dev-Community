@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
-import { trimString } from './trim.transform';
+import { trimString } from '../../common/dto/trim.transform';
 
 export class CreatePostDto {
   @ApiProperty({ maxLength: 200, example: 'Why we switched to cursor pagination' })

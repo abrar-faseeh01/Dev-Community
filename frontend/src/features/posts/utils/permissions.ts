@@ -17,7 +17,8 @@ type Viewer = { id: string; role: "admin" | "user" } | null;
 // controls never flash before the session is known.
 export function getPostActor(
   viewer: Viewer,
-  post: { author: { id: string } },
+  // A deleted author has a null id, which never equals a viewer's id.
+  post: { author: { id: string | null } },
 ): PostActor | null {
   if (!viewer) return null;
   if (viewer.id === post.author.id) return "owner";

@@ -46,7 +46,10 @@ export async function recordAdminOverride(
     notificationsService: NotificationsService;
   },
   requester: RequestUser,
-  target: { id: string; fullName: string },
+  // `exists: false` means the target's account has been deleted: the audit
+  // entry is still written (with whatever name the caller supplies), but
+  // there is nobody to notify. Omitted means the account exists.
+  target: { id: string; fullName: string; exists?: boolean },
   action: AuditAction,
   previousState: Record<string, unknown> | null,
   newState: Record<string, unknown> | null,
@@ -66,6 +69,8 @@ export async function recordAdminOverride(
     newState,
     reason,
   });
+
+  if (target.exists === false) return;
 
   const notificationMessage = reason ? `${message} Reason: ${reason}` : message;
   await services.notificationsService.create(target.id, notificationMessage);

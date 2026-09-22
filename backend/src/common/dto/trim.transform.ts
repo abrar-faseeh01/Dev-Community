@@ -12,7 +12,8 @@ import type { TransformFnParams } from 'class-transformer';
 // so whitespace-only input gets the same "should not be empty" 400 as "" does,
 // and the length limits apply to the stored value rather than to padding.
 // Non-strings pass through untouched so @IsString() still reports them.
-// Relies on `transform: true` on the global ValidationPipe (main.ts).
+// Relies on `transform: true` on the global ValidationPipe (configure-app.ts).
+// Shared by every DTO with a free-text field (posts, comments).
 export function trimString({ value }: TransformFnParams): unknown {
   return typeof value === 'string' ? value.trim() : value;
 }

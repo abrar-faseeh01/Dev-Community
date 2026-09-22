@@ -2,11 +2,13 @@
 // (Mongoose Date -> JSON), not Date objects, same as features/profile/types/profile.ts.
 
 // The populated author is narrowed server-side to exactly these fields —
-// email and role are never returned.
+// email and role are never returned. When the author's account has been
+// deleted the API returns a placeholder of the same shape: id and headline
+// null, fullName "Deleted user".
 export type PostAuthor = {
-  id: string;
+  id: string | null;
   fullName: string;
-  headline?: string;
+  headline?: string | null;
 };
 
 export type Post = {

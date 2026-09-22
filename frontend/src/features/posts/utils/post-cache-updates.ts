@@ -22,10 +22,14 @@ export function applyPostCreated(queryClient: QueryClient, created: Post) {
   queryClient.setQueryData<FeedData>(postKeys.feed(), (feed) =>
     prependPostToFeed(feed, created),
   );
-  queryClient.setQueriesData<FeedData>(
-    { queryKey: postKeys.mine(created.author.id) },
-    (feed) => prependPostToFeed(feed, created),
-  );
+  // A post that was just created always has a real author (the signed-in
+  // user); the null check only narrows the type for the deleted-author case.
+  if (created.author.id) {
+    queryClient.setQueriesData<FeedData>(
+      { queryKey: postKeys.mine(created.author.id) },
+      (feed) => prependPostToFeed(feed, created),
+    );
+  }
   queryClient.invalidateQueries({ queryKey: postKeys.feed() });
   queryClient.invalidateQueries({ queryKey: postKeys.mineAll() });
 }

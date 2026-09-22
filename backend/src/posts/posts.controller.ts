@@ -38,6 +38,7 @@ import { ErrorResponseDto } from '../common/dto/error-response.dto';
 import { ReasonDto } from '../common/dto/reason.dto';
 import { ParseObjectIdPipe } from '../common/pipes/parse-object-id.pipe';
 import { NotificationsService } from '../notifications/notifications.service';
+import { toAuthorSummary, toOverrideTarget } from '../users/author-summary';
 import { CreatePostDto } from './dto/create-post.dto';
 import { ListPostsDto } from './dto/list-posts.dto';
 import {
@@ -186,7 +187,7 @@ export class PostsController {
       await recordAdminOverride(
         { auditService: this.auditService, notificationsService: this.notificationsService },
         requester,
-        { id: authorId, fullName: updated.authorId.fullName },
+        toOverrideTarget(authorId, updated.authorId),
         'update_post',
         { postId: String(post._id), title: previousTitle },
         { postId: String(post._id), title: updated.title },
@@ -209,7 +210,7 @@ export class PostsController {
   @ApiCookieAuth('access_token')
   @ApiOperation({
     summary: 'Delete a post (soft delete)',
-    description: 'Owner-or-admin. Sets deletedAt rather than removing the document — the post then 404s on every read route and never appears in the list. When an admin deletes someone else\'s post, it is audit-logged and the author is notified.',
+    description: 'Owner-or-admin. Sets deletedAt rather than removing the document — the post then 404s on every read route and never appears in the list. Its comments are soft-deleted along with it (their replies included), so they stop appearing in reads too. When an admin deletes someone else\'s post, it is audit-logged and the author is notified.',
   })
   @ApiParam(ID_PARAM)
   @ApiOkResponse({ type: DeletePostResponseDto })
@@ -237,7 +238,7 @@ export class PostsController {
       await recordAdminOverride(
         { auditService: this.auditService, notificationsService: this.notificationsService },
         requester,
-        { id: authorId, fullName: removed.authorId.fullName },
+        toOverrideTarget(authorId, removed.authorId),
         'delete_post',
         { postId: String(post._id), title },
         null,
@@ -252,8 +253,9 @@ export class PostsController {
   // Hand-picked shape, same reasoning as ProfilesController.toProfileResponse
   // — never spread the raw document (no __v, no bare authorId ObjectId),
   // and the populated author is narrowed to exactly {id, fullName, headline}
-  // so nothing else on User (email, role, anything added later) can leak
-  // through by accident.
+  // (toAuthorSummary) so nothing else on User (email, role, anything added
+  // later) can leak through by accident. An author whose account has been
+  // deleted comes back as a placeholder of the same shape.
   private toPostResponse(post: PostWithAuthor) {
     return {
       id: String(post._id),
@@ -265,11 +267,7 @@ export class PostsController {
       deletedAt: post.deletedAt,
       createdAt: (post as unknown as { createdAt: Date }).createdAt,
       updatedAt: (post as unknown as { updatedAt: Date }).updatedAt,
-      author: {
-        id: String(post.authorId._id),
-        fullName: post.authorId.fullName,
-        headline: post.authorId.headline,
-      },
+      author: toAuthorSummary(post.authorId),
     };
   }
 }
