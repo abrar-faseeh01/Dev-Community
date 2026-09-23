@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 type ConfirmDialogProps = {
   open: boolean;
@@ -33,6 +33,9 @@ type ConfirmDialogProps = {
 const inputClass =
   "h-11 w-full rounded-lg border border-border bg-surface px-3.5 text-sm text-foreground outline-none transition-shadow placeholder:text-gray-400 focus:border-accent focus:ring-2 focus:ring-accent/15";
 
+const FOCUSABLE_SELECTOR =
+  'button:not(:disabled), input:not(:disabled), [tabindex]:not([tabindex="-1"])';
+
 // Plain React state + conditional rendering — no dialog/modal library,
 // consistent with how the header's dropdowns were built.
 export function ConfirmDialog({
@@ -49,7 +52,12 @@ export function ConfirmDialog({
   onCancel,
 }: ConfirmDialogProps) {
   const [reason, setReason] = useState("");
+  const dialogRef = useRef<HTMLDivElement>(null);
   const reasonInputRef = useRef<HTMLInputElement>(null);
+  const cancelButtonRef = useRef<HTMLButtonElement>(null);
+  const ids = useId();
+  const titleId = `${ids}-title`;
+  const messageId = `${ids}-message`;
 
   // Reset the reason whenever the dialog transitions closed -> open, e.g.
   // reopening for a different row after cancelling the first. Adjusting
@@ -62,21 +70,71 @@ export function ConfirmDialog({
     if (open) setReason("");
   }
 
+  // Who had focus right before the dialog opened. Its own cleanup — which
+  // fires exactly when `open` flips back to false, or on unmount — gives
+  // focus back to it, but only if it's still on the page: the button that
+  // opened this dialog can be gone by the time the dialog closes (e.g. a
+  // comment delete removes the very Delete button that opened this).
+  // Choosing a replacement target in that case is the caller's job, not
+  // this component's.
+  const openerRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    openerRef.current = document.activeElement as HTMLElement | null;
+    return () => {
+      const opener = openerRef.current;
+      if (opener && opener.isConnected) opener.focus();
+    };
+  }, [open]);
+
+  // Moves focus into the dialog once it's open: the reason input when the
+  // dialog has one, otherwise Cancel — a plain delete confirm previously
+  // received no focus at all.
+  useEffect(() => {
+    if (!open) return;
+    if (showReasonInput) reasonInputRef.current?.focus();
+    else cancelButtonRef.current?.focus();
+  }, [open, showReasonInput]);
+
+  // Always call the latest onCancel without re-registering the keydown
+  // listener on every render (the same idiom hooks/use-dismissible.ts uses
+  // for its own dismiss callback).
+  const onCancelRef = useRef(onCancel);
+  useEffect(() => {
+    onCancelRef.current = onCancel;
+  });
+
   useEffect(() => {
     if (!open) return;
 
-    function handleEscape(e: KeyboardEvent) {
-      if (e.key === "Escape" && !isPending) onCancel();
-    }
-    document.addEventListener("keydown", handleEscape);
-    return () => document.removeEventListener("keydown", handleEscape);
-  }, [open, isPending, onCancel]);
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        if (!isPending) onCancelRef.current();
+        return;
+      }
+      if (e.key !== "Tab") return;
 
-  useEffect(() => {
-    if (open && showReasonInput) {
-      reasonInputRef.current?.focus();
+      // Trap Tab/Shift+Tab inside the dialog so it can't leave to whatever
+      // is behind it while open.
+      const dialog = dialogRef.current;
+      if (!dialog) return;
+      const focusable = dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR);
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
     }
-  }, [open, showReasonInput]);
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [open, isPending]);
 
   if (!open) return null;
 
@@ -93,9 +151,11 @@ export function ConfirmDialog({
       }}
     >
       <div
+        ref={dialogRef}
         role="alertdialog"
         aria-modal="true"
-        aria-labelledby="confirm-dialog-title"
+        aria-labelledby={titleId}
+        aria-describedby={messageId}
         className="w-full max-w-sm rounded-xl border border-border bg-surface p-5 shadow-lg sm:p-6"
         onClick={(e) => e.stopPropagation()}
       >
@@ -104,13 +164,12 @@ export function ConfirmDialog({
             {badge}
           </span>
         )}
-        <h2
-          id="confirm-dialog-title"
-          className="text-base font-semibold text-foreground"
-        >
+        <h2 id={titleId} className="text-base font-semibold text-foreground">
           {title}
         </h2>
-        <p className="mt-2 text-sm text-muted">{message}</p>
+        <p id={messageId} className="mt-2 text-sm text-muted">
+          {message}
+        </p>
 
         {showReasonInput && (
           <input
@@ -142,6 +201,7 @@ export function ConfirmDialog({
 
         <div className="mt-5 flex justify-end gap-2">
           <button
+            ref={cancelButtonRef}
             type="button"
             onClick={onCancel}
             disabled={isPending}
