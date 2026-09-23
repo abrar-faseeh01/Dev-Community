@@ -1,6 +1,9 @@
 "use client";
 
 import { ROUTES } from "@/constants/routes";
+import { CommentFocusHandler } from "@/features/comments/components/comment-focus-handler";
+import { CommentList } from "@/features/comments/components/comment-list";
+import { commentKeys } from "@/features/comments/queries/comment-queries";
 import {
   AdminBadge,
   PostDeleteButton,
@@ -16,7 +19,7 @@ import { postKeys, usePost } from "@/features/posts/queries/post-queries";
 import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { Suspense, useEffect, useRef } from "react";
 
 const retryButtonClass =
   "shrink-0 rounded-lg border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-300 disabled:cursor-not-allowed disabled:opacity-60";
@@ -35,6 +38,9 @@ export function PostPageView({ id }: { id: string }) {
     () => () => {
       if (removedRef.current) {
         queryClient.removeQueries({ queryKey: postKeys.detail(id), exact: true });
+        // The comment tree is equally stale once the post's own cascade
+        // deletes it server-side.
+        queryClient.removeQueries({ queryKey: commentKeys.list(id), exact: true });
       }
     },
     [queryClient, id],
@@ -62,6 +68,13 @@ export function PostPageView({ id }: { id: string }) {
   return (
     <main className="flex flex-1 justify-center px-4 py-8 sm:py-12">
       <div className="w-full max-w-2xl">
+        {/* Reads ?comment=1 (set by a feed card's CommentFeedLink), which
+            needs a Suspense boundary for `next build` — same reason
+            FeedNotice is split out on the feed page. Renders nothing. */}
+        <Suspense fallback={null}>
+          <CommentFocusHandler postLoaded={postQuery.isSuccess} />
+        </Suspense>
+
         <Link
           href={ROUTES.POSTS}
           className="mb-5 inline-flex items-center gap-1 text-sm font-medium text-accent hover:underline"
@@ -125,35 +138,44 @@ export function PostPageView({ id }: { id: string }) {
           )
         ) : (
           postQuery.isSuccess && (
-            <PostDetail
-              post={postQuery.data}
-              linkAuthor={!!user}
-              headerAction={
-                actor ? (
-                  <>
-                    {actor === "moderator" && <AdminBadge />}
-                    <PostEditLink post={postQuery.data} actor={actor} />
-                  </>
-                ) : undefined
-              }
-              footer={
-                actor ? (
-                  <PostDeleteButton
-                    post={postQuery.data}
-                    actor={actor}
-                    label={
-                      actor === "moderator" ? "Delete as admin" : "Delete post"
-                    }
-                    onRemoved={({ alreadyGone }) => {
-                      removedRef.current = true;
-                      router.replace(
-                        feedNoticeUrl(alreadyGone ? "post-gone" : "post-deleted"),
-                      );
-                    }}
-                  />
-                ) : undefined
-              }
-            />
+            <>
+              <PostDetail
+                post={postQuery.data}
+                linkAuthor={!!user}
+                headerAction={
+                  actor ? (
+                    <>
+                      {actor === "moderator" && <AdminBadge />}
+                      <PostEditLink post={postQuery.data} actor={actor} />
+                    </>
+                  ) : undefined
+                }
+                footer={
+                  actor ? (
+                    <PostDeleteButton
+                      post={postQuery.data}
+                      actor={actor}
+                      label={
+                        actor === "moderator" ? "Delete as admin" : "Delete post"
+                      }
+                      onRemoved={({ alreadyGone }) => {
+                        removedRef.current = true;
+                        router.replace(
+                          feedNoticeUrl(alreadyGone ? "post-gone" : "post-deleted"),
+                        );
+                      }}
+                    />
+                  ) : undefined
+                }
+              />
+              <div className="mt-8">
+                <CommentList
+                  postId={id}
+                  commentCount={postQuery.data.commentCount}
+                  postAuthorId={postQuery.data.author.id}
+                />
+              </div>
+            </>
           )
         )}
       </div>

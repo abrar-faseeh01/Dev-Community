@@ -1,6 +1,7 @@
 "use client";
 
 import { ROUTES } from "@/constants/routes";
+import { CommentFeedLink } from "@/features/comments/components/comment-feed-link";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { describeLoadError } from "@/features/posts/utils/errors";
 import { usePostFeed } from "@/features/posts/queries/post-queries";
@@ -113,7 +114,13 @@ export function PostFeed() {
       <ul className="flex flex-col gap-4">
         {posts.map((post) => (
           <li key={post.id}>
-            <PostCard post={post} linkAuthor={!!user} />
+            <PostCard
+              post={post}
+              linkAuthor={!!user}
+              footer={
+                <CommentFeedLink postId={post.id} commentCount={post.commentCount} />
+              }
+            />
           </li>
         ))}
       </ul>

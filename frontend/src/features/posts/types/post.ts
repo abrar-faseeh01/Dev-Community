@@ -1,15 +1,15 @@
 // Mirrors backend/src/posts/dto/post-response.dto.ts. Dates are ISO strings
 // (Mongoose Date -> JSON), not Date objects, same as features/profile/types/profile.ts.
 
+import type { AuthorSummary } from "@/types/author-summary";
+
 // The populated author is narrowed server-side to exactly these fields —
 // email and role are never returned. When the author's account has been
 // deleted the API returns a placeholder of the same shape: id and headline
-// null, fullName "Deleted user".
-export type PostAuthor = {
-  id: string | null;
-  fullName: string;
-  headline?: string | null;
-};
+// null, fullName "Deleted user". Comments use the identical shape
+// (@/types/author-summary), which is why this is now that shared type rather
+// than its own copy.
+export type PostAuthor = AuthorSummary;
 
 export type Post = {
   id: string;
