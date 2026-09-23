@@ -22,7 +22,7 @@ import { useRouter } from "next/navigation";
 import { Suspense, useEffect, useRef } from "react";
 
 const retryButtonClass =
-  "shrink-0 rounded-lg border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-300 disabled:cursor-not-allowed disabled:opacity-60";
+  "shrink-0 rounded-lg border border-red-900/50 bg-neutral-900 px-3 py-1.5 text-sm font-medium text-red-300 transition-colors hover:bg-red-950/40 focus:outline-none focus:ring-2 focus:ring-red-500/30 disabled:cursor-not-allowed disabled:opacity-60";
 
 export function PostPageView({ id }: { id: string }) {
   const { user } = useAuth();
@@ -66,7 +66,7 @@ export function PostPageView({ id }: { id: string }) {
   }, [title]);
 
   return (
-    <main className="flex flex-1 justify-center px-4 py-8 sm:py-12">
+    <main className="flex flex-1 justify-center bg-neutral-950 px-4 py-8 sm:py-12">
       <div className="w-full max-w-2xl">
         {/* Reads ?comment=1 (set by a feed card's CommentFeedLink), which
             needs a Suspense boundary for `next build` — same reason
@@ -77,7 +77,7 @@ export function PostPageView({ id }: { id: string }) {
 
         <Link
           href={ROUTES.POSTS}
-          className="mb-5 inline-flex items-center gap-1 text-sm font-medium text-accent hover:underline"
+          className="mb-5 inline-flex items-center gap-1 text-sm font-medium text-emerald-400 hover:underline"
         >
           <span aria-hidden="true">←</span> Back to feed
         </Link>
@@ -90,7 +90,7 @@ export function PostPageView({ id }: { id: string }) {
             {/* Only once the first attempt has failed and a retry is
                 running — otherwise a dead backend looks like a slow one. */}
             {postQuery.failureCount > 0 && (
-              <p className="text-sm text-muted">
+              <p className="text-sm text-neutral-400">
                 Trouble reaching the server — retrying (attempt{" "}
                 {postQuery.failureCount + 1})…
               </p>
@@ -99,16 +99,16 @@ export function PostPageView({ id }: { id: string }) {
           </div>
         ) : postQuery.isError ? (
           isPostNotFound(postQuery.error) ? (
-            <div className="rounded-xl border border-dashed border-border bg-surface p-8 text-center">
-              <h1 className="text-lg font-semibold text-foreground">
+            <div className="rounded-xl border border-dashed border-neutral-800 bg-neutral-900 p-8 text-center">
+              <h1 className="text-lg font-semibold text-white">
                 Post not found
               </h1>
-              <p className="mt-1 text-sm text-muted">
+              <p className="mt-1 text-sm text-neutral-400">
                 It may have been deleted, or the link may be wrong.
               </p>
               <Link
                 href={ROUTES.POSTS}
-                className="mt-4 inline-block rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground transition-colors hover:bg-accent/90 focus:outline-none focus:ring-2 focus:ring-accent/30"
+                className="mt-4 inline-block rounded-lg bg-emerald-400 px-4 py-2 text-sm font-semibold text-neutral-950 transition-colors hover:bg-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-400/40"
               >
                 Go to the feed
               </Link>
@@ -116,13 +116,13 @@ export function PostPageView({ id }: { id: string }) {
           ) : (
             <div
               role="alert"
-              className="flex flex-col gap-3 rounded-xl border border-red-200 bg-red-50 p-5 sm:flex-row sm:items-center sm:justify-between"
+              className="flex flex-col gap-3 rounded-xl border border-red-900/50 bg-red-950/40 p-5 sm:flex-row sm:items-center sm:justify-between"
             >
               <div>
-                <h1 className="text-sm font-semibold text-red-700">
+                <h1 className="text-sm font-semibold text-red-300">
                   Couldn&rsquo;t load this post
                 </h1>
-                <p className="text-sm text-red-700">
+                <p className="text-sm text-red-300">
                   {describeLoadError(postQuery.error, "Failed to load post.")}
                 </p>
               </div>

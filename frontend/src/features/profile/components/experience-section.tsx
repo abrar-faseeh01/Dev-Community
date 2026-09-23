@@ -71,19 +71,19 @@ export function ExperienceSection({
   return (
     <>
       <section className="flex flex-col gap-4 p-5 sm:p-6">
-        <h2 className="text-sm font-semibold text-foreground">Experience</h2>
+        <h2 className="text-sm font-semibold text-white">Experience</h2>
 
         {errorMessage && (
           <p
             role="alert"
-            className="rounded-lg border border-red-200 bg-red-50 px-3.5 py-3 text-sm text-red-700"
+            className="rounded-lg border border-red-900/50 bg-red-950/40 px-3.5 py-3 text-sm text-red-300"
           >
             {errorMessage}
           </p>
         )}
 
         {profile.experiences.length === 0 ? (
-          <p className="text-sm text-muted">No experience yet.</p>
+          <p className="text-sm text-neutral-400">No experience yet.</p>
         ) : (
           <div className="flex flex-col gap-3">
             {profile.experiences.map((exp) => {
@@ -119,21 +119,21 @@ export function ExperienceSection({
                       }),
                     )}
                     noValidate
-                    className="flex flex-col gap-3 rounded-lg border border-accent/30 bg-background p-4"
+                    className="flex flex-col gap-3 rounded-lg border border-emerald-400/30 bg-neutral-950 p-4"
                   >
                     <ExperienceFields form={editForm} isOwn={isOwn} />
                     <div className="flex justify-end gap-2">
                       <button
                         type="button"
                         onClick={() => setEditingExperienceId(null)}
-                        className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-surface"
+                        className="rounded-lg border border-neutral-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-neutral-800"
                       >
                         Cancel
                       </button>
                       <button
                         type="submit"
                         disabled={editMutation.isPending}
-                        className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground transition-colors hover:bg-accent/90 disabled:opacity-60"
+                        className="rounded-lg bg-emerald-400 px-4 py-2 text-sm font-semibold text-neutral-950 transition-colors hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         {editMutation.isPending ? "Saving…" : "Save"}
                       </button>
@@ -145,18 +145,18 @@ export function ExperienceSection({
               return (
                 <div
                   key={exp._id ?? `${exp.title}-${exp.company}`}
-                  className="rounded-lg border border-border bg-background p-4"
+                  className="rounded-lg border border-neutral-800 bg-neutral-950 p-4"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-sm font-semibold text-foreground">
+                      <p className="text-sm font-semibold text-white">
                         {exp.title}
                       </p>
-                      <p className="text-sm text-muted">
+                      <p className="text-sm text-neutral-400">
                         {exp.company} · {exp.from} – {exp.to || "Present"}
                       </p>
                       {exp.description && (
-                        <p className="mt-2 text-sm text-foreground">
+                        <p className="mt-2 text-sm text-neutral-200">
                           {exp.description}
                         </p>
                       )}
@@ -165,7 +165,7 @@ export function ExperienceSection({
                       <button
                         type="button"
                         onClick={() => startEditing(exp)}
-                        className="text-accent hover:underline"
+                        className="text-emerald-400 hover:underline"
                       >
                         Edit
                       </button>
@@ -175,7 +175,7 @@ export function ExperienceSection({
                         onClick={() =>
                           exp._id && setPendingDeleteExperienceId(exp._id)
                         }
-                        className="text-red-600 hover:underline disabled:opacity-60"
+                        className="text-red-400 hover:underline disabled:opacity-60"
                       >
                         {isBusy ? "…" : "Delete"}
                       </button>

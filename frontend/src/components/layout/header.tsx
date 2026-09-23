@@ -15,13 +15,13 @@ export function Header() {
     pathname === ROUTES.POSTS || pathname.startsWith(`${ROUTES.POSTS}/`);
 
   return (
-    <header className="sticky top-0 z-10 border-b border-border bg-surface/95 backdrop-blur">
+    <header className="sticky top-0 z-10 border-b border-neutral-800 bg-neutral-950/95 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-4 px-4 sm:px-6">
         <Link
           href={ROUTES.HOME}
-          className="flex items-center gap-2 text-base font-bold tracking-tight text-foreground"
+          className="flex items-center gap-2 text-base font-bold tracking-tight text-white"
         >
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-sm font-bold text-accent-foreground">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-400 text-sm font-bold text-neutral-950">
             &lt;/&gt;
           </span>
           <span className="hidden sm:inline">Dev Community</span>
@@ -34,8 +34,8 @@ export function Header() {
           <Link
             href={ROUTES.POSTS}
             aria-current={onFeed ? "page" : undefined}
-            className={`rounded-lg px-3 py-2 font-medium transition-colors hover:bg-background ${
-              onFeed ? "text-foreground" : "text-muted hover:text-foreground"
+            className={`rounded-lg px-3 py-2 font-medium transition-colors hover:bg-neutral-900 ${
+              onFeed ? "text-white" : "text-neutral-400 hover:text-white"
             }`}
           >
             Feed
@@ -50,13 +50,13 @@ export function Header() {
             <>
               <Link
                 href={ROUTES.LOGIN}
-                className="rounded-lg px-3 py-2 font-medium text-muted transition-colors hover:bg-background hover:text-foreground"
+                className="rounded-lg px-3 py-2 font-medium text-neutral-400 transition-colors hover:bg-neutral-900 hover:text-white"
               >
                 Log in
               </Link>
               <Link
                 href={ROUTES.SIGNUP}
-                className="rounded-lg bg-accent px-4 py-2 font-semibold text-accent-foreground transition-colors hover:bg-accent/90"
+                className="rounded-lg bg-emerald-400 px-4 py-2 font-semibold text-neutral-950 transition-colors hover:bg-emerald-300"
               >
                 Sign up
               </Link>

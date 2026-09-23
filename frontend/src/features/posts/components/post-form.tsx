@@ -38,15 +38,15 @@ type PostFormProps = {
 };
 
 const inputClass =
-  "w-full rounded-lg border border-border bg-surface px-3.5 text-sm text-foreground outline-none transition-shadow placeholder:text-gray-400 focus:border-accent focus:ring-2 focus:ring-accent/15 aria-[invalid=true]:border-red-400";
-const errorTextClass = "text-sm text-red-700";
+  "w-full rounded-lg border border-neutral-800 bg-neutral-900 px-3.5 text-sm text-white outline-none transition-shadow placeholder:text-neutral-600 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/15 aria-[invalid=true]:border-red-500";
+const errorTextClass = "text-sm text-red-400";
 
 function Counter({ id, length, max }: { id: string; length: number; max: number }) {
   const over = length > max;
   return (
     <span
       id={id}
-      className={`text-xs tabular-nums ${over ? "font-medium text-red-700" : "text-muted"}`}
+      className={`text-xs tabular-nums ${over ? "font-medium text-red-400" : "text-neutral-400"}`}
     >
       {length} / {max}
     </span>
@@ -152,7 +152,7 @@ export function PostForm({
       {banner && (
         <p
           role="alert"
-          className="rounded-lg border border-red-200 bg-red-50 px-3.5 py-3 text-sm text-red-700"
+          className="rounded-lg border border-red-900/50 bg-red-950/40 px-3.5 py-3 text-sm text-red-300"
         >
           {banner}
         </p>
@@ -160,7 +160,7 @@ export function PostForm({
 
       <div className="flex flex-col gap-2">
         <div className="flex items-baseline justify-between gap-3">
-          <label htmlFor={titleId} className="text-sm font-medium">
+          <label htmlFor={titleId} className="text-sm font-medium text-white">
             Title
           </label>
           <Counter id={`${titleId}-count`} length={titleLength} max={POST_TITLE_MAX} />
@@ -185,7 +185,7 @@ export function PostForm({
 
       <div className="flex flex-col gap-2">
         <div className="flex items-baseline justify-between gap-3">
-          <label htmlFor={bodyId} className="text-sm font-medium">
+          <label htmlFor={bodyId} className="text-sm font-medium text-white">
             Body
           </label>
           <Counter id={`${bodyId}-count`} length={bodyLength} max={POST_BODY_MAX} />
@@ -209,7 +209,7 @@ export function PostForm({
 
       {showReasonField && (
         <div className="flex flex-col gap-2">
-          <label htmlFor={`${ids}-reason`} className="text-sm font-medium">
+          <label htmlFor={`${ids}-reason`} className="text-sm font-medium text-white">
             Reason (optional)
           </label>
           <input
@@ -220,7 +220,7 @@ export function PostForm({
             {...register("reason")}
             className={`${inputClass} h-11`}
           />
-          <span id={`${ids}-reason-hint`} className="text-xs text-muted">
+          <span id={`${ids}-reason-hint`} className="text-xs text-neutral-400">
             Sent to the author with the notification, and recorded in the audit
             log.
           </span>
@@ -230,14 +230,14 @@ export function PostForm({
       <div className="flex items-center justify-end gap-3">
         <Link
           href={cancelHref}
-          className="rounded-lg px-4 py-2.5 text-sm font-medium text-muted transition-colors hover:text-foreground focus:outline-none focus:ring-2 focus:ring-accent/30"
+          className="rounded-lg px-4 py-2.5 text-sm font-medium text-neutral-400 transition-colors hover:text-white focus:outline-none focus:ring-2 focus:ring-emerald-400/30"
         >
           Cancel
         </Link>
         <button
           type="submit"
           disabled={isPending || !changed}
-          className="h-11 rounded-lg bg-accent px-5 text-sm font-semibold text-accent-foreground transition-colors hover:bg-accent/90 focus:outline-none focus:ring-2 focus:ring-accent/30 disabled:cursor-not-allowed disabled:opacity-60"
+          className="h-11 rounded-lg bg-emerald-400 px-5 text-sm font-semibold text-neutral-950 transition-colors hover:bg-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-400/40 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isPending ? pendingLabel : submitLabel}
         </button>

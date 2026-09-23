@@ -21,11 +21,11 @@ type PostCardProps = {
 // where it's read in full.
 export function PostCard({ post, linkAuthor = false, footer }: PostCardProps) {
   return (
-    <article className="rounded-xl border border-border bg-surface p-5 shadow-sm sm:p-6">
-      <h2 className="text-lg font-semibold tracking-tight text-foreground wrap-anywhere">
+    <article className="rounded-xl border border-neutral-800 bg-neutral-900 p-5 sm:p-6">
+      <h2 className="text-lg font-semibold tracking-tight text-white wrap-anywhere">
         <Link
           href={ROUTES.post(post.id)}
-          className="rounded hover:text-accent hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+          className="rounded hover:text-emerald-400 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/40"
         >
           {post.title}
         </Link>
@@ -33,12 +33,12 @@ export function PostCard({ post, linkAuthor = false, footer }: PostCardProps) {
 
       <PostByline post={post} linkAuthor={linkAuthor} />
 
-      <p className="mt-3 line-clamp-3 text-sm text-foreground wrap-anywhere">
+      <p className="mt-3 line-clamp-3 text-sm text-neutral-300 wrap-anywhere">
         {post.body}
       </p>
 
       {footer && (
-        <div className="mt-4 border-t border-border pt-3">{footer}</div>
+        <div className="mt-4 border-t border-neutral-800 pt-3">{footer}</div>
       )}
     </article>
   );

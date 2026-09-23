@@ -21,7 +21,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 const retryButtonClass =
-  "shrink-0 rounded-lg border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-300 disabled:cursor-not-allowed disabled:opacity-60";
+  "shrink-0 rounded-lg border border-red-900/50 bg-neutral-900 px-3 py-1.5 text-sm font-medium text-red-300 transition-colors hover:bg-red-950/40 focus:outline-none focus:ring-2 focus:ring-red-500/30 disabled:cursor-not-allowed disabled:opacity-60";
 
 export function EditPostView({ id }: { id: string }) {
   const { user, loading: authLoading } = useRequireAuth();
@@ -79,7 +79,7 @@ export function EditPostView({ id }: { id: string }) {
     // is shown.
     content = (
       <div role="status" aria-busy="true">
-        <span className="text-sm text-muted">Loading…</span>
+        <span className="text-sm text-neutral-400">Loading…</span>
       </div>
     );
   } else if (post) {
@@ -97,13 +97,13 @@ export function EditPostView({ id }: { id: string }) {
       <div className="flex flex-col gap-3">
         <p
           role="alert"
-          className="rounded-lg border border-red-200 bg-red-50 px-3.5 py-3 text-sm text-red-700"
+          className="rounded-lg border border-red-900/50 bg-red-950/40 px-3.5 py-3 text-sm text-red-300"
         >
           You can only edit your own posts.
         </p>
         <Link
           href={ROUTES.post(id)}
-          className="text-sm font-medium text-accent hover:underline"
+          className="text-sm font-medium text-emerald-400 hover:underline"
         >
           Back to the post
         </Link>
@@ -112,21 +112,21 @@ export function EditPostView({ id }: { id: string }) {
   } else if (postQuery.isPending) {
     content = (
       <div role="status" aria-busy="true">
-        <span className="text-sm text-muted">Loading post…</span>
+        <span className="text-sm text-neutral-400">Loading post…</span>
       </div>
     );
   } else if (isPostNotFound(postQuery.error)) {
     content = (
       <div className="text-center">
-        <p className="text-base font-semibold text-foreground">
+        <p className="text-base font-semibold text-white">
           Post not found
         </p>
-        <p className="mt-1 text-sm text-muted">
+        <p className="mt-1 text-sm text-neutral-400">
           It may have been deleted, or the link may be wrong.
         </p>
         <Link
           href={ROUTES.POSTS}
-          className="mt-4 inline-block rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground transition-colors hover:bg-accent/90 focus:outline-none focus:ring-2 focus:ring-accent/30"
+          className="mt-4 inline-block rounded-lg bg-emerald-400 px-4 py-2 text-sm font-semibold text-neutral-950 transition-colors hover:bg-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-400/40"
         >
           Go to the feed
         </Link>
@@ -136,13 +136,13 @@ export function EditPostView({ id }: { id: string }) {
     content = (
       <div
         role="alert"
-        className="flex flex-col gap-3 rounded-lg border border-red-200 bg-red-50 p-4 sm:flex-row sm:items-center sm:justify-between"
+        className="flex flex-col gap-3 rounded-lg border border-red-900/50 bg-red-950/40 p-4 sm:flex-row sm:items-center sm:justify-between"
       >
         <div>
-          <p className="text-sm font-semibold text-red-700">
+          <p className="text-sm font-semibold text-red-300">
             Couldn&rsquo;t load this post
           </p>
-          <p className="text-sm text-red-700">
+          <p className="text-sm text-red-300">
             {describeLoadError(postQuery.error, "Failed to load post.")}
           </p>
         </div>
@@ -159,14 +159,14 @@ export function EditPostView({ id }: { id: string }) {
   }
 
   return (
-    <main className="flex flex-1 justify-center px-4 py-8 sm:py-12">
+    <main className="flex flex-1 justify-center bg-neutral-950 px-4 py-8 sm:py-12">
       <div className="w-full max-w-2xl">
         <div className="mb-7">
-          <p className="mb-1 text-sm font-medium text-accent">Posts</p>
-          <h1 className="text-2xl font-bold tracking-tight">Edit post</h1>
+          <p className="mb-1 text-sm font-medium text-emerald-400">Posts</p>
+          <h1 className="text-2xl font-bold tracking-tight text-white">Edit post</h1>
         </div>
 
-        <div className="rounded-xl border border-border bg-surface p-6 shadow-sm sm:p-8">
+        <div className="rounded-xl border border-neutral-800 bg-neutral-900 p-6 sm:p-8">
           {content}
         </div>
       </div>
@@ -231,8 +231,8 @@ function EditPostForm({ post, actor, onReload, onGone }: EditPostFormProps) {
   return (
     <div className="flex flex-col gap-5">
       {moderating && (
-        <div className="rounded-lg border border-accent/25 bg-accent/10 px-4 py-3 text-sm text-foreground">
-          <span className="mr-2 rounded-full border border-accent/25 bg-surface px-2 py-0.5 text-xs font-medium text-accent">
+        <div className="rounded-lg border border-emerald-400/25 bg-emerald-400/10 px-4 py-3 text-sm text-white">
+          <span className="mr-2 rounded-full border border-emerald-400/25 bg-neutral-900 px-2 py-0.5 text-xs font-medium text-emerald-400">
             Admin
           </span>
           You&rsquo;re editing {post.author.fullName}&rsquo;s post as an
@@ -244,9 +244,9 @@ function EditPostForm({ post, actor, onReload, onGone }: EditPostFormProps) {
       {conflict && (
         <div
           role="alert"
-          className="flex flex-col gap-3 rounded-lg border border-red-200 bg-red-50 p-4 sm:flex-row sm:items-center sm:justify-between"
+          className="flex flex-col gap-3 rounded-lg border border-red-900/50 bg-red-950/40 p-4 sm:flex-row sm:items-center sm:justify-between"
         >
-          <div className="text-sm text-red-700">
+          <div className="text-sm text-red-300">
             <p className="font-semibold">
               {updateMutation.error instanceof Error
                 ? updateMutation.error.message

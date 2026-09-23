@@ -8,7 +8,7 @@ import Link from "next/link";
 import { useRef, useState } from "react";
 
 const menuItemClass =
-  "rounded-lg px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-background";
+  "rounded-lg px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-neutral-800";
 
 export function UserMenu({ user }: { user: AuthUser }) {
   const [open, setOpen] = useState(false);
@@ -40,7 +40,7 @@ export function UserMenu({ user }: { user: AuthUser }) {
         aria-expanded={open}
         aria-controls="account-menu"
         aria-label="Account menu"
-        className="flex h-9 w-9 items-center justify-center rounded-full bg-accent text-sm font-bold text-accent-foreground transition-shadow hover:shadow-md focus:outline-none focus:ring-2 focus:ring-accent/30"
+        className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-400 text-sm font-bold text-neutral-950 transition-shadow hover:shadow-md focus:outline-none focus:ring-2 focus:ring-emerald-400/30"
       >
         {initial}
       </button>
@@ -51,20 +51,20 @@ export function UserMenu({ user }: { user: AuthUser }) {
       <div
         id="account-menu"
         role="menu"
-        className={`absolute right-0 top-[calc(100%+0.5rem)] w-64 origin-top-right overflow-hidden rounded-xl border border-border bg-surface shadow-lg transition-all duration-150 ease-out ${
+        className={`absolute right-0 top-[calc(100%+0.5rem)] w-64 origin-top-right overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900 shadow-lg transition-all duration-150 ease-out ${
           open ? "visible scale-100 opacity-100" : "invisible scale-95 opacity-0"
         }`}
       >
-        <div className="border-b border-border px-4 py-3">
+        <div className="border-b border-neutral-800 px-4 py-3">
           <div className="flex items-center gap-2">
-            <p className="truncate text-sm font-semibold text-foreground">
+            <p className="truncate text-sm font-semibold text-white">
               {user.fullName || user.email}
             </p>
-            <span className="shrink-0 rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent">
+            <span className="shrink-0 rounded-full bg-emerald-400/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-400">
               {isAdmin ? "Admin" : "User"}
             </span>
           </div>
-          <p className="truncate text-xs text-muted">{user.email}</p>
+          <p className="truncate text-xs text-neutral-400">{user.email}</p>
         </div>
 
         <div className="flex flex-col gap-0.5 p-1.5">
@@ -124,7 +124,7 @@ export function UserMenu({ user }: { user: AuthUser }) {
               logoutMutation.mutate();
             }}
             role="menuitem"
-            className="rounded-lg px-3 py-2 text-left text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
+            className="rounded-lg px-3 py-2 text-left text-sm font-medium text-red-400 transition-colors hover:bg-red-950/40"
           >
             Logout
           </button>

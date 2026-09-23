@@ -10,6 +10,7 @@ import type { Profile } from "@/features/profile/types/profile";
 import { ApiError } from "@/lib/axios/api-error";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   FormProvider,
   useFieldArray,
@@ -48,9 +49,15 @@ function toDateInputValue(iso: string): string {
 export function ProfileDetailsForm({
   profile,
   isOwn,
+  footerSlot,
 }: {
   profile: Profile;
   isOwn: boolean;
+  // Portal target rendered by ProfileEditShell just below the edit box, so
+  // Save changes sits outside the card while its disabled/pending state and
+  // click handler stay owned right here, next to the form and mutation they
+  // read from.
+  footerSlot: HTMLDivElement | null;
 }) {
   const form = useForm<ProfileDetailsFormValues>({
     resolver: zodResolver(profileDetailsSchema),
@@ -117,18 +124,35 @@ export function ProfileDetailsForm({
     "Failed to update profile details.",
   );
 
+  function submit() {
+    form.handleSubmit((values) =>
+      mutation.mutate({
+        values,
+        dirty: form.formState.dirtyFields,
+      }),
+    )();
+  }
+
+  // Lands the reader on the Skills or Portfolio section when they arrive via
+  // one of the Profile view's per-tab Edit links (#skills / #portfolio).
+  // Next's own hash-scroll fires before this page's data has loaded (nothing
+  // with that id exists yet), so this does it manually, once, right after
+  // the sections it targets actually mount.
+  useEffect(() => {
+    const hash = window.location.hash.slice(1);
+    if (hash !== "skills" && hash !== "portfolio") return;
+    document.getElementById(hash)?.scrollIntoView({ block: "start" });
+    document.getElementById(`${hash}-heading`)?.focus();
+  }, []);
+
   return (
     <>
       <FormProvider {...form}>
-        <section className="flex flex-col gap-4 border-b border-border p-5 sm:p-6">
-          <h2 className="text-sm font-semibold text-foreground">
-            Profile details
-          </h2>
-
+        <section className="flex flex-col gap-6 p-5 sm:p-6">
           {errorMessage && (
             <p
               role="alert"
-              className="rounded-lg border border-red-200 bg-red-50 px-3.5 py-3 text-sm text-red-700"
+              className="rounded-lg border border-red-900/50 bg-red-950/40 px-3.5 py-3 text-sm text-red-300"
             >
               {errorMessage}
             </p>
@@ -136,61 +160,75 @@ export function ProfileDetailsForm({
           {mutation.isSuccess && (
             <p
               role="status"
-              className="rounded-lg border border-emerald-200 bg-emerald-50 px-3.5 py-3 text-sm text-emerald-700"
+              className="rounded-lg border border-emerald-400/25 bg-emerald-400/10 px-3.5 py-3 text-sm text-emerald-300"
             >
               Profile details updated.
             </p>
           )}
 
-          <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium text-foreground">
-              Headline
-            </label>
-            <input
-              type="text"
-              placeholder="e.g. Full-stack developer"
-              {...form.register("headline")}
-              className={inputClass}
-            />
-            {form.formState.errors.headline && (
-              <span role="alert" className={errorTextClass}>
-                {form.formState.errors.headline.message}
-              </span>
-            )}
+          <div className="flex flex-col gap-4">
+            <h2 className="text-sm font-semibold text-white">Basics</h2>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium text-white">
+                Headline
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. Full-stack developer"
+                {...form.register("headline")}
+                className={inputClass}
+              />
+              {form.formState.errors.headline && (
+                <span role="alert" className={errorTextClass}>
+                  {form.formState.errors.headline.message}
+                </span>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium text-white">Bio</label>
+              <textarea
+                rows={3}
+                placeholder="A short bio..."
+                {...form.register("bio")}
+                className={textareaClass}
+              />
+              {form.formState.errors.bio && (
+                <span role="alert" className={errorTextClass}>
+                  {form.formState.errors.bio.message}
+                </span>
+              )}
+            </div>
+
+            <div id="skills" className="scroll-mt-32">
+              <SkillsEditor />
+            </div>
           </div>
 
-          <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium text-foreground">Bio</label>
-            <textarea
-              rows={3}
-              placeholder="A short bio..."
-              {...form.register("bio")}
-              className={textareaClass}
-            />
-            {form.formState.errors.bio && (
-              <span role="alert" className={errorTextClass}>
-                {form.formState.errors.bio.message}
-              </span>
-            )}
-          </div>
-
-          <div className="flex flex-col gap-3">
+          <div id="portfolio" className="flex flex-col gap-3 scroll-mt-32">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-foreground">
+              <h2
+                id="portfolio-heading"
+                tabIndex={-1}
+                className="text-sm font-semibold text-white focus:outline-none"
+              >
                 Portfolio projects
-              </p>
+              </h2>
               <button
                 type="button"
                 onClick={() => projectFields.append(EMPTY_PORTFOLIO_PROJECT)}
                 disabled={projectFields.fields.length >= 20}
-                className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-background disabled:opacity-60"
+                className="rounded-lg border border-neutral-700 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-neutral-800 disabled:opacity-60"
               >
                 Add project
               </button>
             </div>
 
             {projectFields.fields.length === 0 ? (
-              <p className="text-sm text-muted">No portfolio projects yet.</p>
+              <p className="text-sm text-neutral-400">
+                No portfolio projects yet.
+              </p>
             ) : (
               <div className="flex flex-col gap-3">
                 {projectFields.fields.map((field, index) => (
@@ -204,8 +242,6 @@ export function ProfileDetailsForm({
             )}
           </div>
 
-          <SkillsEditor />
-
           {!isOwn && (
             <input
               type="text"
@@ -214,29 +250,26 @@ export function ProfileDetailsForm({
               className={inputClass}
             />
           )}
-
-          <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={form.handleSubmit((values) =>
-                mutation.mutate({
-                  values,
-                  dirty: form.formState.dirtyFields,
-                }),
-              )}
-              disabled={mutation.isPending || !form.formState.isDirty}
-              className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground transition-colors hover:bg-accent/90 disabled:opacity-60"
-            >
-              {mutation.isPending ? "Saving…" : "Save profile details"}
-            </button>
-          </div>
         </section>
       </FormProvider>
+
+      {footerSlot &&
+        createPortal(
+          <button
+            type="button"
+            onClick={submit}
+            disabled={mutation.isPending || !form.formState.isDirty}
+            className="rounded-lg bg-emerald-400 px-5 py-2.5 text-sm font-semibold text-neutral-950 shadow-sm transition-colors hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {mutation.isPending ? "Saving…" : "Save changes"}
+          </button>,
+          footerSlot,
+        )}
 
       <ConfirmDialog
         open={pendingDeleteProjectIndex !== null}
         title="Remove project"
-        message="Remove this portfolio project? This isn't saved until you click Save profile details."
+        message="Remove this portfolio project? This isn't saved until you click Save changes."
         showReasonInput={false}
         onConfirm={() => {
           if (pendingDeleteProjectIndex !== null) {

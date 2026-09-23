@@ -14,7 +14,7 @@ const FIRST_LOAD_SKELETON_COUNT = 3;
 const NEXT_PAGE_SKELETON_COUNT = 2;
 
 const retryButtonClass =
-  "shrink-0 rounded-lg border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-300 disabled:cursor-not-allowed disabled:opacity-60";
+  "shrink-0 rounded-lg border border-red-900/50 bg-neutral-900 px-3 py-1.5 text-sm font-medium text-red-300 transition-colors hover:bg-red-950/40 focus:outline-none focus:ring-2 focus:ring-red-500/30 disabled:cursor-not-allowed disabled:opacity-60";
 
 // The feed list. Reads the cursor-paginated GET /posts through
 // useInfiniteQuery: each page's `nextCursor` (null on the last one) becomes
@@ -47,7 +47,7 @@ export function PostFeed() {
         {/* Only after the first attempt has failed and a retry is running —
             otherwise a dead backend looks like a slow one for ~3 seconds. */}
         {feed.failureCount > 0 && (
-          <p className="text-sm text-muted">
+          <p className="text-sm text-neutral-400">
             Trouble reaching the server — retrying (attempt{" "}
             {feed.failureCount + 1})…
           </p>
@@ -66,13 +66,13 @@ export function PostFeed() {
     return (
       <div
         role="alert"
-        className="flex flex-col gap-3 rounded-xl border border-red-200 bg-red-50 p-5 sm:flex-row sm:items-center sm:justify-between"
+        className="flex flex-col gap-3 rounded-xl border border-red-900/50 bg-red-950/40 p-5 sm:flex-row sm:items-center sm:justify-between"
       >
         <div>
-          <p className="text-sm font-semibold text-red-700">
+          <p className="text-sm font-semibold text-red-300">
             Couldn&rsquo;t load posts
           </p>
-          <p className="text-sm text-red-700">
+          <p className="text-sm text-red-300">
             {describeLoadError(feed.error, "Failed to load posts.")}
           </p>
         </div>
@@ -92,15 +92,15 @@ export function PostFeed() {
 
   if (posts.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-border bg-surface p-8 text-center">
-        <p className="text-base font-semibold text-foreground">No posts yet</p>
-        <p className="mt-1 text-sm text-muted">
+      <div className="rounded-xl border border-dashed border-neutral-800 bg-neutral-900 p-8 text-center">
+        <p className="text-base font-semibold text-white">No posts yet</p>
+        <p className="mt-1 text-sm text-neutral-400">
           Nothing has been shared with the community so far.
         </p>
         {user?.role === "user" && (
           <Link
             href={ROUTES.POSTS_CREATE}
-            className="mt-4 inline-block rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground transition-colors hover:bg-accent/90 focus:outline-none focus:ring-2 focus:ring-accent/30"
+            className="mt-4 inline-block rounded-lg bg-emerald-400 px-4 py-2 text-sm font-semibold text-neutral-950 transition-colors hover:bg-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-400/40"
           >
             Create the first post
           </Link>
@@ -130,13 +130,13 @@ export function PostFeed() {
       {feed.isFetchNextPageError ? (
         <div
           role="alert"
-          className="mt-4 flex flex-col gap-3 rounded-xl border border-red-200 bg-red-50 p-5 sm:flex-row sm:items-center sm:justify-between"
+          className="mt-4 flex flex-col gap-3 rounded-xl border border-red-900/50 bg-red-950/40 p-5 sm:flex-row sm:items-center sm:justify-between"
         >
           <div>
-            <p className="text-sm font-semibold text-red-700">
+            <p className="text-sm font-semibold text-red-300">
               Couldn&rsquo;t load more posts
             </p>
-            <p className="text-sm text-red-700">
+            <p className="text-sm text-red-300">
               {describeLoadError(feed.error, "Failed to load more posts.")}
             </p>
           </div>
@@ -163,8 +163,8 @@ export function PostFeed() {
       ) : feed.hasNextPage ? (
         <div ref={sentinelRef} aria-hidden="true" className="h-px" />
       ) : (
-        <p className="mt-6 border-t border-border pt-4 text-center text-sm text-muted">
-          You&rsquo;ve reached the end — no more posts.
+        <p className="mt-6 border-t border-neutral-800 pt-4 text-center text-sm text-neutral-400">
+          You&rsquo;re all caught up.
         </p>
       )}
     </>

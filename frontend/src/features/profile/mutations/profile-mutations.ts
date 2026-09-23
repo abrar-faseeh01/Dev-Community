@@ -8,7 +8,6 @@ import {
   updateSkills,
   type ExperiencePayload,
 } from "@/services/api/profile";
-import { updateFullName } from "@/services/api/users";
 import {
   useMutation,
   useQueryClient,
@@ -100,16 +99,6 @@ export function useUpdateProfileDetails(
       if (latest) setProfile(latest);
     },
     onError: options.onError,
-  });
-}
-
-// Admin editing someone else's name only.
-export function useUpdateFullName(profileId: string) {
-  const setProfile = useSetProfile(profileId);
-  return useMutation({
-    mutationFn: (values: { fullName: string; reason?: string }) =>
-      updateFullName(profileId, values),
-    onSuccess: setProfile,
   });
 }
 

@@ -13,19 +13,19 @@ export function MyPostsView() {
   const canCreate = !loading && user?.role === "user";
 
   return (
-    <main className="flex flex-1 justify-center px-4 py-8 sm:py-12">
+    <main className="flex flex-1 justify-center bg-neutral-950 px-4 py-8 sm:py-12">
       <div className="w-full max-w-2xl">
         <Link
           href={user ? ROUTES.profile(user.id) : ROUTES.POSTS}
-          className="mb-5 inline-flex items-center gap-1 text-sm font-medium text-accent hover:underline"
+          className="mb-5 inline-flex items-center gap-1 text-sm font-medium text-emerald-400 hover:underline"
         >
           <span aria-hidden="true">←</span> Back to profile
         </Link>
 
         <div className="mb-7 flex items-end justify-between gap-4">
           <div>
-            <p className="mb-1 text-sm font-medium text-accent">Profile</p>
-            <h1 className="text-2xl font-bold tracking-tight">
+            <p className="mb-1 text-sm font-medium text-emerald-400">Profile</p>
+            <h1 className="text-2xl font-bold tracking-tight text-white">
               Posts made by you
             </h1>
           </div>
@@ -33,7 +33,7 @@ export function MyPostsView() {
           {canCreate && (
             <Link
               href={ROUTES.POSTS_CREATE}
-              className="shrink-0 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground transition-colors hover:bg-accent/90 focus:outline-none focus:ring-2 focus:ring-accent/30"
+              className="shrink-0 rounded-lg bg-emerald-400 px-4 py-2 text-sm font-semibold text-neutral-950 transition-colors hover:bg-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-400/40"
             >
               New post
             </Link>
@@ -42,7 +42,7 @@ export function MyPostsView() {
 
         {loading || !user ? (
           <div role="status" aria-busy="true">
-            <span className="text-sm text-muted">Loading…</span>
+            <span className="text-sm text-neutral-400">Loading…</span>
           </div>
         ) : (
           <MyPosts user={user} />

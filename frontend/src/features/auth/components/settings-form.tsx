@@ -18,11 +18,13 @@ const emptyValues: UpdateCredentialsFormValues = {
 };
 
 const inputClass =
-  "h-11 rounded-lg border border-border bg-surface px-3.5 text-sm text-foreground outline-none transition-shadow placeholder:text-gray-400 focus:border-accent focus:ring-2 focus:ring-accent/15";
+  "h-11 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-3.5 text-sm text-white outline-none transition-shadow placeholder:text-neutral-500 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/15";
+const errorTextClass = "text-sm text-red-400";
 
 export function SettingsForm() {
   const { user } = useAuth();
   const updateMutation = useUpdateCredentials();
+  const isAdmin = user?.role === "admin";
 
   const {
     register,
@@ -50,20 +52,27 @@ export function SettingsForm() {
   }
 
   return (
-    <main className="flex flex-1 justify-center px-4 py-8 sm:py-12">
+    <main className="flex flex-1 justify-center bg-neutral-950 px-4 py-8 sm:py-12">
       <div className="w-full max-w-2xl">
         <div className="mb-7">
-          <p className="mb-1 text-sm font-medium text-accent">Account</p>
-          <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
-          <p className="mt-2 text-sm text-muted">
+          <p className="mb-1 text-sm font-medium text-emerald-400">
+            {isAdmin ? "Admin" : "Account"}
+          </p>
+          <h1 className="text-2xl font-bold tracking-tight text-white">
+            Settings
+          </h1>
+          <p className="mt-2 text-sm text-neutral-400">
             Change your account credentials.
           </p>
         </div>
 
-        <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
-          <div className="border-b border-border px-5 py-4 sm:px-6">
-            <p className="mt-1 text-sm text-muted">
-              Signed in as {user?.fullName}
+        <div className="overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900">
+          <div className="border-b border-neutral-800 px-5 py-4 sm:px-6">
+            <p className="text-sm text-neutral-400">
+              Signed in as{" "}
+              <span className="font-semibold text-white">
+                {user?.fullName}
+              </span>
             </p>
           </div>
 
@@ -75,7 +84,7 @@ export function SettingsForm() {
             {updateMutation.isError && (
               <p
                 role="alert"
-                className="rounded-lg border border-red-200 bg-red-50 px-3.5 py-3 text-sm text-red-700"
+                className="rounded-lg border border-red-900/50 bg-red-950/40 px-3.5 py-3 text-sm text-red-300"
               >
                 {updateMutation.error instanceof Error
                   ? updateMutation.error.message
@@ -86,13 +95,13 @@ export function SettingsForm() {
             {updateMutation.isSuccess && (
               <p
                 role="status"
-                className="rounded-lg border border-emerald-200 bg-emerald-50 px-3.5 py-3 text-sm text-emerald-700"
+                className="rounded-lg border border-emerald-400/25 bg-emerald-400/10 px-3.5 py-3 text-sm text-emerald-300"
               >
                 Account updated.
               </p>
             )}
 
-            <label className="flex flex-col gap-2 text-sm font-medium">
+            <label className="flex flex-col gap-2 text-sm font-medium text-white">
               <span>Full name</span>
               <input
                 type="text"
@@ -102,13 +111,13 @@ export function SettingsForm() {
                 className={inputClass}
               />
               {errors.newFullName && (
-                <span role="alert" className="text-sm text-red-600">
+                <span role="alert" className={errorTextClass}>
                   {errors.newFullName.message}
                 </span>
               )}
             </label>
 
-            <label className="flex flex-col gap-2 text-sm font-medium">
+            <label className="flex flex-col gap-2 text-sm font-medium text-white">
               <span>Current password</span>
               <PasswordInput
                 aria-invalid={errors.currentPassword ? "true" : "false"}
@@ -116,16 +125,15 @@ export function SettingsForm() {
                 className={inputClass}
               />
               {errors.currentPassword && (
-                <span role="alert" className="text-sm text-red-600">
+                <span role="alert" className={errorTextClass}>
                   {errors.currentPassword.message}
                 </span>
               )}
             </label>
 
-            {user?.role === "admin" && (
-              <label className="flex flex-col gap-2 text-sm font-medium">
+            {isAdmin && (
+              <label className="flex flex-col gap-2 text-sm font-medium text-white">
                 <span>New email</span>
-
                 <input
                   type="email"
                   aria-invalid={errors.newEmail ? "true" : "false"}
@@ -133,17 +141,17 @@ export function SettingsForm() {
                   className={inputClass}
                 />
                 {errors.newEmail && (
-                  <span role="alert" className="text-sm text-red-600">
+                  <span role="alert" className={errorTextClass}>
                     {errors.newEmail.message}
                   </span>
                 )}
               </label>
             )}
 
-            <label className="flex flex-col gap-2 text-sm font-medium">
+            <label className="flex flex-col gap-2 text-sm font-medium text-white">
               <span>New password</span>
-              {user?.role === "admin" && (
-                <span className="font-normal text-xs text-muted">
+              {isAdmin && (
+                <span className="font-normal text-xs text-neutral-400">
                   Leave blank if you only want to change your email.
                 </span>
               )}
@@ -154,19 +162,19 @@ export function SettingsForm() {
                 className={inputClass}
               />
               {errors.newPassword && (
-                <span role="alert" className="text-sm text-red-600">
+                <span role="alert" className={errorTextClass}>
                   {errors.newPassword.message}
                 </span>
               )}
             </label>
 
-            <div className="flex justify-end border-t border-border pt-5">
+            <div className="flex justify-end border-t border-neutral-800 pt-5">
               <button
                 type="submit"
                 disabled={updateMutation.isPending}
-                className="h-10 rounded-lg bg-accent px-5 text-sm font-semibold text-accent-foreground transition-colors hover:bg-accent/90 focus:outline-none focus:ring-2 focus:ring-accent/30 disabled:cursor-not-allowed disabled:opacity-60"
+                className="h-10 rounded-lg bg-emerald-400 px-5 text-sm font-semibold text-neutral-950 transition-colors hover:bg-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-400/40 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                Save changes
+                {updateMutation.isPending ? "Saving…" : "Save changes"}
               </button>
             </div>
           </form>

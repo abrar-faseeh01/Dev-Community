@@ -32,7 +32,7 @@ type CommentListProps = {
 };
 
 const retryButtonClass =
-  "shrink-0 rounded-lg border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-300 disabled:cursor-not-allowed disabled:opacity-60";
+  "shrink-0 rounded-lg border border-red-900/50 bg-neutral-900 px-3 py-1.5 text-sm font-medium text-red-300 transition-colors hover:bg-red-950/40 focus:outline-none focus:ring-2 focus:ring-red-500/30 disabled:cursor-not-allowed disabled:opacity-60";
 
 // A separate component, not an effect inline in CommentList, so its own
 // effect calling onDone (an opaque prop from this component's point of
@@ -161,7 +161,7 @@ export function CommentList({ postId, commentCount, postAuthorId }: CommentListP
       <h2
         id={COMMENTS_HEADING_ID}
         tabIndex={-1}
-        className="text-lg font-semibold text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 rounded"
+        className="text-lg font-semibold text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/30 rounded"
       >
         Comments ({commentCount})
       </h2>
@@ -183,10 +183,10 @@ export function CommentList({ postId, commentCount, postAuthorId }: CommentListP
             don't render during the loading window either, without a
             redundant per-comment sign-in prompt. */}
         {loading ? null : user === null ? (
-          <p className="mb-5 text-sm text-muted">
+          <p className="mb-5 text-sm text-neutral-400">
             <Link
               href={ROUTES.LOGIN}
-              className="font-medium text-accent hover:underline"
+              className="font-medium text-emerald-400 hover:underline"
             >
               Sign in
             </Link>{" "}
@@ -206,15 +206,15 @@ export function CommentList({ postId, commentCount, postAuthorId }: CommentListP
         ) : null}
 
         {commentsQuery.isPending ? (
-          <div role="status" aria-busy="true" className="text-sm text-muted">
+          <div role="status" aria-busy="true" className="text-sm text-neutral-400">
             Loading comments…
           </div>
         ) : commentsQuery.isError ? (
           <div
             role="alert"
-            className="flex flex-col gap-3 rounded-lg border border-red-200 bg-red-50 p-4 sm:flex-row sm:items-center sm:justify-between"
+            className="flex flex-col gap-3 rounded-lg border border-red-900/50 bg-red-950/40 p-4 sm:flex-row sm:items-center sm:justify-between"
           >
-            <p className="text-sm text-red-700">Couldn&rsquo;t load comments.</p>
+            <p className="text-sm text-red-300">Couldn&rsquo;t load comments.</p>
             <button
               type="button"
               onClick={() => commentsQuery.refetch()}
@@ -225,7 +225,7 @@ export function CommentList({ postId, commentCount, postAuthorId }: CommentListP
             </button>
           </div>
         ) : commentsQuery.data.length === 0 ? (
-          <p className="text-sm text-muted">No comments yet.</p>
+          <p className="text-sm text-neutral-400">No comments yet.</p>
         ) : (
           <ul className="flex flex-col gap-3">
             {commentsQuery.data.map((comment) => (

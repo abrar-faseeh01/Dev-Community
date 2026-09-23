@@ -14,4 +14,6 @@ export const ROUTES = {
   profile: (id: string) => `/profile/${id}`,
   profileEdit: (id: string) => `/profile/edit/${id}`,
   profileEditExperience: (id: string) => `/profile/edit/${id}/experience`,
+  profileEditSkills: (id: string) => `/profile/edit/${id}#skills`,
+  profileEditPortfolio: (id: string) => `/profile/edit/${id}#portfolio`,
 } as const;

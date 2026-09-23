@@ -19,16 +19,6 @@ const urlField = (label: string) =>
       message: `${label} must be a valid URL (including http:// or https://)`,
     });
 
-// Mirrors backend/src/users/dto/update-fullname.dto.ts.
-export const fullNameSchema = z.object({
-  fullName: z
-    .string()
-    .trim()
-    .min(2, "Full name must be at least 2 characters"),
-  reason: z.string(),
-});
-export type FullNameFormValues = z.infer<typeof fullNameSchema>;
-
 // Shared by both the "add experience" and "inline edit experience" forms.
 // backend/src/profiles/dto/update-experience.dto.ts makes every field
 // optional (it's a partial PATCH), but this UI always submits a full

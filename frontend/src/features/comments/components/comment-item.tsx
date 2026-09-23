@@ -1,5 +1,6 @@
 "use client";
 
+import { Avatar } from "@/components/common/avatar";
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import type { Comment } from "@/features/comments/types/comment";
 import {
@@ -185,114 +186,119 @@ export function CommentItem({
       ref={rootRef}
       tabIndex={-1}
       data-comment-id={comment.id}
-      className="list-none rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
+      className="list-none rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/30"
     >
-      <article className="rounded-lg border border-border bg-surface p-4">
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-muted">
-          <span className="font-medium text-foreground">{comment.author.fullName}</span>
-          <span aria-hidden="true">·</span>
-          <time
-            dateTime={comment.createdAt}
-            title={formatFullDateTime(comment.createdAt)}
-          >
-            {formatRelativeTime(comment.createdAt)}
-          </time>
-          {edited && <span className="text-xs">(edited)</span>}
+      <article className="rounded-lg border border-neutral-800 bg-neutral-900 p-4">
+        <div className="flex items-start gap-3">
+          <Avatar name={comment.author.fullName} size="sm" />
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-neutral-400">
+              <span className="font-medium text-white">{comment.author.fullName}</span>
+              <span aria-hidden="true">·</span>
+              <time
+                dateTime={comment.createdAt}
+                title={formatFullDateTime(comment.createdAt)}
+              >
+                {formatRelativeTime(comment.createdAt)}
+              </time>
+              {edited && <span className="text-xs">(edited)</span>}
+            </div>
+
+            {replyingToAuthor && (
+              <p className="mt-0.5 text-xs text-neutral-400">
+                Replying to <span className="font-medium">@{replyingToAuthor}</span>
+              </p>
+            )}
+
+            {isEditOpen ? (
+              <div className="mt-2">
+                <CommentForm
+                  placeholder="Edit your comment…"
+                  initialValue={comment.body}
+                  submitLabel="Save"
+                  pendingLabel="Saving…"
+                  isPending={updateMutation.isPending}
+                  error={updateMutation.isError ? updateMutation.error : undefined}
+                  autoFocus
+                  onCancel={coordination.closeForm}
+                  onDirtyChange={coordination.onFormDirtyChange}
+                  onSubmit={(body) => updateMutation.mutateAsync({ id: comment.id, body })}
+                />
+              </div>
+            ) : (
+              <>
+                <p
+                  className={`mt-2 whitespace-pre-wrap text-sm text-neutral-200 wrap-anywhere ${
+                    isLong && !expanded ? "line-clamp-6" : ""
+                  }`}
+                >
+                  {comment.body}
+                </p>
+                {isLong && (
+                  <button
+                    type="button"
+                    onClick={() => setExpanded((e) => !e)}
+                    className="mt-1 text-xs font-medium text-emerald-400 hover:underline focus:outline-none focus:ring-2 focus:ring-emerald-400/30"
+                  >
+                    {expanded ? "Show less" : "Show more"}
+                  </button>
+                )}
+              </>
+            )}
+
+            {!isEditOpen && !isReplyOpen && (
+              <div className="mt-2 flex items-center gap-3">
+                {canComment(viewer) && (
+                  <button
+                    ref={replyTriggerRef}
+                    type="button"
+                    onClick={() => coordination.requestForm(comment.id, "reply")}
+                    className="text-xs font-medium text-emerald-400 hover:underline focus:outline-none focus:ring-2 focus:ring-emerald-400/30"
+                  >
+                    Reply
+                  </button>
+                )}
+                {actor === "author" && (
+                  <button
+                    ref={editTriggerRef}
+                    type="button"
+                    onClick={() => coordination.requestForm(comment.id, "edit")}
+                    className="text-xs font-medium text-neutral-400 hover:text-white hover:underline focus:outline-none focus:ring-2 focus:ring-emerald-400/30"
+                  >
+                    Edit
+                  </button>
+                )}
+                {actor !== null && (
+                  <button
+                    type="button"
+                    onClick={openDeleteConfirm}
+                    className="text-xs font-medium text-red-400 hover:underline focus:outline-none focus:ring-2 focus:ring-red-500/30"
+                  >
+                    Delete
+                  </button>
+                )}
+              </div>
+            )}
+
+            {isReplyOpen && (
+              <div className="mt-3">
+                <CommentForm
+                  placeholder={`Reply to ${comment.author.fullName}…`}
+                  submitLabel="Reply"
+                  pendingLabel="Posting…"
+                  isPending={replyMutation.isPending}
+                  error={replyMutation.isError ? replyMutation.error : undefined}
+                  autoFocus
+                  onCancel={coordination.closeForm}
+                  onDirtyChange={coordination.onFormDirtyChange}
+                  onSubmit={(body) =>
+                    replyMutation.mutateAsync({ body, parentCommentId: comment.id })
+                  }
+                />
+              </div>
+            )}
+          </div>
         </div>
-
-        {replyingToAuthor && (
-          <p className="mt-0.5 text-xs text-muted">
-            Replying to <span className="font-medium">@{replyingToAuthor}</span>
-          </p>
-        )}
-
-        {isEditOpen ? (
-          <div className="mt-2">
-            <CommentForm
-              placeholder="Edit your comment…"
-              initialValue={comment.body}
-              submitLabel="Save"
-              pendingLabel="Saving…"
-              isPending={updateMutation.isPending}
-              error={updateMutation.isError ? updateMutation.error : undefined}
-              autoFocus
-              onCancel={coordination.closeForm}
-              onDirtyChange={coordination.onFormDirtyChange}
-              onSubmit={(body) => updateMutation.mutateAsync({ id: comment.id, body })}
-            />
-          </div>
-        ) : (
-          <>
-            <p
-              className={`mt-2 whitespace-pre-wrap text-sm text-foreground wrap-anywhere ${
-                isLong && !expanded ? "line-clamp-6" : ""
-              }`}
-            >
-              {comment.body}
-            </p>
-            {isLong && (
-              <button
-                type="button"
-                onClick={() => setExpanded((e) => !e)}
-                className="mt-1 text-xs font-medium text-accent hover:underline focus:outline-none focus:ring-2 focus:ring-accent/30"
-              >
-                {expanded ? "Show less" : "Show more"}
-              </button>
-            )}
-          </>
-        )}
-
-        {!isEditOpen && !isReplyOpen && (
-          <div className="mt-2 flex items-center gap-3">
-            {canComment(viewer) && (
-              <button
-                ref={replyTriggerRef}
-                type="button"
-                onClick={() => coordination.requestForm(comment.id, "reply")}
-                className="text-xs font-medium text-accent hover:underline focus:outline-none focus:ring-2 focus:ring-accent/30"
-              >
-                Reply
-              </button>
-            )}
-            {actor === "author" && (
-              <button
-                ref={editTriggerRef}
-                type="button"
-                onClick={() => coordination.requestForm(comment.id, "edit")}
-                className="text-xs font-medium text-muted hover:text-foreground hover:underline focus:outline-none focus:ring-2 focus:ring-accent/30"
-              >
-                Edit
-              </button>
-            )}
-            {actor !== null && (
-              <button
-                type="button"
-                onClick={openDeleteConfirm}
-                className="text-xs font-medium text-red-600 hover:underline focus:outline-none focus:ring-2 focus:ring-red-300"
-              >
-                Delete
-              </button>
-            )}
-          </div>
-        )}
-
-        {isReplyOpen && (
-          <div className="mt-3">
-            <CommentForm
-              placeholder={`Reply to ${comment.author.fullName}…`}
-              submitLabel="Reply"
-              pendingLabel="Posting…"
-              isPending={replyMutation.isPending}
-              error={replyMutation.isError ? replyMutation.error : undefined}
-              autoFocus
-              onCancel={coordination.closeForm}
-              onDirtyChange={coordination.onFormDirtyChange}
-              onSubmit={(body) =>
-                replyMutation.mutateAsync({ body, parentCommentId: comment.id })
-              }
-            />
-          </div>
-        )}
       </article>
 
       <ConfirmDialog
@@ -326,7 +332,7 @@ export function CommentItem({
       />
 
       {comment.replies.length > 0 && (
-        <ul className="mt-3 flex flex-col gap-3 border-l border-border pl-4">
+        <ul className="mt-3 flex flex-col gap-3 border-l border-neutral-800 pl-4">
           {comment.replies.map((reply) => {
             // A direct child's parentCommentId is this node's own id; a
             // flattened deeper reply's parentCommentId points at some other

@@ -2,11 +2,9 @@ import {
   Body,
   Controller,
   Delete,
-  ForbiddenException,
   Get,
   HttpCode,
   Param,
-  Patch,
 } from '@nestjs/common';
 import {
   ApiCookieAuth,
@@ -21,16 +19,13 @@ import {
 import { AuditService } from '../audit/audit.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { recordAdminOverride } from '../common/authorization/owner-or-admin';
 import type { RequestUser } from '../common/authorization/owner-or-admin';
 import { ErrorResponseDto } from '../common/dto/error-response.dto';
 import { NullDataResponseDto } from '../common/dto/null-data-response.dto';
 import { ReasonDto } from '../common/dto/reason.dto';
 import { ParseObjectIdPipe } from '../common/pipes/parse-object-id.pipe';
 import { NotificationsService } from '../notifications/notifications.service';
-import { UpdateFullNameDto } from './dto/update-fullname.dto';
-import { UpdateFullNameResponseDto, UsersListResponseDto } from './dto/users-response.dto';
-import { User } from './schemas/user.schema';
+import { UsersListResponseDto } from './dto/users-response.dto';
 import { UsersService } from './users.service';
 
 @ApiTags('users')
@@ -99,67 +94,4 @@ export class UsersController {
     return null;
   }
 
-  // Admin-only, not owner-or-admin like the skills/experience routes (now
-  // in ProfilesController): self-editing your own name already has a
-  // dedicated, password-gated path (PATCH /auth/me — see
-  // AuthService.updateCredentials). This route exists specifically for an
-  // admin acting on someone else, so it deliberately doesn't offer a
-  // weaker duplicate way to rename yourself without proving your password.
-  @Patch(':id/fullname')
-  @HttpCode(200)
-  @Roles('admin')
-  @ApiOperation({
-    summary: "Rename another user's account (admin only)",
-    description:
-      "For editing your own name, use PATCH /auth/me instead — this route exists specifically for an admin acting on someone else and rejects self-targeting.",
-  })
-  @ApiParam({ name: 'id', example: '64f1c2e5a1b2c3d4e5f6a7b8' })
-  @ApiOkResponse({ type: UpdateFullNameResponseDto })
-  @ApiForbiddenResponse({ description: 'Caller is not an admin, or is targeting their own account.', type: ErrorResponseDto })
-  @ApiNotFoundResponse({ description: 'User not found.', type: ErrorResponseDto })
-  async updateFullName(
-    @Param('id', ParseObjectIdPipe) id: string,
-    @CurrentUser() requester: RequestUser,
-    @Body() dto: UpdateFullNameDto,
-  ) {
-    if (requester.userId === id) {
-      throw new ForbiddenException(
-        'Use PATCH /auth/me to edit your own full name',
-      );
-    }
-
-    const before = await this.usersService.getProfileById(id);
-    const user = await this.usersService.updateFullName(id, dto.fullName);
-
-    // Every successful call here is, by construction, an admin acting on
-    // someone else (admin-only route, self-edits rejected above) — always
-    // record, same as deleteUser above.
-    await recordAdminOverride(
-      { auditService: this.auditService, notificationsService: this.notificationsService },
-      requester,
-      { id, fullName: before.fullName },
-      'update_fullname',
-      { fullName: before.fullName },
-      { fullName: user.fullName },
-      'An administrator updated your profile.',
-      dto.reason,
-    );
-
-    return this.toProfile(user);
-  }
-
-  // Hand-picked shape — never return the raw document. passwordHash is
-  // already excluded by select:false and toJSON, but picking exact fields
-  // here means nothing else on the document (however it evolves later)
-  // can leak through by accident either.
-  private toProfile(user: User) {
-    return {
-      id: String(user._id),
-      fullName: user.fullName,
-      email: user.email,
-      role: user.role,
-      skills: user.skills,
-      experiences: user.experiences,
-    };
-  }
 }

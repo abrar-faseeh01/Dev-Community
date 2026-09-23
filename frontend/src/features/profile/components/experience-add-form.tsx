@@ -44,14 +44,14 @@ export function ExperienceAddForm({
         }),
       )}
       noValidate
-      className="flex flex-col gap-3 rounded-lg border border-border p-4"
+      className="flex flex-col gap-3 rounded-lg border border-neutral-800 bg-neutral-950 p-4"
     >
-      <p className="text-sm font-semibold text-foreground">Add experience</p>
+      <p className="text-sm font-semibold text-white">Add experience</p>
 
       {errorMessage && (
         <p
           role="alert"
-          className="rounded-lg border border-red-200 bg-red-50 px-3.5 py-3 text-sm text-red-700"
+          className="rounded-lg border border-red-900/50 bg-red-950/40 px-3.5 py-3 text-sm text-red-300"
         >
           {errorMessage}
         </p>
@@ -63,7 +63,7 @@ export function ExperienceAddForm({
         <button
           type="submit"
           disabled={mutation.isPending}
-          className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground transition-colors hover:bg-accent/90 disabled:opacity-60"
+          className="rounded-lg bg-emerald-400 px-4 py-2 text-sm font-semibold text-neutral-950 transition-colors hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {mutation.isPending ? "Adding…" : "Add experience"}
         </button>

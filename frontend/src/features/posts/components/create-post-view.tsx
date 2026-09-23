@@ -43,14 +43,14 @@ export function CreatePostView() {
     createMutation.error.status === 403;
 
   return (
-    <main className="flex flex-1 justify-center px-4 py-8 sm:py-12">
+    <main className="flex flex-1 justify-center bg-neutral-950 px-4 py-8 sm:py-12">
       <div className="w-full max-w-2xl">
         <div className="mb-7">
-          <p className="mb-1 text-sm font-medium text-accent">Posts</p>
-          <h1 className="text-2xl font-bold tracking-tight">Create post</h1>
+          <p className="mb-1 text-sm font-medium text-emerald-400">Posts</p>
+          <h1 className="text-2xl font-bold tracking-tight text-white">Create post</h1>
         </div>
 
-        <div className="rounded-xl border border-border bg-surface p-6 shadow-sm sm:p-8">
+        <div className="rounded-xl border border-neutral-800 bg-neutral-900 p-6 sm:p-8">
           {canShowForm ? (
             <PostForm
               submitLabel="Publish post"
@@ -71,7 +71,7 @@ export function CreatePostView() {
             // While the session loads, and for the moment before an admin or
             // signed-out visitor is redirected: never the form.
             <div role="status" aria-busy="true">
-              <span className="text-sm text-muted">Loading…</span>
+              <span className="text-sm text-neutral-400">Loading…</span>
             </div>
           )}
         </div>

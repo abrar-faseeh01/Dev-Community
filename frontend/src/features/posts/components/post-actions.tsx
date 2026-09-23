@@ -25,21 +25,35 @@ import { useRef, useState } from "react";
 const actionClass =
   "rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors focus:outline-none focus:ring-2";
 
+// "outline" is the original look (Post Detail's header Edit link and footer
+// Delete button — bordered, no fill). "solid" is only for "Posts made by
+// you" (my-posts.tsx), where Edit/Delete sit together in a row and read
+// better as filled buttons. Defaulting to "outline" everywhere means Post
+// Detail's existing callers, which never pass this prop, render exactly as
+// they did before this page's restyle.
+type ActionVariant = "outline" | "solid";
+
 export function AdminBadge() {
   return (
-    <span className="rounded-full border border-accent/25 bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent">
+    <span className="rounded-full border border-emerald-400/25 bg-emerald-400/10 px-2 py-0.5 text-xs font-medium text-emerald-400">
       Admin
     </span>
   );
 }
 
-type EditLinkProps = { post: Post; actor: PostActor };
+type EditLinkProps = { post: Post; actor: PostActor; variant?: ActionVariant };
 
-export function PostEditLink({ post, actor }: EditLinkProps) {
+const EDIT_VARIANT_CLASSES: Record<ActionVariant, string> = {
+  outline: "border-neutral-700 text-white hover:bg-neutral-800 focus:ring-emerald-400/30",
+  solid:
+    "border-transparent bg-emerald-400 text-neutral-950 hover:bg-emerald-300 focus:ring-emerald-400/40",
+};
+
+export function PostEditLink({ post, actor, variant = "outline" }: EditLinkProps) {
   return (
     <Link
       href={ROUTES.postEdit(post.id)}
-      className={`${actionClass} border-border text-foreground hover:bg-background focus:ring-accent/30`}
+      className={`${actionClass} ${EDIT_VARIANT_CLASSES[variant]}`}
     >
       {actor === "moderator" ? "Edit as admin" : "Edit"}
     </Link>
@@ -68,6 +82,13 @@ type DeleteButtonProps = {
   // navigate away, and the list page to say what happened. When omitted the
   // reader is sent to the feed with a notice.
   onRemoved?: (info: { alreadyGone: boolean }) => void;
+  variant?: ActionVariant;
+};
+
+const DELETE_VARIANT_CLASSES: Record<ActionVariant, string> = {
+  outline: "border-red-900/50 text-red-400 hover:bg-red-950/40 focus:ring-red-400/30",
+  solid:
+    "border-transparent bg-red-400 text-neutral-950 hover:bg-red-300 focus:ring-red-400/40",
 };
 
 export function PostDeleteButton({
@@ -75,6 +96,7 @@ export function PostDeleteButton({
   actor,
   label,
   onRemoved,
+  variant = "outline",
 }: DeleteButtonProps) {
   const router = useRouter();
   const [confirming, setConfirming] = useState(false);
@@ -121,7 +143,7 @@ export function PostDeleteButton({
       <button
         type="button"
         onClick={openDialog}
-        className={`${actionClass} border-red-200 text-red-700 hover:bg-red-50 focus:ring-red-300`}
+        className={`${actionClass} ${DELETE_VARIANT_CLASSES[variant]}`}
       >
         {label ?? (moderating ? "Delete as admin" : "Delete")}
       </button>
@@ -159,14 +181,15 @@ type ActionsProps = {
   post: Post;
   actor: PostActor;
   onRemoved?: DeleteButtonProps["onRemoved"];
+  variant?: ActionVariant;
 };
 
 // Both controls side by side — for a row in "Posts made by you".
-export function PostActions({ post, actor, onRemoved }: ActionsProps) {
+export function PostActions({ post, actor, onRemoved, variant = "outline" }: ActionsProps) {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <PostEditLink post={post} actor={actor} />
-      <PostDeleteButton post={post} actor={actor} onRemoved={onRemoved} />
+      <PostEditLink post={post} actor={actor} variant={variant} />
+      <PostDeleteButton post={post} actor={actor} onRemoved={onRemoved} variant={variant} />
       {actor === "moderator" && <AdminBadge />}
     </div>
   );

@@ -6,16 +6,16 @@ export function PostDetailSkeleton() {
   return (
     <div
       aria-hidden="true"
-      className="animate-pulse rounded-xl border border-border bg-surface p-5 shadow-sm sm:p-8"
+      className="animate-pulse rounded-xl border border-neutral-800 bg-neutral-900 p-5 sm:p-8"
     >
-      <div className="h-7 w-3/4 rounded bg-border/70" />
-      <div className="mt-4 h-3.5 w-2/5 rounded bg-border/70" />
+      <div className="h-7 w-3/4 rounded bg-neutral-800" />
+      <div className="mt-4 h-3.5 w-2/5 rounded bg-neutral-800" />
       <div className="mt-8 flex flex-col gap-3">
-        <div className="h-3.5 w-full rounded bg-border/70" />
-        <div className="h-3.5 w-full rounded bg-border/70" />
-        <div className="h-3.5 w-full rounded bg-border/70" />
-        <div className="h-3.5 w-5/6 rounded bg-border/70" />
-        <div className="h-3.5 w-2/3 rounded bg-border/70" />
+        <div className="h-3.5 w-full rounded bg-neutral-800" />
+        <div className="h-3.5 w-full rounded bg-neutral-800" />
+        <div className="h-3.5 w-full rounded bg-neutral-800" />
+        <div className="h-3.5 w-5/6 rounded bg-neutral-800" />
+        <div className="h-3.5 w-2/3 rounded bg-neutral-800" />
       </div>
     </div>
   );

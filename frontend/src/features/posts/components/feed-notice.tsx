@@ -44,13 +44,13 @@ export function FeedNotice() {
   return (
     <div
       role="status"
-      className="mb-5 flex items-start justify-between gap-3 rounded-xl border border-accent/25 bg-accent/10 px-4 py-3 text-sm text-foreground"
+      className="mb-5 flex items-start justify-between gap-3 rounded-xl border border-emerald-400/25 bg-emerald-400/10 px-4 py-3 text-sm text-white"
     >
       <p>{message}</p>
       <button
         type="button"
         onClick={() => setMessage(null)}
-        className="shrink-0 rounded px-1 font-medium text-accent hover:underline focus:outline-none focus:ring-2 focus:ring-accent/30"
+        className="shrink-0 rounded px-1 font-medium text-emerald-400 hover:underline focus:outline-none focus:ring-2 focus:ring-emerald-400/30"
       >
         Dismiss
       </button>

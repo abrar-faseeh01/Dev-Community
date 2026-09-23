@@ -74,7 +74,7 @@ export function NotificationBell({ userId }: { userId: string }) {
         aria-expanded={open}
         aria-controls="notifications-panel"
         aria-label="Notifications"
-        className="relative flex h-9 w-9 items-center justify-center rounded-full text-muted transition-colors hover:bg-background hover:text-foreground focus:outline-none focus:ring-2 focus:ring-accent/30"
+        className="relative flex h-9 w-9 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-neutral-800 hover:text-white focus:outline-none focus:ring-2 focus:ring-emerald-400/30"
       >
         <BellIcon />
         {unreadCount > 0 && (
@@ -99,21 +99,23 @@ export function NotificationBell({ userId }: { userId: string }) {
           than the viewport minus a 0.5rem margin either side. */}
       <div
         id="notifications-panel"
-        className={`absolute right-2 top-[calc(100%+0.5rem)] w-[min(20rem,calc(100vw-1rem))] origin-top-right overflow-hidden rounded-xl border border-border bg-surface shadow-lg transition-all duration-150 ease-out sm:right-0 sm:w-80 ${
+        className={`absolute right-2 top-[calc(100%+0.5rem)] w-[min(20rem,calc(100vw-1rem))] origin-top-right overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900 shadow-lg transition-all duration-150 ease-out sm:right-0 sm:w-80 ${
           open ? "visible scale-100 opacity-100" : "invisible scale-95 opacity-0"
         }`}
       >
-        <div className="border-b border-border px-4 py-3">
-          <p className="text-sm font-semibold text-foreground">Notifications</p>
+        <div className="border-b border-neutral-800 px-4 py-3">
+          <p className="text-sm font-semibold text-white">Notifications</p>
         </div>
 
         <div className="max-h-80 overflow-y-auto">
-          {notifLoading && <p className="p-4 text-sm text-muted">Loading…</p>}
+          {notifLoading && (
+            <p className="p-4 text-sm text-neutral-400">Loading…</p>
+          )}
 
           {!notifLoading && notifError && (
             <p
               role="alert"
-              className="m-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+              className="m-3 rounded-lg border border-red-900/50 bg-red-950/40 px-3 py-2 text-sm text-red-300"
             >
               {notifError}
             </p>
@@ -123,7 +125,9 @@ export function NotificationBell({ userId }: { userId: string }) {
             !notifError &&
             notifications &&
             notifications.length === 0 && (
-              <p className="p-4 text-sm text-muted">No notifications yet.</p>
+              <p className="p-4 text-sm text-neutral-400">
+                No notifications yet.
+              </p>
             )}
 
           {!notifLoading &&
@@ -136,21 +140,21 @@ export function NotificationBell({ userId }: { userId: string }) {
                     <button
                       type="button"
                       onClick={() => handleNotificationClick(n)}
-                      className={`flex w-full flex-col items-start gap-1 border-b border-border px-4 py-3 text-left transition-colors last:border-b-0 hover:bg-background ${
-                        n.read ? "" : "bg-accent/5"
+                      className={`flex w-full flex-col items-start gap-1 border-b border-neutral-800 px-4 py-3 text-left transition-colors last:border-b-0 hover:bg-neutral-800 ${
+                        n.read ? "" : "bg-emerald-400/5"
                       }`}
                     >
                       <span className="flex w-full items-start gap-2">
                         {!n.read && (
-                          <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
+                          <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />
                         )}
                         <span
-                          className={`text-sm ${n.read ? "text-muted" : "font-medium text-foreground"}`}
+                          className={`text-sm ${n.read ? "text-neutral-400" : "font-medium text-white"}`}
                         >
                           {n.message}
                         </span>
                       </span>
-                      <span className="pl-3.5 text-xs text-muted">
+                      <span className="pl-3.5 text-xs text-neutral-400">
                         {formatRelativeTime(n.createdAt)}
                       </span>
                     </button>

@@ -6,14 +6,14 @@ export function PostCardSkeleton() {
   return (
     <div
       aria-hidden="true"
-      className="animate-pulse rounded-xl border border-border bg-surface p-5 shadow-sm sm:p-6"
+      className="animate-pulse rounded-xl border border-neutral-800 bg-neutral-900 p-5 sm:p-6"
     >
-      <div className="h-5 w-2/3 rounded bg-border/70" />
-      <div className="mt-3 h-3.5 w-2/5 rounded bg-border/70" />
+      <div className="h-5 w-2/3 rounded bg-neutral-800" />
+      <div className="mt-3 h-3.5 w-2/5 rounded bg-neutral-800" />
       <div className="mt-4 flex flex-col gap-2">
-        <div className="h-3.5 w-full rounded bg-border/70" />
-        <div className="h-3.5 w-full rounded bg-border/70" />
-        <div className="h-3.5 w-4/5 rounded bg-border/70" />
+        <div className="h-3.5 w-full rounded bg-neutral-800" />
+        <div className="h-3.5 w-full rounded bg-neutral-800" />
+        <div className="h-3.5 w-4/5 rounded bg-neutral-800" />
       </div>
     </div>
   );

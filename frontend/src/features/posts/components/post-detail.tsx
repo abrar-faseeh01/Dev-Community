@@ -25,9 +25,11 @@ export function PostDetail({
   footer,
 }: PostDetailProps) {
   return (
-    <article className="rounded-xl border border-border bg-surface p-5 shadow-sm sm:p-8">
-      <div className="flex items-start justify-between gap-4">
-        <h1 className="min-w-0 text-2xl font-bold tracking-tight text-foreground wrap-anywhere">
+    <article className="rounded-xl border border-neutral-800 bg-neutral-900 p-5 sm:p-8">
+      <PostByline post={post} linkAuthor={linkAuthor} showAvatar />
+
+      <div className="mt-4 flex items-start justify-between gap-4">
+        <h1 className="min-w-0 text-2xl font-bold tracking-tight text-white wrap-anywhere">
           {post.title}
         </h1>
         {headerAction && (
@@ -37,14 +39,12 @@ export function PostDetail({
         )}
       </div>
 
-      <PostByline post={post} linkAuthor={linkAuthor} />
-
-      <div className="mt-6 whitespace-pre-wrap text-base leading-relaxed text-foreground wrap-anywhere">
+      <div className="mt-6 whitespace-pre-wrap text-base leading-relaxed text-neutral-200 wrap-anywhere">
         {post.body}
       </div>
 
       {footer && (
-        <div className="mt-6 border-t border-border pt-4">{footer}</div>
+        <div className="mt-6 border-t border-neutral-800 pt-4">{footer}</div>
       )}
     </article>
   );

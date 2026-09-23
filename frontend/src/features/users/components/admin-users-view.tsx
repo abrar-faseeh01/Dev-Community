@@ -1,5 +1,6 @@
 "use client";
 
+import { Avatar } from "@/components/common/avatar";
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { ROUTES } from "@/constants/routes";
 import { useRequireAdmin } from "@/features/auth/hooks/use-require-auth";
@@ -57,27 +58,31 @@ export function AdminUsersView() {
   }
 
   return (
-    <main className="flex flex-1 justify-center px-4 py-8 sm:py-12">
+    <main className="flex flex-1 justify-center bg-neutral-950 px-4 py-8 sm:py-12">
       <div className="w-full max-w-4xl">
         <div className="mb-7">
-          <p className="mb-1 text-sm font-medium text-accent">Admin</p>
-          <h1 className="text-2xl font-bold tracking-tight">All users</h1>
+          <p className="mb-1 text-sm font-medium text-emerald-400">Admin</p>
+          <h1 className="text-2xl font-bold tracking-tight text-white">
+            All users
+          </h1>
         </div>
 
-        <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
-          {loading && <p className="p-6 text-sm text-muted">Loading users…</p>}
+        <div className="overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900">
+          {loading && (
+            <p className="p-6 text-sm text-neutral-400">Loading users…</p>
+          )}
 
           {!loading && loadError && (
             <p
               role="alert"
-              className="m-5 rounded-lg border border-red-200 bg-red-50 px-3.5 py-3 text-sm text-red-700 sm:m-6"
+              className="m-5 rounded-lg border border-red-900/50 bg-red-950/40 px-3.5 py-3 text-sm text-red-300 sm:m-6"
             >
               {loadError}
             </p>
           )}
 
           {!loading && !loadError && users && users.length === 0 && (
-            <p className="p-6 text-sm text-muted">No users found.</p>
+            <p className="p-6 text-sm text-neutral-400">No users found.</p>
           )}
 
           {!loading && !loadError && users && users.length > 0 && (
@@ -85,7 +90,7 @@ export function AdminUsersView() {
               {deleteError && (
                 <p
                   role="alert"
-                  className="m-5 rounded-lg border border-red-200 bg-red-50 px-3.5 py-3 text-sm text-red-700 sm:m-6 sm:mb-0"
+                  className="m-5 rounded-lg border border-red-900/50 bg-red-950/40 px-3.5 py-3 text-sm text-red-300 sm:m-6 sm:mb-0"
                 >
                   {deleteError}
                 </p>
@@ -94,7 +99,7 @@ export function AdminUsersView() {
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
                   <thead>
-                    <tr className="border-b border-border text-xs font-semibold uppercase tracking-wide text-muted">
+                    <tr className="border-b border-neutral-800 text-xs font-semibold uppercase tracking-wide text-neutral-400">
                       <th className="px-5 py-3 sm:px-6">Full name</th>
                       <th className="px-5 py-3 sm:px-6">Email</th>
                       <th className="px-5 py-3 sm:px-6">Role</th>
@@ -109,42 +114,49 @@ export function AdminUsersView() {
                       return (
                         <tr
                           key={row.id}
-                          className="border-b border-border last:border-b-0 transition-colors hover:bg-background"
+                          className="border-b border-neutral-800 last:border-b-0 transition-colors hover:bg-neutral-800/60"
                         >
-                          <td className="px-5 py-3.5 font-medium text-foreground sm:px-6">
-                            {row.fullName}
+                          <td className="px-5 py-3.5 sm:px-6">
+                            <div className="flex items-center gap-3">
+                              <Avatar name={row.fullName} size="sm" />
+                              <span className="font-medium text-white">
+                                {row.fullName}
+                              </span>
+                            </div>
                           </td>
-                          <td className="px-5 py-3.5 text-muted sm:px-6">
+                          <td className="px-5 py-3.5 text-neutral-400 sm:px-6">
                             {row.email}
                           </td>
                           <td className="px-5 py-3.5 sm:px-6">
                             {isRowAdmin ? (
-                              <span className="rounded-full border border-accent/25 bg-accent/10 px-2.5 py-1 text-xs font-medium text-accent">
+                              <span className="rounded-full border border-emerald-400/25 bg-emerald-400/10 px-2.5 py-1 text-xs font-medium text-emerald-400">
                                 Admin
                               </span>
                             ) : (
-                              <span className="text-muted">User</span>
+                              <span className="rounded-full border border-neutral-700 bg-neutral-800 px-2.5 py-1 text-xs font-medium text-neutral-300">
+                                User
+                              </span>
                             )}
                           </td>
-                          <td className="px-5 py-3.5 text-muted sm:px-6">
+                          <td className="px-5 py-3.5 text-neutral-400 sm:px-6">
                             {formatDate(row.createdAt)}
                           </td>
                           <td className="px-5 py-3.5 sm:px-6">
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-4">
                               <Link
                                 href={
                                   isRowAdmin
                                     ? ROUTES.SETTINGS
                                     : ROUTES.profileEdit(row.id)
                                 }
-                                className="font-medium text-accent hover:underline"
+                                className="font-medium text-emerald-400 hover:underline"
                               >
                                 Edit
                               </Link>
                               {isRowAdmin ? (
                                 <span
                                   title="Admin accounts can't be deleted"
-                                  className="cursor-not-allowed font-medium text-muted"
+                                  className="cursor-not-allowed font-medium text-neutral-500"
                                 >
                                   Delete
                                 </span>
@@ -153,7 +165,7 @@ export function AdminUsersView() {
                                   type="button"
                                   disabled={isDeleting}
                                   onClick={() => setPendingDelete(row)}
-                                  className="font-medium text-red-600 hover:underline disabled:opacity-60"
+                                  className="font-medium text-red-400 hover:underline disabled:cursor-not-allowed disabled:opacity-60"
                                 >
                                   {isDeleting ? "Deleting…" : "Delete"}
                                 </button>
