@@ -1,6 +1,6 @@
 # Developer Community Platform
 
-I'm building a Developer Community Platform where members can authenticate, maintain a developer profile, publish posts, comment (threaded, with replies), and (eventually) react, search, and browse ranked content. This repo covers the platform through Day 9 of my 20-day build plan: project foundations, authentication with role-based access, a full developer profile API and form, a Posts API with ownership, pagination, and admin moderation, the posts UI (infinite-scroll feed, post page, create/edit form), and a threaded comments API (create, reply, list as a tree, cascade delete, and edit). After Day 8 I also restructured the frontend into a feature-first layout (see the Day 8 section under Progress). Day 9 is backend-only per the plan — the comments UI is Day 10.
+I'm building a Developer Community Platform where members can authenticate, maintain a developer profile, publish posts, comment (threaded, with replies), and (eventually) react, search, and browse ranked content. This repo covers the platform through Day 10 of my 20-day build plan: project foundations, authentication with role-based access, a full developer profile API and form, a Posts API with ownership, pagination, and admin moderation, the posts UI (infinite-scroll feed, post page, create/edit form), a threaded comments API (create, reply, list as a tree, cascade delete, and edit), and the comments UI itself (recursive reply/edit/delete, permission-gated, with full keyboard focus management). After Day 8 I also restructured the frontend into a feature-first layout (see the Day 8 section under Progress).
 
 ## Stack
 
@@ -169,7 +169,6 @@ Comments never expose the internal `ancestorIds` path or `deletedAt`. `Post.comm
 |---|---|---|
 | `GET /users` | Admin only | Full user list |
 | `DELETE /users/:id` | Admin only | Refuses to delete any admin account, including by another admin |
-| `PATCH /users/:id/fullname` | Admin only | Rejects targeting your own id — use `PATCH /auth/me` for that |
 
 ### Admin (`/admin`)
 
@@ -205,8 +204,7 @@ Every admin-override action creates one audit-log entry (who, what changed, befo
 - Notifications are polled (every 45 seconds while the app is open and the tab is visible), not pushed in real time.
 - No search or filtering on the admin user list or profile viewing — the full list is returned and any narrowing happens client-side, if at all.
 - The posts list response carries every post's full `body` (there's no excerpt field), so a page of long posts is a large response; the feed cards only truncate visually.
-- The feed has no search, filtering, or alternative sort yet (Day 14), and post cards don't show like/dislike/comment counts yet — `likeCount`/`dislikeCount` stay 0 until Day 11's reactions; `commentCount` has been accurate since Day 9, but there's no comments UI to show it against until Day 10, so it stays unrendered for now too.
-- There's no frontend test runner yet (Jest and React Testing Library arrive on Day 17); frontend changes are verified with `npm run lint`, `npx tsc --noEmit`, `npm run build`, and manual testing against the running app.
+- The feed has no search, filtering, or alternative sort yet (Day 14), and post cards don't show like/dislike counts yet — `likeCount`/`dislikeCount` stay 0 until Day 11's reactions. `commentCount` is accurate and now rendered, in the comments section's "Comments (N)" heading.
 - `frontend/src/middleware.ts` still uses Next.js 16's deprecated `middleware` name (the current name is `proxy`); it works, and the rename is deliberately left as its own change.
 - Soft-deleted posts are retained in the database indefinitely — there's no scheduled purge (TTL index or cron job) that hard-deletes them after any retention period, and no restore path either.
 - Admin-override actions (profile edits, post edits/deletes) aren't wrapped in a database transaction — if the audit-log/notification write fails after the underlying change already saved, the change persists with no audit trail. Not yet hit in practice; the guard that does fire (optimistic concurrency on a genuine conflicting edit) correctly returns `409`, not `500`.
@@ -219,6 +217,8 @@ Every admin-override action creates one audit-log entry (who, what changed, befo
 - No notification yet when someone comments or replies on a post.
 - No rate limiting on comment routes yet (planned for the security-hardening day).
 - Deleting a user account doesn't yet remove or reassign their comments — they still show up, with the author shown as "Deleted user".
+- If a reader's session expires while a comment composer or reply form is already open, the `401` on submit hard-redirects to `/login` before the typed text can be saved anywhere — fixed by Day 18's refresh-token flow.
+- `ConfirmDialog`'s focus-restore on close is guarded against a removed element, but doesn't pick a replacement target itself — that's each caller's job. Comment delete does this (focuses the parent comment, or the heading for a root); deleting a post from "Posts made by you" doesn't yet.
 
 ## Progress
 
@@ -252,8 +252,8 @@ Every admin-override action creates one audit-log entry (who, what changed, befo
 ### Day 5 — Developer profile API
 
 - Added `headline`, `bio`, and `portfolioProjects` (with per-project URL, technology, and conditional end-date validation) to the developer profile, alongside the existing `skills` and `experiences`.
-- Built `ProfilesModule`: `GET/PATCH /profile/me` for self-service, and `GET /profile/:id` plus owner-or-admin write routes for every profile field, so an admin can edit any member's profile with the same audit-logging and notification behavior that already existed for skills, experiences, and full-name changes.
-- Kept `UsersController` scoped to account administration only (list, delete, admin rename) and extracted the shared owner-or-admin authorization logic so both controllers use one implementation.
+- Built `ProfilesModule`: `GET/PATCH /profile/me` for self-service, and `GET /profile/:id` plus owner-or-admin write routes for every profile field, so an admin can edit any member's profile with the same audit-logging and notification behavior that already existed for skills and experiences.
+- Kept `UsersController` scoped to account administration only (list, delete) and extracted the shared owner-or-admin authorization logic so both controllers use one implementation. Full name stays out of that owner-or-admin surface entirely — it only ever changes through `PATCH /auth/me`, self-only.
 
 ### Day 6 — Complex developer profile form
 
@@ -333,3 +333,15 @@ frontend/src/
 - `PATCH /comments/:id` edits a comment's body — the comment's own author only, no admin or post-owner override, unlike delete. No time limit on when a comment may be edited. `updatedAt` exists solely so a client can detect an edit (`updatedAt !== createdAt`); the value itself is never meant to be displayed.
 - Found and fixed an existing Day 7/8 bug while working on this: a post's read/edit/delete routes threw a bare 500 if the post's author account had been hard-deleted. A shared helper now returns `{id: null, fullName: "Deleted user"}` instead, used by both posts and comments; an admin acting on such an account is still audit-logged, just not notified (nobody to notify).
 - Built a committed Jest e2e suite (158 tests across 6 files) against the real database, with throwaway accounts cleaned up after every run, rather than one-off manual scripts.
+
+### Day 10 — Threaded comments interface
+
+- Set up the frontend's first Jest/RTL test harness (`next/jest`, jsdom, `@testing-library/*`) — named in the stack since Day 1 but never actually wired up; Day 10 is the first day with real interactive/keyboard behavior worth unit-testing.
+- Fixed a focus-management gap in `ConfirmDialog` deferred from Day 8: it now traps Tab within the dialog while open, focuses the reason input or Cancel button on open, and restores focus to whatever opened it on close (skipped if that element is gone). Comment delete becomes its 5th caller, alongside the 4 existing ones.
+- Built `features/comments/`: a recursive comment tree (`CommentItem`/`CommentList`) with reply, edit, and delete, each gated by the same author/post-owner/admin rules the Day 9 backend already enforces. Structural changes (create, delete) invalidate and refetch rather than patch the cache locally, matching the backend's own depth-2 flattening rule instead of re-implementing it client-side; edit patches the body in place since it never changes the tree's shape.
+- Coordinated forms across the whole tree so only one reply/edit draft can be open at a time, confirming before discarding an unsent one when switching targets.
+- Managed focus through every action so keyboard users always land somewhere sensible afterward — the new comment, the edit button, a delete's parent comment or the "Comments" heading — with polite live-region announcements alongside each.
+- Every reply shows "Replying to @X" naming its true parent, not just ones flattened past the backend's depth-2 display cutoff — direct nesting alone doesn't distinguish a reply from a flattened one once both sit at the same single indent level in the UI.
+- Remapped a handful of accurate-but-technical backend error strings (e.g. "Parent comment not found") into reader-facing wording for the races that can actually trigger them — a parent, comment, or post deleted between page load and submit.
+- Added a Comment button on the feed that deep-links into a post's comment section, sending a logged-out reader to `/login` first; an admin, who has no composer, lands on the section itself.
+- Verified with tsc/lint/build plus ~98 unit and component tests, and manually against the real API for each rejection case before finalizing the error mapping.

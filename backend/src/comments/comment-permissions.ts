@@ -11,8 +11,8 @@ import type { RequestUser } from '../common/authorization/owner-or-admin';
 //      their own post, and may remove anyone's comment there;
 //   3. an admin, who moderates everywhere.
 //
-// Anyone else is refused, including the author of some other post. Nobody can
-// EDIT a comment at all, admins included, so there is no edit check to write.
+// Anyone else is refused, including the author of some other post. Editing is
+// a separate, stricter check — see assertMayEditComment below.
 
 // The two rules that need no lookup. Kept apart from the full check so the
 // caller can skip the post query — the only extra read — whenever the
