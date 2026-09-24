@@ -11,6 +11,7 @@ import { HealthModule } from './health/health.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { PostsModule } from './posts/posts.module';
 import { ProfilesModule } from './profiles/profiles.module';
+import { ReactionsModule } from './reactions/reactions.module';
 import { UsersModule } from './users/users.module';
 
 @Module({
@@ -36,6 +37,7 @@ import { UsersModule } from './users/users.module';
     ProfilesModule,
     PostsModule,
     CommentsModule,
+    ReactionsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
