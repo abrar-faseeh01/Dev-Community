@@ -1,4 +1,5 @@
 import type { Types } from 'mongoose';
+import { displayCount } from '../reactions/reaction-toggle';
 import { toAuthorSummary, type PopulatedAuthor } from '../users/author-summary';
 import type { CommentRow } from './comment-tree';
 
@@ -14,6 +15,10 @@ export type PopulatedComment = {
   body: string;
   createdAt: Date;
   updatedAt: Date;
+  // Optional: rows written before the counters existed do not have them. May
+  // also be negative if a counter drifted; displayCount floors both.
+  likeCount?: number;
+  dislikeCount?: number;
   authorId: PopulatedAuthor | null;
 };
 
@@ -30,6 +35,12 @@ export function toCommentRow(comment: PopulatedComment): CommentRow {
     body: comment.body,
     createdAt: comment.createdAt,
     updatedAt: comment.updatedAt,
+    likeCount: displayCount(comment.likeCount),
+    dislikeCount: displayCount(comment.dislikeCount),
+    // A stored comment says nothing about who is looking at it. The list route
+    // overrides this for a signed-in caller; a comment that was just created
+    // keeps null, since its author cannot have reacted to it yet.
+    myReaction: null,
     author: toAuthorSummary(comment.authorId),
   };
 }

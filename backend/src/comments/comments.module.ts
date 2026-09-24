@@ -3,6 +3,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { AuditModule } from '../audit/audit.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { Post, PostSchema } from '../posts/schemas/post.schema';
+import { ReactionsModule } from '../reactions/reactions.module';
 import { UsersModule } from '../users/users.module';
 import { CommentsController } from './comments.controller';
 import { CommentsService } from './comments.service';
@@ -22,6 +23,9 @@ import { Comment, CommentSchema } from './schemas/comment.schema';
     UsersModule,
     AuditModule,
     NotificationsModule,
+    // For the caller's own reactions on the list read. One direction only:
+    // ReactionsModule imports neither this module nor PostsModule.
+    ReactionsModule,
   ],
   controllers: [CommentsController],
   providers: [CommentsService],

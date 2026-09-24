@@ -8,6 +8,7 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Post } from '../posts/schemas/post.schema';
+import { ReactionsService } from '../reactions/reactions.service';
 import { toCommentRow, type PopulatedComment } from './comment-row';
 import {
   buildCommentTree,
@@ -30,6 +31,8 @@ export class CommentsService {
   constructor(
     @InjectModel(Comment.name) private commentModel: Model<Comment>,
     @InjectModel(Post.name) private postModel: Model<Post>,
+    // Only for the caller's own reactions on the list read (findMineFor).
+    private readonly reactionsService: ReactionsService,
   ) {}
 
   // Order matters here, and each step is its own failure mode:
@@ -94,7 +97,13 @@ export class CommentsService {
   // Ordering and orphans are buildCommentTree's job, not this query's: it
   // sorts for itself and drops any comment whose parent is not in the list.
   // There is no pagination — the whole tree comes back.
-  async list(postId: string): Promise<CommentNode[]> {
+  //
+  // `userId` is the signed-in caller, or null for an anonymous read. Their own
+  // reaction to every comment in the thread comes from ONE batched query
+  // (findMineFor), attached to the rows before the tree is built — so the
+  // tree builder never learns about reactions, and the cost is one query per
+  // thread, not one per comment.
+  async list(postId: string, userId: string | null): Promise<CommentNode[]> {
     const post = await this.postModel.exists({ _id: postId, deletedAt: null });
     if (!post) {
       throw new NotFoundException('Post not found');
@@ -102,16 +111,25 @@ export class CommentsService {
 
     const comments = await this.commentModel
       .find({ postId, deletedAt: null })
-      .select('postId authorId parentCommentId body createdAt updatedAt')
+      .select(
+        'postId authorId parentCommentId body createdAt updatedAt likeCount dislikeCount',
+      )
       .sort({ _id: 1 })
       .populate('authorId', 'fullName headline')
       .lean()
       .exec();
 
+    const mine = await this.reactionsService.findMineFor(
+      userId,
+      'comment',
+      comments.map((comment) => String(comment._id)),
+    );
+
     return buildCommentTree(
-      comments.map((comment) =>
-        toCommentRow(comment as unknown as PopulatedComment),
-      ),
+      comments.map((comment) => {
+        const row = toCommentRow(comment as unknown as PopulatedComment);
+        return { ...row, myReaction: mine.get(row.id) ?? null };
+      }),
     );
   }
 

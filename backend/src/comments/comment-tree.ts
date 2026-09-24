@@ -1,3 +1,4 @@
+import type { ReactionType } from '../reactions/schemas/reaction.schema';
 import type { AuthorSummary } from '../users/author-summary';
 import { MAX_COMMENT_DEPTH } from './comment.constants';
 
@@ -35,6 +36,12 @@ export type CommentRow = {
   // Equal to createdAt until the comment is edited. A client compares the
   // two to show an "Edited" label — the value itself is never displayed.
   updatedAt: Date;
+  likeCount: number;
+  dislikeCount: number;
+  // The caller's own reaction. Not stored on the comment: toCommentRow leaves
+  // it null and the list route fills it in for the signed-in caller (one
+  // batched lookup) before the tree is built, so this file stays pure.
+  myReaction: ReactionType | null;
   author: AuthorSummary;
 };
 
@@ -53,6 +60,9 @@ export function toCommentNode(row: CommentRow): CommentNode {
     body: row.body,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
+    likeCount: row.likeCount,
+    dislikeCount: row.dislikeCount,
+    myReaction: row.myReaction,
     author: row.author,
     replies: [],
   };

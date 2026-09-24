@@ -1,4 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
+import {
+  REACTION_TYPES,
+  type ReactionType,
+} from '../../reactions/schemas/reaction.schema';
 import { AuthorSummaryDto } from '../../users/dto/author-summary.dto';
 import { MAX_COMMENT_DEPTH } from '../comment.constants';
 
@@ -31,6 +35,21 @@ export class CommentDto {
     description: 'Equal to createdAt until the comment is edited. Compare the two to show an "edited" indicator — the value itself is not meant to be displayed.',
   })
   updatedAt: Date;
+
+  @ApiProperty({ example: 3, description: 'How many users currently like this comment.' })
+  likeCount: number;
+
+  @ApiProperty({ example: 0, description: 'How many users currently dislike this comment.' })
+  dislikeCount: number;
+
+  @ApiProperty({
+    enum: REACTION_TYPES,
+    nullable: true,
+    example: null,
+    description:
+      "The caller's own reaction to this comment. null when the caller has none, is not signed in, or (on a just-created comment) cannot have one yet.",
+  })
+  myReaction: ReactionType | null;
 
   @ApiProperty({ type: AuthorSummaryDto })
   author: AuthorSummaryDto;

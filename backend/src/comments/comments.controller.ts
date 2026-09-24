@@ -7,6 +7,7 @@ import {
   Param,
   Patch,
   Post,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
@@ -24,6 +25,7 @@ import { AuditService } from '../audit/audit.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Public } from '../auth/decorators/public.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import {
   isAdminOverride,
   recordAdminOverride,
@@ -81,12 +83,17 @@ export class CommentsController {
   // The whole tree is returned as a bare array of top-level comments; the
   // global envelope already wraps it, and with no pagination there is no
   // cursor metadata to put alongside it.
+  //
+  // @UseGuards(OptionalJwtAuthGuard): still public, but a signed-in caller is
+  // identified so every comment can carry their own reaction (`myReaction`).
+  // Anonymous or bad-cookie callers are not rejected; they get null throughout.
   @Public()
+  @UseGuards(OptionalJwtAuthGuard)
   @Get('posts/:postId/comments')
   @ApiOperation({
     summary: 'List a post\'s comments as a tree',
     description:
-      'Public — no authentication required. Returns every live comment on the post as a nested tree: top-level comments newest first, each with its full reply thread in `replies` (oldest first), nested up to a maximum depth of 2 — a reply deeper than that still appears in its root\'s `replies`, keeping its own true `parentCommentId`, rather than nesting further. Deleted comments and their replies are not included. There is no pagination, so the response grows with the number of comments on the post.',
+      'Public — no authentication required. Returns every live comment on the post as a nested tree: top-level comments newest first, each with its full reply thread in `replies` (oldest first), nested up to a maximum depth of 2 — a reply deeper than that still appears in its root\'s `replies`, keeping its own true `parentCommentId`, rather than nesting further. Deleted comments and their replies are not included. There is no pagination, so the response grows with the number of comments on the post. When the request carries a valid session cookie, each comment\'s `myReaction` is the caller\'s own reaction to it (looked up for the whole thread in one query); otherwise it is null.',
   })
   @ApiParam(POST_ID_PARAM)
   @ApiOkResponse({ type: CommentListResponseDto })
@@ -98,8 +105,11 @@ export class CommentsController {
     description: 'The post does not exist or has been deleted.',
     type: ErrorResponseDto,
   })
-  list(@Param('postId', ParseObjectIdPipe) postId: string) {
-    return this.commentsService.list(postId);
+  list(
+    @Param('postId', ParseObjectIdPipe) postId: string,
+    @CurrentUser() requester: RequestUser | null,
+  ) {
+    return this.commentsService.list(postId, requester?.userId ?? null);
   }
 
   // No @Public() — protected by the global JwtAuthGuard default.

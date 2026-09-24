@@ -87,7 +87,10 @@ describeE2e('comments API', () => {
         'author',
         'body',
         'createdAt',
+        'dislikeCount',
         'id',
+        'likeCount',
+        'myReaction',
         'parentCommentId',
         'postId',
         'replies',
@@ -98,6 +101,10 @@ describeE2e('comments API', () => {
         parentCommentId: null,
         body: 'First!',
         replies: [],
+        // Nobody has reacted to a brand-new comment, its author included.
+        likeCount: 0,
+        dislikeCount: 0,
+        myReaction: null,
         author: { id: commenter.id, fullName: commenter.fullName },
       });
       expect(new Date(node.createdAt).toString()).not.toBe('Invalid Date');
@@ -672,7 +679,10 @@ describeE2e('comments API', () => {
           'author',
           'body',
           'createdAt',
+          'dislikeCount',
           'id',
+          'likeCount',
+          'myReaction',
           'parentCommentId',
           'postId',
           'replies',

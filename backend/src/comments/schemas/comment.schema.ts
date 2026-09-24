@@ -63,6 +63,17 @@ export class Comment extends Document {
   // Soft delete, like Post — deleting a comment cascades to its whole
   // subtree, and a post's comments are cascaded when the post itself is
   // deleted, so the rows stay for the audit trail but never read back.
+  // Denormalized reaction totals, changed only by the reactions module with
+  // one atomic update per toggle (never recomputed on read). Comments created
+  // before these fields existed have neither stored, which is why every read
+  // path defaults them to 0 (toCommentRow) — `$inc` on a missing field
+  // starts from 0, so the write side needs no backfill.
+  @Prop({ default: 0 })
+  likeCount: number;
+
+  @Prop({ default: 0 })
+  dislikeCount: number;
+
   @Prop({ type: Date, default: null })
   deletedAt: Date | null;
 }

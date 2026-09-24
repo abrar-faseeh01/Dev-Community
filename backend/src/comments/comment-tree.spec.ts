@@ -26,6 +26,9 @@ function row(
     body: `comment ${n}`,
     createdAt,
     updatedAt: createdAt, // never edited, by default
+    likeCount: 0,
+    dislikeCount: 0,
+    myReaction: null,
     author: { id: oid(900 + n), fullName: `Author ${n}` },
     ...overrides,
   };
@@ -199,12 +202,30 @@ describe('buildCommentTree', () => {
       'author',
       'body',
       'createdAt',
+      'dislikeCount',
       'id',
+      'likeCount',
+      'myReaction',
       'parentCommentId',
       'postId',
       'replies',
       'updatedAt',
     ]);
+  });
+
+  it("carries each comment's own myReaction and counters through to its node, replies included", () => {
+    const [root] = buildCommentTree([
+      row(1, null, { myReaction: 'like', likeCount: 3 }),
+      row(2, 1, { myReaction: 'dislike', dislikeCount: 2 }),
+      row(3, 1),
+    ]);
+
+    expect(root.myReaction).toBe('like');
+    expect(root.likeCount).toBe(3);
+    const [reply1, reply2] = root.replies;
+    expect(reply1.myReaction).toBe('dislike');
+    expect(reply1.dislikeCount).toBe(2);
+    expect(reply2.myReaction).toBeNull();
   });
 
   it('carries the author through as given, including a deleted one', () => {
