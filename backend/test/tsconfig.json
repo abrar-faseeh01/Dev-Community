@@ -1,0 +1,14 @@
+{
+  // Only for the editor and for `tsc -p test`. The root tsconfig.json includes
+  // just src/, so without this file everything under test/ is a loose file to
+  // the TypeScript server and Jest's globals (beforeAll, afterAll, describe...)
+  // show up as unknown names. Jest itself does not read this file: the e2e
+  // run compiles through ts-jest with the inline options in jest-e2e.json.
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "..",
+    "noEmit": true,
+    "incremental": false
+  },
+  "include": ["./**/*.ts", "../src/**/*.ts"]
+}
