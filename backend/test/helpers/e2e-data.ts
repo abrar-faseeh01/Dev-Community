@@ -7,6 +7,7 @@ import { AuditLog } from '../../src/audit/schemas/audit-log.schema';
 import { Comment } from '../../src/comments/schemas/comment.schema';
 import { Notification } from '../../src/notifications/schemas/notification.schema';
 import { Post } from '../../src/posts/schemas/post.schema';
+import { Reaction } from '../../src/reactions/schemas/reaction.schema';
 import { User, UserRole } from '../../src/users/schemas/user.schema';
 
 // Every throwaway account carries this marker in its email, so anything a
@@ -39,6 +40,7 @@ export type CleanupResult = {
   comments: number;
   auditLogs: number;
   notifications: number;
+  reactions: number;
 };
 
 const EMPTY_RESULT: CleanupResult = {
@@ -48,6 +50,7 @@ const EMPTY_RESULT: CleanupResult = {
   comments: 0,
   auditLogs: 0,
   notifications: 0,
+  reactions: 0,
 };
 
 function toObjectIds(ids: Iterable<string>): Types.ObjectId[] {
@@ -78,6 +81,7 @@ export class E2eData {
     user: Model<User>;
     post: Model<Post>;
     comment: Model<Comment>;
+    reaction: Model<Reaction>;
     auditLog: Model<AuditLog>;
     notification: Model<Notification>;
   };
@@ -88,6 +92,7 @@ export class E2eData {
       user: app.get(getModelToken(User.name), { strict: false }),
       post: app.get(getModelToken(Post.name), { strict: false }),
       comment: app.get(getModelToken(Comment.name), { strict: false }),
+      reaction: app.get(getModelToken(Reaction.name), { strict: false }),
       auditLog: app.get(getModelToken(AuditLog.name), { strict: false }),
       notification: app.get(getModelToken(Notification.name), {
         strict: false,
@@ -221,6 +226,26 @@ export class E2eData {
         $or: commentClauses,
       });
       result.comments = res.deletedCount;
+    }
+
+    // Reactions are removed by tracked ids only: the ones a throwaway user
+    // made, and any on a throwaway post or a tracked comment.
+    const reactionClauses: Record<string, unknown>[] = [];
+    if (userIds.length) reactionClauses.push({ userId: { $in: userIds } });
+    if (postIds.length) {
+      reactionClauses.push({ targetType: 'post', targetId: { $in: postIds } });
+    }
+    if (commentIds.length) {
+      reactionClauses.push({
+        targetType: 'comment',
+        targetId: { $in: commentIds },
+      });
+    }
+    if (reactionClauses.length) {
+      const res = await this.models.reaction.deleteMany({
+        $or: reactionClauses,
+      });
+      result.reactions = res.deletedCount;
     }
 
     if (userIds.length) {
