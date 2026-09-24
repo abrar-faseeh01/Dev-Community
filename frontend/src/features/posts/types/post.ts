@@ -2,6 +2,7 @@
 // (Mongoose Date -> JSON), not Date objects, same as features/profile/types/profile.ts.
 
 import type { AuthorSummary } from "@/types/author-summary";
+import type { ReactionType } from "@/types/reaction";
 
 // The populated author is narrowed server-side to exactly these fields —
 // email and role are never returned. When the author's account has been
@@ -15,12 +16,15 @@ export type Post = {
   id: string;
   title: string;
   body: string;
-  // Denormalized counters, always 0 until Day 9 (comments) and Day 11
-  // (reactions) start maintaining them. Typed so the contract is complete,
-  // but not rendered yet.
+  // Denormalized counters, maintained by the backend (comments and
+  // reactions). Typed so the contract is complete; the reaction counts are
+  // not rendered yet.
   likeCount: number;
   dislikeCount: number;
   commentCount: number;
+  // The signed-in caller's own reaction to this post. null when they have
+  // none, are signed out, or (on a post they just created) cannot have one.
+  myReaction: ReactionType | null;
   // Always null on anything the API returns from a read route — a
   // soft-deleted post 404s instead.
   deletedAt: string | null;

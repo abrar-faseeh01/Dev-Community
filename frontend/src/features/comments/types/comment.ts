@@ -4,6 +4,7 @@
 // returned by the API and so have no place here.
 
 import type { AuthorSummary } from "@/types/author-summary";
+import type { ReactionType } from "@/types/reaction";
 
 export type Comment = {
   id: string;
@@ -20,6 +21,12 @@ export type Comment = {
   // Equal to createdAt until the comment is edited — compare the two to show
   // an "(edited)" label. The value itself is never meant to be displayed.
   updatedAt: string;
+  // Reaction totals, maintained by the backend; not rendered yet.
+  likeCount: number;
+  dislikeCount: number;
+  // The signed-in caller's own reaction to this comment. null when they have
+  // none, are signed out, or (on a comment they just created) cannot have one.
+  myReaction: ReactionType | null;
   author: AuthorSummary;
   // This comment's full reply thread, oldest first. In practice only ever
   // non-empty on a root (depth-1) comment — see the parentCommentId note.
