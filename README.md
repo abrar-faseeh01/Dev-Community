@@ -1,6 +1,6 @@
 # Developer Community Platform
 
-I'm building a Developer Community Platform where members can authenticate, maintain a developer profile, publish posts, comment (threaded, with replies), and (eventually) react, search, and browse ranked content. This repo covers the platform through Day 10 of my 20-day build plan: project foundations, authentication with role-based access, a full developer profile API and form, a Posts API with ownership, pagination, and admin moderation, the posts UI (infinite-scroll feed, post page, create/edit form), a threaded comments API (create, reply, list as a tree, cascade delete, and edit), and the comments UI itself (recursive reply/edit/delete, permission-gated, with full keyboard focus management). After Day 8 I also restructured the frontend into a feature-first layout (see the Day 8 section under Progress).
+I'm building a Developer Community Platform where members can authenticate, maintain a developer profile, publish posts, comment (threaded, with replies), react (like/dislike), and (eventually) search and browse ranked content. This repo covers the platform through Day 11 of my 20-day build plan: project foundations, authentication with role-based access, a full developer profile API and form, a Posts API with ownership, pagination, and admin moderation, the posts UI (infinite-scroll feed, post page, create/edit form), a threaded comments API (create, reply, list as a tree, cascade delete, and edit), and the comments UI itself (recursive reply/edit/delete, permission-gated, with full keyboard focus management), and the reaction engine on the backend (like/dislike on posts and comments with toggle behaviour, a unique index, and concurrency-safe counters; the reaction buttons themselves are Day 12). After Day 8 I also restructured the frontend into a feature-first layout (see the Day 8 section under Progress).
 
 ## Stack
 
@@ -163,6 +163,17 @@ The list response shape is `{items, nextCursor}` — pass the previous response'
 
 Comments never expose the internal `ancestorIds` path or `deletedAt`. `Post.commentCount` is kept accurate through create and delete, including under concurrent requests. Deleting a post soft-deletes all of its own comments too.
 
+### Reactions (`/posts/:id/reaction`, `/comments/:id/reaction`)
+
+| Method & path | Access | Notes |
+|---|---|---|
+| `POST /posts/:id/reaction` | Regular members only | Body `{ "type": "like" \| "dislike" }`. One toggle for every change: no reaction creates it, the same type again removes it, the opposite type switches it in place (one counter down, the other up). Returns `{likeCount, dislikeCount, myReaction}` — the counts after the change and the caller's own reaction (`null` after a remove). `404` for a missing or deleted post, `403` for an admin. |
+| `POST /comments/:id/reaction` | Regular members only | Same body, behaviour and response, for a comment. |
+
+It is a `POST` that returns `200`, not an idempotent `PUT`: sending the same request twice gives a different result (react, then un-react). A user has at most one reaction per post or comment, enforced by a unique database index, not only by the code.
+
+`GET /posts`, `GET /posts/:id` and `GET /posts/:postId/comments` stay public and now also return `myReaction` on every post and comment: the signed-in caller's own reaction, or `null` for an anonymous reader (a missing, invalid or expired cookie is treated as anonymous, not a `401`). The feed and the comment tree fetch all of a page's or thread's reactions with one query. `PATCH /posts/:id` returns it too; a just-created post or comment returns `null`.
+
 ### Users / admin (`/users`)
 
 | Method & path | Access | Notes |
@@ -204,7 +215,7 @@ Every admin-override action creates one audit-log entry (who, what changed, befo
 - Notifications are polled (every 45 seconds while the app is open and the tab is visible), not pushed in real time.
 - No search or filtering on the admin user list or profile viewing — the full list is returned and any narrowing happens client-side, if at all.
 - The posts list response carries every post's full `body` (there's no excerpt field), so a page of long posts is a large response; the feed cards only truncate visually.
-- The feed has no search, filtering, or alternative sort yet (Day 14), and post cards don't show like/dislike counts yet — `likeCount`/`dislikeCount` stay 0 until Day 11's reactions. `commentCount` is accurate and now rendered, in the comments section's "Comments (N)" heading.
+- The feed has no search, filtering, or alternative sort yet (Day 14), and post cards don't show like/dislike counts or reaction buttons yet — the API returns them since Day 11, but the UI is Day 12. `commentCount` is accurate and now rendered, in the comments section's "Comments (N)" heading.
 - `frontend/src/middleware.ts` still uses Next.js 16's deprecated `middleware` name (the current name is `proxy`); it works, and the rename is deliberately left as its own change.
 - Soft-deleted posts are retained in the database indefinitely — there's no scheduled purge (TTL index or cron job) that hard-deletes them after any retention period, and no restore path either.
 - Admin-override actions (profile edits, post edits/deletes) aren't wrapped in a database transaction — if the audit-log/notification write fails after the underlying change already saved, the change persists with no audit trail. Not yet hit in practice; the guard that does fire (optimistic concurrency on a genuine conflicting edit) correctly returns `409`, not `500`.
@@ -217,6 +228,10 @@ Every admin-override action creates one audit-log entry (who, what changed, befo
 - No notification yet when someone comments or replies on a post.
 - No rate limiting on comment routes yet (planned for the security-hardening day).
 - Deleting a user account doesn't yet remove or reassign their comments — they still show up, with the author shown as "Deleted user".
+- Reactions from a deleted account, and reactions on a post or comment that has since been soft-deleted, stay in the database and keep counting toward the counters; nothing removes them yet.
+- The reaction row and its counter are two separate writes with no transaction, so a server crash between them can leave a counter one off. A counter whose update fails while the server is running is repaired by a recount from the reaction rows; a crash is not.
+- A counter that has drifted below zero is shown as `0` but is not corrected in storage.
+- Signed-in reads (feed, post, comment tree) cost one extra user lookup for the session check, plus one reactions query per page or thread.
 - If a reader's session expires while a comment composer or reply form is already open, the `401` on submit hard-redirects to `/login` before the typed text can be saved anywhere — fixed by Day 18's refresh-token flow.
 - `ConfirmDialog`'s focus-restore on close is guarded against a removed element, but doesn't pick a replacement target itself — that's each caller's job. Comment delete does this (focuses the parent comment, or the heading for a root); deleting a post from "Posts made by you" doesn't yet.
 
@@ -345,3 +360,15 @@ frontend/src/
 - Remapped a handful of accurate-but-technical backend error strings (e.g. "Parent comment not found") into reader-facing wording for the races that can actually trigger them — a parent, comment, or post deleted between page load and submit.
 - Added a Comment button on the feed that deep-links into a post's comment section, sending a logged-out reader to `/login` first; an admin, who has no composer, lands on the section itself.
 - Verified with tsc/lint/build plus ~98 unit and component tests, and manually against the real API for each rejection case before finalizing the error mapping.
+
+### Day 11 — Reaction engine
+
+- Added the `Reaction` schema (`userId`, `targetType` of `post` or `comment`, `targetId`, `type` of `like` or `dislike`) with a unique index on `{userId, targetType, targetId}`, so the database itself refuses a second reaction from the same user on the same target, and built `POST /posts/:id/reaction` and `POST /comments/:id/reaction`, restricted to regular members like posting and commenting.
+- One toggle serves both targets. The reaction row is changed with atomic single-document operations — delete it if it already has the requested type, otherwise change it if it has the opposite type, otherwise insert it — so there is no read-then-write gap. If two requests race to insert, the loser hits the unique index, is caught, and reports what actually exists instead of failing with a 500. No transactions.
+- The counters change by one atomic update whose result is also the response, so there is no follow-up query. `Comment` gained `likeCount` and `dislikeCount`; comments stored before then have none and read as `0`.
+- Counters use a plain `$inc`, not the clamped update used for `commentCount`. An end-to-end run against the real database showed a floor on the write can lose an update when two requests race (a decrement that lands first on a counter at 0 is swallowed, so the increment that follows leaves it one too high; I confirmed that order-dependence directly). Increments commute, so the counters converge on the reaction rows in any order; the floor is applied when a count is shown instead.
+- Posts (feed, detail, edit) and the comment tree return the caller's own reaction as `myReaction`, through one batched lookup per page or thread. The three read routes are public, and the global guard never identifies a caller on a public route, so I added `OptionalJwtAuthGuard` for them: it identifies a signed-in caller without ever rejecting anyone.
+- Two things only showed up by running the real app. The first boot failed because the new guard couldn't be built inside the posts and comments modules, which type-checking and unit tests could not see; an explicit empty constructor fixed it. The counter race above surfaced once as a failed concurrency test that I could not reproduce afterwards, so I proved the mechanism directly rather than assume it was the cause.
+- Tests: unit specs for the pure toggle helpers and for the service (real helpers, mocked models, every branch checked through the whole chain; I mutation-checked the service spec by breaking the service twice and confirming the tests fail), plus a 31-test end-to-end spec against the real database covering create/switch/remove on both targets, the unique index refusing a direct duplicate, bursts of 5 and 20 concurrent requests (stored counters must equal the reaction rows), every rejection case, and `myReaction` on every read. 94 backend unit tests pass and the reactions e2e spec passed 31 of 31 on three consecutive runs. The existing comments, posts and harness e2e specs still pass; the comments spec's two exact-field-list assertions were updated for the new comment fields.
+- Frontend: only the `Post` and `Comment` types and their test fixtures changed (`myReaction`, and the comment counts). The reaction buttons and optimistic updates are Day 12.
+- Added a `tsconfig.json` under `backend/test/` so the editor recognises the Jest globals; the root config only includes `src/`. Type-checking `test/` for the first time also surfaced two real type errors in the new spec, which I fixed.
