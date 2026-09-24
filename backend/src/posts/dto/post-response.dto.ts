@@ -1,4 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
+import {
+  REACTION_TYPES,
+  type ReactionType,
+} from '../../reactions/schemas/reaction.schema';
 import { AuthorSummaryDto } from '../../users/dto/author-summary.dto';
 
 // The shape returned by create/list/detail/update — never the raw
@@ -15,14 +19,23 @@ export class PostDto {
   @ApiProperty({ example: 'Offset pagination degrades as pages get deeper...' })
   body: string;
 
-  @ApiProperty({ example: 0, description: 'Denormalized counter — inert until Day 11 (Reactions).' })
+  @ApiProperty({ example: 3, description: 'How many users currently like this post.' })
   likeCount: number;
 
-  @ApiProperty({ example: 0, description: 'Denormalized counter — inert until Day 11 (Reactions).' })
+  @ApiProperty({ example: 0, description: 'How many users currently dislike this post.' })
   dislikeCount: number;
 
   @ApiProperty({ example: 0, description: 'Denormalized counter — inert until Day 9 (Comments).' })
   commentCount: number;
+
+  @ApiProperty({
+    enum: REACTION_TYPES,
+    nullable: true,
+    example: null,
+    description:
+      "The caller's own reaction to this post. null when the caller has none, is not signed in, or (on a just-created post) cannot have one yet.",
+  })
+  myReaction: ReactionType | null;
 
   @ApiProperty({ type: 'string', format: 'date-time', nullable: true, example: null, description: 'Soft-delete timestamp; null while the post is live.' })
   deletedAt: Date | null;
