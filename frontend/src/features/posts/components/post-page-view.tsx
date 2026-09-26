@@ -1,6 +1,7 @@
 "use client";
 
 import { ROUTES } from "@/constants/routes";
+import { useAuth } from "@/features/auth/hooks/use-auth";
 import { CommentFocusHandler } from "@/features/comments/components/comment-focus-handler";
 import { CommentList } from "@/features/comments/components/comment-list";
 import { commentKeys } from "@/features/comments/queries/comment-queries";
@@ -11,11 +12,15 @@ import {
 } from "@/features/posts/components/post-actions";
 import { PostDetail } from "@/features/posts/components/post-detail";
 import { PostDetailSkeleton } from "@/features/posts/components/post-detail-skeleton";
-import { useAuth } from "@/features/auth/hooks/use-auth";
-import { describeLoadError, isPostNotFound } from "@/features/posts/utils/errors";
+import { PostReactionSummary } from "@/features/posts/components/post-reaction-summary";
+import { PostReactions } from "@/features/posts/components/post-reactions";
+import { postKeys, usePost } from "@/features/posts/queries/post-queries";
+import {
+  describeLoadError,
+  isPostNotFound,
+} from "@/features/posts/utils/errors";
 import { feedNoticeUrl } from "@/features/posts/utils/notices";
 import { getPostActor } from "@/features/posts/utils/permissions";
-import { postKeys, usePost } from "@/features/posts/queries/post-queries";
 import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -37,10 +42,16 @@ export function PostPageView({ id }: { id: string }) {
   useEffect(
     () => () => {
       if (removedRef.current) {
-        queryClient.removeQueries({ queryKey: postKeys.detail(id), exact: true });
+        queryClient.removeQueries({
+          queryKey: postKeys.detail(id),
+          exact: true,
+        });
         // The comment tree is equally stale once the post's own cascade
         // deletes it server-side.
-        queryClient.removeQueries({ queryKey: commentKeys.list(id), exact: true });
+        queryClient.removeQueries({
+          queryKey: commentKeys.list(id),
+          exact: true,
+        });
       }
     },
     [queryClient, id],
@@ -151,21 +162,31 @@ export function PostPageView({ id }: { id: string }) {
                   ) : undefined
                 }
                 footer={
-                  actor ? (
-                    <PostDeleteButton
-                      post={postQuery.data}
-                      actor={actor}
-                      label={
-                        actor === "moderator" ? "Delete as admin" : "Delete post"
-                      }
-                      onRemoved={({ alreadyGone }) => {
-                        removedRef.current = true;
-                        router.replace(
-                          feedNoticeUrl(alreadyGone ? "post-gone" : "post-deleted"),
-                        );
-                      }}
-                    />
-                  ) : undefined
+                  <div className="flex flex-col items-start gap-2">
+                    <PostReactionSummary post={postQuery.data} />
+                    <div className="flex w-full items-center justify-between gap-4">
+                      <PostReactions post={postQuery.data} size="lg" />
+                      {actor && (
+                        <PostDeleteButton
+                          post={postQuery.data}
+                          actor={actor}
+                          label={
+                            actor === "moderator"
+                              ? "Delete as admin"
+                              : "Delete post"
+                          }
+                          onRemoved={({ alreadyGone }) => {
+                            removedRef.current = true;
+                            router.replace(
+                              feedNoticeUrl(
+                                alreadyGone ? "post-gone" : "post-deleted",
+                              ),
+                            );
+                          }}
+                        />
+                      )}
+                    </div>
+                  </div>
                 }
               />
               <div className="mt-8">

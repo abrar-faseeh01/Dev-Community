@@ -1,14 +1,14 @@
-import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { CommentTree } from "@/features/comments/types/comment";
 import { useAuth } from "@/features/auth/hooks/use-auth";
-import { useComments } from "@/features/comments/queries/comment-queries";
 import {
   useCreateComment,
   useDeleteComment,
   useUpdateComment,
 } from "@/features/comments/mutations/comment-mutations";
+import { useComments } from "@/features/comments/queries/comment-queries";
+import type { CommentTree } from "@/features/comments/types/comment";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { CommentList } from "./comment-list";
 
 // Mocking the query/mutation hooks and useAuth, not the API/service layer
@@ -21,6 +21,10 @@ import { CommentList } from "./comment-list";
 jest.mock("@/features/comments/queries/comment-queries");
 jest.mock("@/features/comments/mutations/comment-mutations");
 jest.mock("@/features/auth/hooks/use-auth");
+jest.mock("./comment-reactions", () => ({ CommentReactions: () => null }));
+jest.mock("./comment-reaction-summary", () => ({
+  CommentReactionSummary: () => null,
+}));
 
 const mockUseComments = useComments as jest.MockedFunction<typeof useComments>;
 const mockUseCreateComment = useCreateComment as jest.MockedFunction<
@@ -48,7 +52,11 @@ const POST_AUTHOR_ID = "post-owner-1";
 type CommentsResult = ReturnType<typeof useComments>;
 
 function pendingComments(): CommentsResult {
-  return { isPending: true, isError: false, isFetching: true } as CommentsResult;
+  return {
+    isPending: true,
+    isError: false,
+    isFetching: true,
+  } as CommentsResult;
 }
 function errorComments(): CommentsResult {
   return {
@@ -60,10 +68,17 @@ function errorComments(): CommentsResult {
   } as unknown as CommentsResult;
 }
 function successComments(data: CommentTree): CommentsResult {
-  return { isPending: false, isError: false, isFetching: false, data } as CommentsResult;
+  return {
+    isPending: false,
+    isError: false,
+    isFetching: false,
+    data,
+  } as CommentsResult;
 }
 
-function fakeMutation(overrides: Partial<ReturnType<typeof useCreateComment>> = {}) {
+function fakeMutation(
+  overrides: Partial<ReturnType<typeof useCreateComment>> = {},
+) {
   return {
     isPending: false,
     isError: false,
@@ -73,7 +88,9 @@ function fakeMutation(overrides: Partial<ReturnType<typeof useCreateComment>> = 
   } as unknown as ReturnType<typeof useCreateComment>;
 }
 
-function fakeUpdateMutation(overrides: Partial<ReturnType<typeof useUpdateComment>> = {}) {
+function fakeUpdateMutation(
+  overrides: Partial<ReturnType<typeof useUpdateComment>> = {},
+) {
   return {
     isPending: false,
     isError: false,
@@ -83,7 +100,9 @@ function fakeUpdateMutation(overrides: Partial<ReturnType<typeof useUpdateCommen
   } as unknown as ReturnType<typeof useUpdateComment>;
 }
 
-function fakeDeleteMutation(overrides: Partial<ReturnType<typeof useDeleteComment>> = {}) {
+function fakeDeleteMutation(
+  overrides: Partial<ReturnType<typeof useDeleteComment>> = {},
+) {
   return {
     isPending: false,
     isError: false,
@@ -140,7 +159,12 @@ const TWO_COMMENT_TREE: CommentTree = [
 ];
 
 const LOGGED_IN_USER = {
-  user: { id: "viewer-1", fullName: "Viewer", email: "v@example.com", role: "user" as const },
+  user: {
+    id: "viewer-1",
+    fullName: "Viewer",
+    email: "v@example.com",
+    role: "user" as const,
+  },
   loading: false,
 };
 
@@ -207,7 +231,9 @@ describe("CommentList", () => {
       expect(
         screen.queryByPlaceholderText("Write a comment…"),
       ).not.toBeInTheDocument();
-      expect(screen.queryByRole("link", { name: "Sign in" })).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("link", { name: "Sign in" }),
+      ).not.toBeInTheDocument();
     });
 
     it("shows a sign-in link when logged out", () => {
@@ -220,17 +246,29 @@ describe("CommentList", () => {
 
     it("shows the composer for a 'user'-role viewer", () => {
       mockUseAuth.mockReturnValue({
-        user: { id: "u1", fullName: "A User", email: "a@example.com", role: "user" },
+        user: {
+          id: "u1",
+          fullName: "A User",
+          email: "a@example.com",
+          role: "user",
+        },
         loading: false,
       });
       renderCommentList({ commentCount: 0 });
 
-      expect(screen.getByPlaceholderText("Write a comment…")).toBeInTheDocument();
+      expect(
+        screen.getByPlaceholderText("Write a comment…"),
+      ).toBeInTheDocument();
     });
 
     it("shows neither the composer nor a sign-in link for an admin", () => {
       mockUseAuth.mockReturnValue({
-        user: { id: "a1", fullName: "An Admin", email: "admin@example.com", role: "admin" },
+        user: {
+          id: "a1",
+          fullName: "An Admin",
+          email: "admin@example.com",
+          role: "admin",
+        },
         loading: false,
       });
       renderCommentList({ commentCount: 0 });
@@ -238,7 +276,9 @@ describe("CommentList", () => {
       expect(
         screen.queryByPlaceholderText("Write a comment…"),
       ).not.toBeInTheDocument();
-      expect(screen.queryByRole("link", { name: "Sign in" })).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("link", { name: "Sign in" }),
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -257,7 +297,9 @@ describe("CommentList", () => {
         name: "Reply",
       });
       await user.click(replyOnFirst);
-      expect(screen.getByPlaceholderText("Reply to Ada Lovelace…")).toBeInTheDocument();
+      expect(
+        screen.getByPlaceholderText("Reply to Ada Lovelace…"),
+      ).toBeInTheDocument();
 
       await user.click(replyOnSecond);
 
@@ -265,7 +307,9 @@ describe("CommentList", () => {
       expect(
         screen.queryByPlaceholderText("Reply to Ada Lovelace…"),
       ).not.toBeInTheDocument();
-      expect(screen.getByPlaceholderText("Reply to Grace Hopper…")).toBeInTheDocument();
+      expect(
+        screen.getByPlaceholderText("Reply to Grace Hopper…"),
+      ).toBeInTheDocument();
       confirmSpy.mockRestore();
     });
 
@@ -286,7 +330,9 @@ describe("CommentList", () => {
       await user.click(replyOnSecond);
 
       expect(confirmSpy).toHaveBeenCalledTimes(1);
-      expect(screen.getByPlaceholderText("Reply to Grace Hopper…")).toBeInTheDocument();
+      expect(
+        screen.getByPlaceholderText("Reply to Grace Hopper…"),
+      ).toBeInTheDocument();
       confirmSpy.mockRestore();
     });
 
@@ -318,7 +364,12 @@ describe("CommentList", () => {
 
     it("shows the Edit trigger for the author on their own comment, alongside Reply on both", () => {
       mockUseAuth.mockReturnValue({
-        user: { id: "author-1", fullName: "Ada Lovelace", email: "a@example.com", role: "user" },
+        user: {
+          id: "author-1",
+          fullName: "Ada Lovelace",
+          email: "a@example.com",
+          role: "user",
+        },
         loading: false,
       });
       renderCommentList({ commentCount: 2 });

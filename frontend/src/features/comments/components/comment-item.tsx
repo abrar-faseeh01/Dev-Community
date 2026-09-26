@@ -2,19 +2,27 @@
 
 import { Avatar } from "@/components/common/avatar";
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
-import type { Comment } from "@/features/comments/types/comment";
 import {
   useDeleteComment,
   type useCreateComment,
   type useUpdateComment,
 } from "@/features/comments/mutations/comment-mutations";
 import { commentKeys } from "@/features/comments/queries/comment-queries";
-import { canComment, getCommentActor } from "@/features/comments/utils/permissions";
+import type { Comment } from "@/features/comments/types/comment";
 import { describeSaveError, hasStatus } from "@/features/comments/utils/errors";
-import { formatFullDateTime, formatRelativeTime } from "@/lib/utils/format-time";
+import {
+  canComment,
+  getCommentActor,
+} from "@/features/comments/utils/permissions";
+import {
+  formatFullDateTime,
+  formatRelativeTime,
+} from "@/lib/utils/format-time";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { CommentForm } from "./comment-form";
+import { CommentReactionSummary } from "./comment-reaction-summary";
+import { CommentReactions } from "./comment-reactions";
 
 export type ActiveForm = { commentId: string; kind: "reply" | "edit" } | null;
 
@@ -56,7 +64,10 @@ export type FormCoordination = {
   // and the cascade's deletedCount, for the live-region announcement.
   // comment-list.tsx owns resolving this to an actual DOM node, since it's
   // the one place with visibility into the whole tree.
-  onCommentDeleted: (focusTarget: string | "heading", deletedCount: number) => void;
+  onCommentDeleted: (
+    focusTarget: string | "heading",
+    deletedCount: number,
+  ) => void;
 };
 
 type Viewer = { id: string; role: "admin" | "user" } | null;
@@ -127,7 +138,8 @@ export function CommentItem({
   // the refetched tree has landed (this effect only runs once that render
   // has happened — it can't fire before the node exists).
   const rootRef = useRef<HTMLLIElement>(null);
-  const { justCreatedId, clearJustCreated, justSavedId, clearJustSaved } = coordination;
+  const { justCreatedId, clearJustCreated, justSavedId, clearJustSaved } =
+    coordination;
   useEffect(() => {
     if (justCreatedId === comment.id) {
       rootRef.current?.focus();
@@ -164,7 +176,10 @@ export function CommentItem({
     // looks like by the time the response (and refetch) lands.
     const focusTarget = comment.parentCommentId ?? "heading";
     try {
-      const result = await deleteMutation.mutateAsync({ id: comment.id, reason });
+      const result = await deleteMutation.mutateAsync({
+        id: comment.id,
+        reason,
+      });
       setConfirmingDelete(false);
       coordination.onCommentDeleted(focusTarget, result.deletedCount);
     } catch (err) {
@@ -174,7 +189,9 @@ export function CommentItem({
       // "forget it" cache helper for a single comment.
       if (hasStatus(err, 404)) {
         setConfirmingDelete(false);
-        queryClient.invalidateQueries({ queryKey: commentKeys.list(comment.postId) });
+        queryClient.invalidateQueries({
+          queryKey: commentKeys.list(comment.postId),
+        });
         return;
       }
       // Any other failure: dialog stays open, shows deleteMutation.error.
@@ -193,7 +210,9 @@ export function CommentItem({
           <Avatar name={comment.author.fullName} size="sm" />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-neutral-400">
-              <span className="font-medium text-white">{comment.author.fullName}</span>
+              <span className="font-medium text-white">
+                {comment.author.fullName}
+              </span>
               <span aria-hidden="true">·</span>
               <time
                 dateTime={comment.createdAt}
@@ -206,7 +225,8 @@ export function CommentItem({
 
             {replyingToAuthor && (
               <p className="mt-0.5 text-xs text-neutral-400">
-                Replying to <span className="font-medium">@{replyingToAuthor}</span>
+                Replying to{" "}
+                <span className="font-medium">@{replyingToAuthor}</span>
               </p>
             )}
 
@@ -218,11 +238,15 @@ export function CommentItem({
                   submitLabel="Save"
                   pendingLabel="Saving…"
                   isPending={updateMutation.isPending}
-                  error={updateMutation.isError ? updateMutation.error : undefined}
+                  error={
+                    updateMutation.isError ? updateMutation.error : undefined
+                  }
                   autoFocus
                   onCancel={coordination.closeForm}
                   onDirtyChange={coordination.onFormDirtyChange}
-                  onSubmit={(body) => updateMutation.mutateAsync({ id: comment.id, body })}
+                  onSubmit={(body) =>
+                    updateMutation.mutateAsync({ id: comment.id, body })
+                  }
                 />
               </div>
             ) : (
@@ -247,36 +271,50 @@ export function CommentItem({
             )}
 
             {!isEditOpen && !isReplyOpen && (
-              <div className="mt-2 flex items-center gap-3">
-                {canComment(viewer) && (
-                  <button
-                    ref={replyTriggerRef}
-                    type="button"
-                    onClick={() => coordination.requestForm(comment.id, "reply")}
-                    className="text-xs font-medium text-emerald-400 hover:underline focus:outline-none focus:ring-2 focus:ring-emerald-400/30"
-                  >
-                    Reply
-                  </button>
-                )}
-                {actor === "author" && (
-                  <button
-                    ref={editTriggerRef}
-                    type="button"
-                    onClick={() => coordination.requestForm(comment.id, "edit")}
-                    className="text-xs font-medium text-neutral-400 hover:text-white hover:underline focus:outline-none focus:ring-2 focus:ring-emerald-400/30"
-                  >
-                    Edit
-                  </button>
-                )}
-                {actor !== null && (
-                  <button
-                    type="button"
-                    onClick={openDeleteConfirm}
-                    className="text-xs font-medium text-red-400 hover:underline focus:outline-none focus:ring-2 focus:ring-red-500/30"
-                  >
-                    Delete
-                  </button>
-                )}
+              <div className="mt-2 flex flex-col items-start gap-1">
+                {/* On its own line, so it pushes the whole row below it down
+                    together instead of sitting inside the row. */}
+                <CommentReactionSummary comment={comment} />
+                {/* items-start, and py-1 on the text buttons to match the
+                    reaction buttons' height: an error message appearing under
+                    the thumbs grows that one item only, and must not drag
+                    Reply/Edit/Delete out of line with the buttons. */}
+                <div className="flex items-start gap-3">
+                  <CommentReactions comment={comment} />
+                  {canComment(viewer) && (
+                    <button
+                      ref={replyTriggerRef}
+                      type="button"
+                      onClick={() =>
+                        coordination.requestForm(comment.id, "reply")
+                      }
+                      className="py-1 text-xs font-medium text-emerald-400 hover:underline focus:outline-none focus:ring-2 focus:ring-emerald-400/30"
+                    >
+                      Reply
+                    </button>
+                  )}
+                  {actor === "author" && (
+                    <button
+                      ref={editTriggerRef}
+                      type="button"
+                      onClick={() =>
+                        coordination.requestForm(comment.id, "edit")
+                      }
+                      className="py-1 text-xs font-medium text-neutral-400 hover:text-white hover:underline focus:outline-none focus:ring-2 focus:ring-emerald-400/30"
+                    >
+                      Edit
+                    </button>
+                  )}
+                  {actor !== null && (
+                    <button
+                      type="button"
+                      onClick={openDeleteConfirm}
+                      className="py-1 text-xs font-medium text-red-400 hover:underline focus:outline-none focus:ring-2 focus:ring-red-500/30"
+                    >
+                      Delete
+                    </button>
+                  )}
+                </div>
               </div>
             )}
 
@@ -287,12 +325,17 @@ export function CommentItem({
                   submitLabel="Reply"
                   pendingLabel="Posting…"
                   isPending={replyMutation.isPending}
-                  error={replyMutation.isError ? replyMutation.error : undefined}
+                  error={
+                    replyMutation.isError ? replyMutation.error : undefined
+                  }
                   autoFocus
                   onCancel={coordination.closeForm}
                   onDirtyChange={coordination.onFormDirtyChange}
                   onSubmit={(body) =>
-                    replyMutation.mutateAsync({ body, parentCommentId: comment.id })
+                    replyMutation.mutateAsync({
+                      body,
+                      parentCommentId: comment.id,
+                    })
                   }
                 />
               </div>
@@ -324,7 +367,10 @@ export function CommentItem({
         isPending={deleteMutation.isPending}
         error={
           deleteMutation.isError
-            ? describeSaveError(deleteMutation.error, "Failed to delete the comment.")
+            ? describeSaveError(
+                deleteMutation.error,
+                "Failed to delete the comment.",
+              )
             : undefined
         }
         onConfirm={confirmDelete}
@@ -342,8 +388,8 @@ export function CommentItem({
             const replyReplyingTo =
               reply.parentCommentId === comment.id
                 ? comment.author.fullName
-                : comment.replies.find((c) => c.id === reply.parentCommentId)
-                    ?.author.fullName ?? comment.author.fullName;
+                : (comment.replies.find((c) => c.id === reply.parentCommentId)
+                    ?.author.fullName ?? comment.author.fullName);
             return (
               <CommentItem
                 key={reply.id}

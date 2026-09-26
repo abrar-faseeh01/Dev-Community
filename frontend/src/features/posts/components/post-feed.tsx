@@ -1,14 +1,16 @@
 "use client";
 
 import { ROUTES } from "@/constants/routes";
-import { CommentFeedLink } from "@/features/comments/components/comment-feed-link";
 import { useAuth } from "@/features/auth/hooks/use-auth";
-import { describeLoadError } from "@/features/posts/utils/errors";
+import { CommentFeedLink } from "@/features/comments/components/comment-feed-link";
 import { usePostFeed } from "@/features/posts/queries/post-queries";
+import { describeLoadError } from "@/features/posts/utils/errors";
+import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
 import Link from "next/link";
 import { PostCard } from "./post-card";
 import { PostCardSkeleton } from "./post-card-skeleton";
-import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
+import { PostReactionSummary } from "./post-reaction-summary";
+import { PostReactions } from "./post-reactions";
 
 const FIRST_LOAD_SKELETON_COUNT = 3;
 const NEXT_PAGE_SKELETON_COUNT = 2;
@@ -118,7 +120,16 @@ export function PostFeed() {
               post={post}
               linkAuthor={!!user}
               footer={
-                <CommentFeedLink postId={post.id} commentCount={post.commentCount} />
+                <div className="flex flex-col items-start gap-2">
+                  <PostReactionSummary post={post} />
+                  <div className="flex flex-wrap items-center gap-4">
+                    <PostReactions post={post} />
+                    <CommentFeedLink
+                      postId={post.id}
+                      commentCount={post.commentCount}
+                    />
+                  </div>
+                </div>
               }
             />
           </li>

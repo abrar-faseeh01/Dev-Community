@@ -1,16 +1,18 @@
 "use client";
 
 import { ROUTES } from "@/constants/routes";
+import { useMyPosts } from "@/features/posts/queries/post-queries";
 import { describeLoadError } from "@/features/posts/utils/errors";
 import { FEED_NOTICES } from "@/features/posts/utils/notices";
 import { getPostActor } from "@/features/posts/utils/permissions";
-import { useMyPosts } from "@/features/posts/queries/post-queries";
+import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
 import Link from "next/link";
 import { useState } from "react";
 import { PostActions } from "./post-actions";
 import { PostCard } from "./post-card";
 import { PostCardSkeleton } from "./post-card-skeleton";
-import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
+import { PostReactionSummary } from "./post-reaction-summary";
+import { PostReactions } from "./post-reactions";
 
 const FIRST_LOAD_SKELETON_COUNT = 3;
 const NEXT_PAGE_SKELETON_COUNT = 2;
@@ -151,20 +153,26 @@ export function MyPosts({ user, authorId }: MyPostsProps) {
                   post={post}
                   linkAuthor
                   footer={
-                    actor ? (
-                      <PostActions
-                        post={post}
-                        actor={actor}
-                        variant="solid"
-                        onRemoved={({ alreadyGone }) =>
-                          setNotice(
-                            alreadyGone
-                              ? FEED_NOTICES["post-gone"]
-                              : FEED_NOTICES["post-deleted"],
-                          )
-                        }
-                      />
-                    ) : undefined
+                    <div className="flex flex-col items-start gap-2">
+                      <PostReactionSummary post={post} />
+                      <div className="flex w-full flex-wrap items-center justify-between gap-3">
+                        <PostReactions post={post} />
+                        {actor && (
+                          <PostActions
+                            post={post}
+                            actor={actor}
+                            variant="solid"
+                            onRemoved={({ alreadyGone }) =>
+                              setNotice(
+                                alreadyGone
+                                  ? FEED_NOTICES["post-gone"]
+                                  : FEED_NOTICES["post-deleted"],
+                              )
+                            }
+                          />
+                        )}
+                      </div>
+                    </div>
                   }
                 />
               </li>
@@ -211,7 +219,9 @@ export function MyPosts({ user, authorId }: MyPostsProps) {
           <div ref={sentinelRef} aria-hidden="true" className="h-px" />
         ) : (
           <p className="mt-6 border-t border-neutral-800 pt-4 text-center text-sm text-neutral-400">
-            {isOwnList ? "That’s all your posts." : "That’s all — no more posts."}
+            {isOwnList
+              ? "That’s all your posts."
+              : "That’s all — no more posts."}
           </p>
         ))}
     </>
