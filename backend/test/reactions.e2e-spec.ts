@@ -415,6 +415,172 @@ describeE2e('reactions', () => {
         });
       });
     });
+
+    // The list behind the "who reacted" overlay. Every request is anonymous
+    // unless a test says otherwise: it is a public read, like the post itself.
+    describe('who reacted', () => {
+      const reactorsPath = (id: string) =>
+        kind === 'post' ? `/posts/${id}/reactions` : `/comments/${id}/reactions`;
+
+      type ListedReactor = {
+        user: { id: string | null; fullName: string; headline?: string | null };
+        type: Type;
+      };
+      type ReactorList = {
+        items: ListedReactor[];
+        likeCount: number;
+        dislikeCount: number;
+      };
+      const listReactors = async (id: string, query = '') => {
+        const res = await http().get(`${reactorsPath(id)}${query}`).expect(200);
+        return res.body.data as ReactorList;
+      };
+
+      it('lists everyone who reacted, newest first, with their names and types and the totals', async () => {
+        const { id } = await newTarget();
+        const first = await data.createUser('user');
+        const second = await data.createUser('user');
+        const third = await data.createUser('user');
+        await react(first, kind, id, 'like').expect(200);
+        await react(second, kind, id, 'dislike').expect(200);
+        await react(third, kind, id, 'like').expect(200);
+
+        const res = await http().get(reactorsPath(id)).expect(200);
+
+        expect(res.body.success).toBe(true);
+        const list = res.body.data as ReactorList;
+        expect(list.items).toEqual([
+          {
+            user: { id: third.id, fullName: third.fullName },
+            type: 'like',
+          },
+          {
+            user: { id: second.id, fullName: second.fullName },
+            type: 'dislike',
+          },
+          {
+            user: { id: first.id, fullName: first.fullName },
+            type: 'like',
+          },
+        ]);
+        expect(list.likeCount).toBe(2);
+        expect(list.dislikeCount).toBe(1);
+        // Only id, name and headline of a user ever leave the server.
+        expect(JSON.stringify(res.body)).not.toContain('example.test');
+        expect(JSON.stringify(res.body)).not.toContain('passwordHash');
+      });
+
+      it('is empty, not an error, for a target nobody has reacted to', async () => {
+        const { id } = await newTarget();
+
+        expect(await listReactors(id)).toEqual({
+          items: [],
+          likeCount: 0,
+          dislikeCount: 0,
+        });
+      });
+
+      it('narrows to one type with ?type=, and keeps both totals', async () => {
+        const { id } = await newTarget();
+        const liker = await data.createUser('user');
+        const disliker = await data.createUser('user');
+        await react(liker, kind, id, 'like').expect(200);
+        await react(disliker, kind, id, 'dislike').expect(200);
+
+        const likes = await listReactors(id, '?type=like');
+        expect(likes.items.map((r) => r.user.id)).toEqual([liker.id]);
+        expect(likes.likeCount).toBe(1);
+        expect(likes.dislikeCount).toBe(1);
+
+        const dislikes = await listReactors(id, '?type=dislike');
+        expect(dislikes.items.map((r) => r.user.id)).toEqual([disliker.id]);
+        expect(dislikes.likeCount).toBe(1);
+        expect(dislikes.dislikeCount).toBe(1);
+      });
+
+      it('follows a switch and a removal', async () => {
+        const { id } = await newTarget();
+        const user = await data.createUser('user');
+
+        await react(user, kind, id, 'like').expect(200);
+        expect((await listReactors(id)).items).toEqual([
+          { user: { id: user.id, fullName: user.fullName }, type: 'like' },
+        ]);
+
+        await react(user, kind, id, 'dislike').expect(200);
+        const switched = await listReactors(id);
+        expect(switched.items).toEqual([
+          { user: { id: user.id, fullName: user.fullName }, type: 'dislike' },
+        ]);
+        expect(switched).toMatchObject({ likeCount: 0, dislikeCount: 1 });
+        expect((await listReactors(id, '?type=like')).items).toEqual([]);
+
+        await react(user, kind, id, 'dislike').expect(200);
+        expect(await listReactors(id)).toEqual({
+          items: [],
+          likeCount: 0,
+          dislikeCount: 0,
+        });
+      });
+
+      it('answers the same for a signed-in reader, an admin and anonymous', async () => {
+        const { id } = await newTarget();
+        const reactor = await data.createUser('user');
+        const admin = await data.createUser('admin');
+        await react(reactor, kind, id, 'like').expect(200);
+
+        const anonymous = await listReactors(id);
+        for (const cookie of [reactor.cookie, admin.cookie]) {
+          const res = await http()
+            .get(reactorsPath(id))
+            .set('Cookie', cookie)
+            .expect(200);
+          expect(res.body.data).toEqual(anonymous);
+        }
+      });
+
+      it('shows a deleted account as the Deleted user placeholder, still counted', async () => {
+        const { id } = await newTarget();
+        const leaver = await data.createUser('user');
+        await react(leaver, kind, id, 'like').expect(200);
+        // Reaction rows are not removed with the account (a known limitation),
+        // so the row outlives the user.
+        await data.models.user.deleteOne({ _id: leaver.id });
+
+        const list = await listReactors(id);
+
+        expect(list.items).toEqual([
+          {
+            user: { id: null, fullName: 'Deleted user', headline: null },
+            type: 'like',
+          },
+        ]);
+        expect(list.likeCount).toBe(1);
+      });
+
+      it('400s a malformed id, an unknown type and an unknown query parameter', async () => {
+        const { id } = await newTarget();
+
+        await http().get(reactorsPath('not-an-id')).expect(400);
+        await http().get(`${reactorsPath(id)}?type=love`).expect(400);
+        await http().get(`${reactorsPath(id)}?limit=5`).expect(400);
+      });
+
+      it('404s a target that does not exist and one that has been deleted', async () => {
+        await http()
+          .get(reactorsPath(new Types.ObjectId().toString()))
+          .expect(404);
+
+        const { author, postId, id } = await newTarget();
+        await http()
+          .delete(kind === 'post' ? `/posts/${postId}` : `/comments/${id}`)
+          .set('Cookie', author.cookie)
+          .send({})
+          .expect(200);
+
+        await http().get(reactorsPath(id)).expect(404);
+      });
+    });
   });
 
   describe('myReaction on reads', () => {
