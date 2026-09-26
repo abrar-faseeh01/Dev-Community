@@ -1,0 +1,166 @@
+import { useAuth } from "@/features/auth/hooks/use-auth";
+import type { AuthUser } from "@/features/auth/types/user";
+import type { ReactionResult } from "@/features/reactions/types/reaction-result";
+import { ApiError } from "@/lib/axios/api-error";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import type { ReactNode } from "react";
+import type { Comment } from "../types/comment";
+import { CommentReactions } from "./comment-reactions";
+
+// Same approach as post-reactions.test.tsx: service and useAuth mocked, the
+// real hook, cache and buttons run. The mocked function comes from
+// requireMock because components (tests included) must not import the API
+// layer.
+jest.mock("@/services/api/reactions");
+jest.mock("@/features/auth/hooks/use-auth");
+const { toggleCommentReaction: mockToggle } = jest.requireMock<{
+  toggleCommentReaction: jest.MockedFunction<
+    typeof import("@/services/api/reactions").toggleCommentReaction
+  >;
+}>("@/services/api/reactions");
+const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
+
+const USER: AuthUser = {
+  id: "u1",
+  fullName: "Ada Lovelace",
+  email: "ada@example.com",
+  role: "user",
+};
+const ADMIN: AuthUser = { ...USER, id: "a1", role: "admin" };
+
+const COMMENT: Comment = {
+  id: "c1",
+  postId: "post-1",
+  parentCommentId: null,
+  body: "body",
+  createdAt: "2026-01-01T00:00:00.000Z",
+  updatedAt: "2026-01-01T00:00:00.000Z",
+  likeCount: 2,
+  dislikeCount: 1,
+  myReaction: null,
+  author: { id: "author-1", fullName: "Author", headline: null },
+  replies: [],
+};
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (error: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
+function renderReactions() {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  function Wrapper({ children }: { children: ReactNode }) {
+    return (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+  }
+  return render(<CommentReactions comment={COMMENT} />, { wrapper: Wrapper });
+}
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  mockUseAuth.mockReturnValue({ user: USER, loading: false });
+});
+
+describe("CommentReactions", () => {
+  it("sends one request for repeated clicks while the first is in flight", async () => {
+    const user = userEvent.setup();
+    const call = deferred<ReactionResult>();
+    mockToggle.mockReturnValue(call.promise);
+    renderReactions();
+
+    const like = screen.getByRole("button", { name: "Like, 2" });
+    await user.click(like);
+    await waitFor(() => expect(like).toHaveAttribute("aria-disabled", "true"));
+
+    await user.click(like);
+    await user.click(screen.getByRole("button", { name: "Dislike, 1" }));
+
+    expect(mockToggle).toHaveBeenCalledTimes(1);
+    expect(mockToggle).toHaveBeenCalledWith("c1", "like");
+
+    await act(async () => {
+      call.resolve({ likeCount: 3, dislikeCount: 1, myReaction: "like" });
+    });
+    await waitFor(() => expect(like).not.toHaveAttribute("aria-disabled"));
+  });
+
+  it("sends one request even for two clicks in the same tick", async () => {
+    mockToggle.mockReturnValue(new Promise(() => {}));
+    renderReactions();
+
+    const like = screen.getByRole("button", { name: "Like, 2" });
+    fireEvent.click(like);
+    fireEvent.click(like);
+
+    // The service is called after onMutate's awaits, so let those finish
+    // before counting.
+    await waitFor(() => expect(mockToggle).toHaveBeenCalled());
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    expect(mockToggle).toHaveBeenCalledTimes(1);
+  });
+
+  it("lets a different comment be reacted to while one is still in flight", async () => {
+    const user = userEvent.setup();
+    mockToggle.mockReturnValue(new Promise(() => {}));
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <CommentReactions comment={COMMENT} />
+        <CommentReactions comment={{ ...COMMENT, id: "c2", likeCount: 7 }} />
+      </QueryClientProvider>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Like, 2" }));
+    await waitFor(() => expect(mockToggle).toHaveBeenCalledTimes(1));
+    await user.click(screen.getByRole("button", { name: "Like, 7" }));
+
+    await waitFor(() => expect(mockToggle).toHaveBeenCalledTimes(2));
+    expect(mockToggle).toHaveBeenNthCalledWith(2, "c2", "like");
+  });
+
+  it("shows a message when the request fails", async () => {
+    const user = userEvent.setup();
+    mockToggle.mockRejectedValueOnce(new ApiError("Internal error", [], 500));
+    renderReactions();
+
+    await user.click(screen.getByRole("button", { name: "Like, 2" }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent(
+        "Couldn't save your reaction. Please try again.",
+      ),
+    );
+  });
+
+  it("signed out: a click sends nothing and offers the sign-in link", async () => {
+    const user = userEvent.setup();
+    mockUseAuth.mockReturnValue({ user: null, loading: false });
+    renderReactions();
+
+    await user.click(screen.getByRole("button", { name: "Like, 2" }));
+
+    expect(mockToggle).not.toHaveBeenCalled();
+    expect(screen.getByRole("link", { name: "Sign in" })).toBeInTheDocument();
+  });
+
+  it("admin: counts only, no buttons", () => {
+    mockUseAuth.mockReturnValue({ user: ADMIN, loading: false });
+    renderReactions();
+
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  });
+});
