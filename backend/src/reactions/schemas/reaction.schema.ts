@@ -13,7 +13,9 @@ export type ReactionType = (typeof REACTION_TYPES)[number];
 // reaction deletes the row; switching like <-> dislike edits `type` in place,
 // so a user never has more than one row per target (see the index below).
 //
-// Timestamps are on for the audit trail only; nothing reads them. No
+// Timestamps are on for the audit trail, and `createdAt` orders the reactor
+// list (see the second index below). A switch keeps `createdAt`, so switching
+// does not move someone up the list. No
 // optimisticConcurrency: rows are never fetched-then-saved, every change is a
 // single atomic findOneAndDelete / findOneAndUpdate / insert.
 @Schema({ timestamps: true })
@@ -50,3 +52,10 @@ ReactionSchema.index(
   { userId: 1, targetType: 1, targetId: 1 },
   { unique: true },
 );
+
+// The other read: "who reacted to this target, most recent first" for the
+// reactor list. The unique index above starts with userId, so it cannot serve
+// a lookup by target; this one is equality on {targetType, targetId} then the
+// sort key, so the newest N come straight off the index. The optional `type`
+// filter is applied to those few rows and needs no index of its own.
+ReactionSchema.index({ targetType: 1, targetId: 1, createdAt: -1 });

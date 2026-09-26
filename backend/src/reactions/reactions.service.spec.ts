@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { jest } from '@jest/globals';
+import { MAX_REACTORS_LISTED } from './reaction.constants';
 import { ReactionsService } from './reactions.service';
 import type { ReactionTargetType, ReactionType } from './schemas/reaction.schema';
 
@@ -368,6 +369,166 @@ describe.each<ReactionTargetType>(['post', 'comment'])(
         await expect(toggle('like')).rejects.toThrow(
           InternalServerErrorException,
         );
+      });
+    });
+  },
+);
+
+// The query the reactor list sends: find(...).sort(...).limit(...)
+// .populate(...).lean().exec(), recorded so each step can be asserted.
+function listChain(rows: unknown[]) {
+  const calls: { sort?: unknown; limit?: unknown; populate?: unknown[] } = {};
+  const query = {
+    sort: (arg: unknown) => {
+      calls.sort = arg;
+      return query;
+    },
+    limit: (arg: unknown) => {
+      calls.limit = arg;
+      return query;
+    },
+    populate: (...args: unknown[]) => {
+      calls.populate = args;
+      return query;
+    },
+    lean: () => query,
+    exec: async () => rows,
+  };
+  return { query, calls };
+}
+
+const ADA = { _id: 'u-ada', fullName: 'Ada Lovelace', headline: 'Engineer' };
+const GRACE = { _id: 'u-grace', fullName: 'Grace Hopper' };
+
+describe.each<ReactionTargetType>(['post', 'comment'])(
+  'ReactionsService reactor list (%s target)',
+  (targetType) => {
+    let env: ReturnType<typeof setup>;
+    let target: { findOne: jest.Mock<SyncFn> };
+
+    const list = (type?: ReactionType) =>
+      targetType === 'post'
+        ? env.service.listPostReactors(TARGET, type)
+        : env.service.listCommentReactors(TARGET, type);
+
+    beforeEach(() => {
+      env = setup();
+      target = targetType === 'post' ? env.post : env.comment;
+      target.findOne.mockReturnValue(chain({ likeCount: 12, dislikeCount: 2 }));
+    });
+
+    it("returns the reactors in the API shape, with the target's own totals", async () => {
+      const { query } = listChain([
+        { _id: 'r1', type: 'like', userId: ADA },
+        { _id: 'r2', type: 'dislike', userId: GRACE },
+      ]);
+      env.reaction.find.mockReturnValue(query);
+
+      const result = await list();
+
+      expect(result).toEqual({
+        items: [
+          {
+            user: { id: 'u-ada', fullName: 'Ada Lovelace', headline: 'Engineer' },
+            type: 'like',
+          },
+          {
+            user: { id: 'u-grace', fullName: 'Grace Hopper', headline: undefined },
+            type: 'dislike',
+          },
+        ],
+        likeCount: 12,
+        dislikeCount: 2,
+      });
+    });
+
+    it('asks for this target only, newest first, capped, with just the name and headline', async () => {
+      const { query, calls } = listChain([]);
+      env.reaction.find.mockReturnValue(query);
+
+      await list();
+
+      expect(env.reaction.find).toHaveBeenCalledTimes(1);
+      expect(env.reaction.find).toHaveBeenCalledWith({
+        targetType,
+        targetId: TARGET,
+      });
+      expect(calls.sort).toEqual({ createdAt: -1, _id: -1 });
+      expect(calls.limit).toBe(MAX_REACTORS_LISTED);
+      expect(calls.populate).toEqual(['userId', 'fullName headline']);
+    });
+
+    it.each<ReactionType>(['like', 'dislike'])(
+      'adds the type to the filter when asked for %s only',
+      async (type) => {
+        const { query } = listChain([]);
+        env.reaction.find.mockReturnValue(query);
+
+        await list(type);
+
+        expect(env.reaction.find).toHaveBeenCalledWith({
+          targetType,
+          targetId: TARGET,
+          type,
+        });
+      },
+    );
+
+    it('still reports both totals when filtered to one type', async () => {
+      const { query } = listChain([{ _id: 'r1', type: 'like', userId: ADA }]);
+      env.reaction.find.mockReturnValue(query);
+
+      const result = await list('like');
+
+      expect(result.likeCount).toBe(12);
+      expect(result.dislikeCount).toBe(2);
+    });
+
+    it('shows a deleted account as the Deleted user placeholder', async () => {
+      const { query } = listChain([{ _id: 'r1', type: 'like', userId: null }]);
+      env.reaction.find.mockReturnValue(query);
+
+      const result = await list();
+
+      expect(result.items).toEqual([
+        {
+          user: { id: null, fullName: 'Deleted user', headline: null },
+          type: 'like',
+        },
+      ]);
+    });
+
+    it('returns an empty list, not an error, when nobody has reacted', async () => {
+      target.findOne.mockReturnValue(chain({ likeCount: 0, dislikeCount: 0 }));
+      const { query } = listChain([]);
+      env.reaction.find.mockReturnValue(query);
+
+      expect(await list()).toEqual({
+        items: [],
+        likeCount: 0,
+        dislikeCount: 0,
+      });
+    });
+
+    it('reads a missing or negative counter as 0', async () => {
+      target.findOne.mockReturnValue(chain({ dislikeCount: -3 }));
+      const { query } = listChain([]);
+      env.reaction.find.mockReturnValue(query);
+
+      const result = await list();
+
+      expect(result.likeCount).toBe(0);
+      expect(result.dislikeCount).toBe(0);
+    });
+
+    it('404s a missing or deleted target without reading any reaction', async () => {
+      target.findOne.mockReturnValue(chain(null));
+
+      await expect(list()).rejects.toBeInstanceOf(NotFoundException);
+      expect(env.reaction.find).not.toHaveBeenCalled();
+      expect(target.findOne).toHaveBeenCalledWith({
+        _id: TARGET,
+        deletedAt: null,
       });
     });
   },

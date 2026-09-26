@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { AuthorSummaryDto } from '../../users/dto/author-summary.dto';
 import { REACTION_TYPES, type ReactionType } from '../schemas/reaction.schema';
 
 export class ReactionResultDto {
@@ -24,4 +25,46 @@ export class ReactionResponseDto {
 
   @ApiProperty({ type: ReactionResultDto })
   data: ReactionResultDto;
+}
+
+export class ReactorDto {
+  @ApiProperty({
+    type: AuthorSummaryDto,
+    description:
+      'Who reacted: id, name and headline only. A deleted account is the "Deleted user" placeholder.',
+  })
+  user: AuthorSummaryDto;
+
+  @ApiProperty({ enum: REACTION_TYPES, example: 'like' })
+  type: ReactionType;
+}
+
+export class ReactorListDto {
+  @ApiProperty({
+    type: [ReactorDto],
+    description:
+      'The most recent reactors first, at most 50. Filtered by `type` when that is given.',
+  })
+  items: ReactorDto[];
+
+  @ApiProperty({
+    example: 12,
+    description:
+      'The target\'s total like count, the same number shown next to the buttons. Not affected by `type` or by the 50 cap.',
+  })
+  likeCount: number;
+
+  @ApiProperty({
+    example: 2,
+    description: 'The target\'s total dislike count. Not affected by `type` or by the cap.',
+  })
+  dislikeCount: number;
+}
+
+export class ReactorListResponseDto {
+  @ApiProperty({ example: true })
+  success: true;
+
+  @ApiProperty({ type: ReactorListDto })
+  data: ReactorListDto;
 }

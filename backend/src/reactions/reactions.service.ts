@@ -8,6 +8,12 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Comment } from '../comments/schemas/comment.schema';
 import { Post } from '../posts/schemas/post.schema';
+import { MAX_REACTORS_LISTED } from './reaction.constants';
+import {
+  toReactor,
+  type PopulatedReaction,
+  type Reactor,
+} from './reactor-row';
 import {
   counterDelta,
   displayCount,
@@ -28,6 +34,14 @@ export type ReactionResult = {
   likeCount: number;
   dislikeCount: number;
   myReaction: ReactionType | null;
+};
+
+// What the reactor-list routes return: the people (newest reaction first,
+// capped) and the target's true totals.
+export type ReactorList = {
+  items: Reactor[];
+  likeCount: number;
+  dislikeCount: number;
 };
 
 type Counts = { likeCount: number; dislikeCount: number };
@@ -92,6 +106,44 @@ export class ReactionsService {
       throw new NotFoundException('Comment not found');
     }
     return this.toggle(userId, 'comment', commentId, type);
+  }
+
+  // "Who reacted", one entry point per target type like the toggles above.
+  // Public reads, so nothing here depends on who is asking.
+  listPostReactors(postId: string, type?: ReactionType): Promise<ReactorList> {
+    return this.listReactors('post', postId, type);
+  }
+
+  listCommentReactors(
+    commentId: string,
+    type?: ReactionType,
+  ): Promise<ReactorList> {
+    return this.listReactors('comment', commentId, type);
+  }
+
+  // The target is read first, for two reasons in one query: a missing or
+  // soft-deleted target is a 404 (the same rule the toggle applies), and its
+  // counters are the totals returned alongside the list, so they match the
+  // numbers next to the buttons. Then the people: newest reaction first (ties
+  // broken by _id so the order is stable), capped at MAX_REACTORS_LISTED, each
+  // user narrowed to name and headline by the populate. A user who has been
+  // deleted populates to null and comes out as the "Deleted user" placeholder.
+  private async listReactors(
+    targetType: ReactionTargetType,
+    targetId: string,
+    type?: ReactionType,
+  ): Promise<ReactorList> {
+    const counts = await this.readCounts(targetType, targetId);
+
+    const rows = (await this.reactionModel
+      .find({ targetType, targetId, ...(type ? { type } : {}) })
+      .sort({ createdAt: -1, _id: -1 })
+      .limit(MAX_REACTORS_LISTED)
+      .populate('userId', 'fullName headline')
+      .lean()
+      .exec()) as unknown as PopulatedReaction[];
+
+    return { items: rows.map(toReactor), ...counts };
   }
 
   // The caller's own reactions to a batch of targets, for the read routes:
@@ -338,7 +390,8 @@ export class ReactionsService {
     }
   }
 
-  // The current counters, changed by nothing. Only for the lost-race answer.
+  // The current counters, changed by nothing, or a 404 when the target is
+  // missing or deleted. For the lost-race answer and the reactor lists.
   private async readCounts(
     targetType: ReactionTargetType,
     targetId: string,
