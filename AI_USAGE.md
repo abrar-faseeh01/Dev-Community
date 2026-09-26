@@ -207,7 +207,7 @@ For Day 12 I changed how I split the work. I still had it check the plan against
 
 **Two mistakes in the checking itself.** Two breaks did not apply because my search text didn't match the file (one line also appears twice in the service), so they showed up as "not applied" instead of passing silently, which is why the runner counts the matches first. And a one-line shell edit I made to add a break wrote raw line breaks into a string; the runner crashed at import before changing anything, and I confirmed that by hash before fixing it. The checks also do not cover where the summary line sits in the feed, "Posts made by you" and post page layouts, which have no test.
 
-**What I have not verified.** I have not done the manual pass with a throttled and a blocked network, which is the plan's checkpoint 7. The behaviours it checks are covered by automated tests, but I have not watched them in a browser.
+**The manual pass.** I did the plan's checkpoint 7 myself in a browser and everything worked. I did not keep per-case notes, so the automated tests remain the written record.
 
 ### Day 12 extension — Who reacted
 
@@ -221,7 +221,7 @@ Partway through Day 12 I asked for a Facebook-style "who reacted" list, with a s
 
 **Two ordinary slips.** It ran `npx eslint` in the backend before checking `package.json`; the backend lints with `oxlint`, and `npx` tried to download an ESLint I don't use. Nothing in the project changed, but it should have looked at the scripts first. And it wrote unit-test counts into my README from memory (8 and 22); I had it run the suites, and the real numbers are 4 and 18.
 
-**What I have not verified.** The backend is covered against the real database (the reactions e2e spec passed 47 of 47 in one run, 16 of them new), and the frontend has unit and component tests, and I have not yet looked at the overlay in a real browser. I did mutation-check the new tests afterwards; see the end of the Day 12 entry above. The public list also shows who disliked something; I left it public because the post is, and noted the one-line change in the README if I decide otherwise.
+**What I have not verified.** The backend is covered against the real database (the reactions e2e spec passed 47 of 47 in one run, 16 of them new), and the frontend has unit and component tests, and my manual pass in a browser afterwards covered it. I did mutation-check the new tests afterwards; see the end of the Day 12 entry above. The public list also shows who disliked something; I left it public because the post is, and noted the one-line change in the README if I decide otherwise.
 
 ## Where this leaves me
 
