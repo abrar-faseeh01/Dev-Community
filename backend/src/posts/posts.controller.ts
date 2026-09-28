@@ -45,7 +45,7 @@ import { ReactionsService } from '../reactions/reactions.service';
 import type { ReactionType } from '../reactions/schemas/reaction.schema';
 import { toAuthorSummary, toOverrideTarget } from '../users/author-summary';
 import { CreatePostDto } from './dto/create-post.dto';
-import { ListPostsDto } from './dto/list-posts.dto';
+import { ListPostsDto, POST_SORTS } from './dto/list-posts.dto';
 import {
   DeletePostResponseDto,
   PostListResponseDto,
@@ -55,15 +55,26 @@ import { UpdatePostDto } from './dto/update-post.dto';
 import { PostsService, PostWithAuthor } from './posts.service';
 
 const ID_PARAM = { name: 'id', example: '64f1c2e5a1b2c3d4e5f6a7c0' };
-const NOT_FOUND = { description: 'Post not found (or already soft-deleted).', type: ErrorResponseDto };
-const FORBIDDEN = { description: 'Caller is neither the post\'s author nor an admin.', type: ErrorResponseDto };
-const CONFLICT = {
-  description: 'The post was modified concurrently by someone else (optimistic concurrency). Reload and retry.',
+const NOT_FOUND = {
+  description: 'Post not found (or already soft-deleted).',
   type: ErrorResponseDto,
 };
-const UNAUTHORIZED = { description: 'Missing, invalid, or expired session cookie.', type: ErrorResponseDto };
+const FORBIDDEN = {
+  description: "Caller is neither the post's author nor an admin.",
+  type: ErrorResponseDto,
+};
+const CONFLICT = {
+  description:
+    'The post was modified concurrently by someone else (optimistic concurrency). Reload and retry.',
+  type: ErrorResponseDto,
+};
+const UNAUTHORIZED = {
+  description: 'Missing, invalid, or expired session cookie.',
+  type: ErrorResponseDto,
+};
 const ADMIN_CANNOT_CREATE = {
-  description: 'Administrator accounts cannot create posts (role check: only the `user` role may). Admins can still edit or delete any post.',
+  description:
+    'Administrator accounts cannot create posts (role check: only the `user` role may). Admins can still edit or delete any post.',
   type: ErrorResponseDto,
 };
 
@@ -93,7 +104,8 @@ export class PostsController {
   @ApiCookieAuth('access_token')
   @ApiOperation({
     summary: 'Create a post',
-    description: 'Regular (`user`-role) accounts only. The author is always the authenticated caller — never client-supplied. Administrators get 403: they can moderate any post but cannot create one.',
+    description:
+      'Regular (`user`-role) accounts only. The author is always the authenticated caller — never client-supplied. Administrators get 403: they can moderate any post but cannot create one.',
   })
   @ApiCreatedResponse({ type: PostResponseDto })
   @ApiUnauthorizedResponse(UNAUTHORIZED)
@@ -122,16 +134,42 @@ export class PostsController {
   @Get()
   @ApiOperation({
     summary: 'List posts (cursor-paginated feed)',
-    description: "Public — no authentication required. Sorted newest-first by _id. Soft-deleted posts are excluded. When the request carries a valid session cookie, each post's `myReaction` is the caller's own reaction to it (looked up for the whole page in one query); otherwise it is null.",
+    description:
+      "Public — no authentication required. Sorted newest-first by _id. Soft-deleted posts are excluded. When the request carries a valid session cookie, each post's `myReaction` is the caller's own reaction to it (looked up for the whole page in one query); otherwise it is null.",
   })
-  @ApiQuery({ name: 'limit', required: false, schema: { type: 'integer', minimum: 1, maximum: 50, default: 10 } })
-  @ApiQuery({ name: 'cursor', required: false, description: 'Previous response\'s nextCursor. Omit for the first page.' })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    schema: { type: 'integer', minimum: 1, maximum: 50, default: 10 },
+  })
+  @ApiQuery({
+    name: 'cursor',
+    required: false,
+    description: "Previous response's nextCursor. Omit for the first page.",
+  })
+  @ApiQuery({
+    name: 'sort',
+    required: false,
+    enum: POST_SORTS,
+    description:
+      "Feed ordering: 'latest' (default), 'top' (ranked score) or 'discussed' (most comments). A cursor is only valid for the sort that produced it.",
+  })
   @ApiOkResponse({
     type: PostListResponseDto,
-    description: 'Requesting past the last page returns { items: [], nextCursor: null } rather than an error.',
+    description:
+      'Requesting past the last page returns { items: [], nextCursor: null } rather than an error.',
   })
-  @ApiQuery({ name: 'authorId', required: false, description: 'Only posts written by this user (a valid user id). Used for the "posts made by you" page.' })
-  @ApiBadRequestResponse({ description: 'Malformed cursor (bad encoding or not a valid post id), or a malformed authorId.', type: ErrorResponseDto })
+  @ApiQuery({
+    name: 'authorId',
+    required: false,
+    description:
+      'Only posts written by this user (a valid user id). Used for the "posts made by you" page.',
+  })
+  @ApiBadRequestResponse({
+    description:
+      'Malformed cursor (bad encoding or not a valid post id), or a malformed authorId.',
+    type: ErrorResponseDto,
+  })
   async list(
     @Query() dto: ListPostsDto,
     @CurrentUser() requester: RequestUser | null,
@@ -140,6 +178,7 @@ export class PostsController {
       dto.limit,
       dto.cursor,
       dto.authorId,
+      dto.sort ?? 'latest',
     );
     // One query for the whole page, not one per post.
     const mine = await this.reactionsService.findMineFor(
@@ -162,7 +201,11 @@ export class PostsController {
   @Public()
   @UseGuards(OptionalJwtAuthGuard)
   @Get(':id')
-  @ApiOperation({ summary: 'Get a single post', description: "Public — no authentication required. A soft-deleted post 404s the same as a nonexistent one. When the request carries a valid session cookie, `myReaction` is the caller's own reaction to the post; otherwise it is null." })
+  @ApiOperation({
+    summary: 'Get a single post',
+    description:
+      "Public — no authentication required. A soft-deleted post 404s the same as a nonexistent one. When the request carries a valid session cookie, `myReaction` is the caller's own reaction to the post; otherwise it is null.",
+  })
   @ApiParam(ID_PARAM)
   @ApiOkResponse({ type: PostResponseDto })
   @ApiNotFoundResponse(NOT_FOUND)
@@ -192,7 +235,8 @@ export class PostsController {
   @ApiCookieAuth('access_token')
   @ApiOperation({
     summary: 'Update a post',
-    description: 'Owner-or-admin. Partial update — at least one of title/body is required. When an admin edits someone else\'s post, the change is audit-logged (identifying the post, not just the author) and the author is notified.',
+    description:
+      "Owner-or-admin. Partial update — at least one of title/body is required. When an admin edits someone else's post, the change is audit-logged (identifying the post, not just the author) and the author is notified.",
   })
   @ApiParam(ID_PARAM)
   @ApiOkResponse({ type: PostResponseDto })
@@ -222,7 +266,10 @@ export class PostsController {
 
     if (isAdminOverride(requester, authorId)) {
       await recordAdminOverride(
-        { auditService: this.auditService, notificationsService: this.notificationsService },
+        {
+          auditService: this.auditService,
+          notificationsService: this.notificationsService,
+        },
         requester,
         toOverrideTarget(authorId, updated.authorId),
         'update_post',
@@ -254,7 +301,8 @@ export class PostsController {
   @ApiCookieAuth('access_token')
   @ApiOperation({
     summary: 'Delete a post (soft delete)',
-    description: 'Owner-or-admin. Sets deletedAt rather than removing the document — the post then 404s on every read route and never appears in the list. Its comments are soft-deleted along with it (their replies included), so they stop appearing in reads too. When an admin deletes someone else\'s post, it is audit-logged and the author is notified.',
+    description:
+      "Owner-or-admin. Sets deletedAt rather than removing the document — the post then 404s on every read route and never appears in the list. Its comments are soft-deleted along with it (their replies included), so they stop appearing in reads too. When an admin deletes someone else's post, it is audit-logged and the author is notified.",
   })
   @ApiParam(ID_PARAM)
   @ApiOkResponse({ type: DeletePostResponseDto })
@@ -280,7 +328,10 @@ export class PostsController {
 
     if (isAdminOverride(requester, authorId)) {
       await recordAdminOverride(
-        { auditService: this.auditService, notificationsService: this.notificationsService },
+        {
+          auditService: this.auditService,
+          notificationsService: this.notificationsService,
+        },
         requester,
         toOverrideTarget(authorId, removed.authorId),
         'delete_post',
@@ -312,6 +363,7 @@ export class PostsController {
       dislikeCount: displayCount(post.dislikeCount),
       commentCount: post.commentCount,
       myReaction,
+      rankScore: post.score ?? null,
       deletedAt: post.deletedAt,
       createdAt: (post as unknown as { createdAt: Date }).createdAt,
       updatedAt: (post as unknown as { updatedAt: Date }).updatedAt,

@@ -37,6 +37,15 @@ export class PostDto {
   })
   myReaction: ReactionType | null;
 
+  @ApiProperty({
+    type: 'number',
+    nullable: true,
+    example: 92.2157,
+    description:
+      'The ranking score this post was sorted by under sort=top, read directly from the database query, never recomputed. null under sort=latest/discussed, where no score is computed.',
+  })
+  rankScore: number | null;
+
   @ApiProperty({ type: 'string', format: 'date-time', nullable: true, example: null, description: 'Soft-delete timestamp; null while the post is live.' })
   deletedAt: Date | null;
 

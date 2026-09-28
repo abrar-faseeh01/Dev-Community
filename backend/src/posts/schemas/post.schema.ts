@@ -54,3 +54,11 @@ PostSchema.index({ authorId: 1, createdAt: -1 });
 // serve an _id sort (it would fetch and sort all of that author's posts),
 // so this one puts _id last, the same shape as the feed index.
 PostSchema.index({ authorId: 1, deletedAt: 1, _id: -1 });
+
+// Serves sort=discussed: commentCount desc, _id desc, filtered by
+// deletedAt. Sorted on the raw stored field deliberately (no floor/$max
+// applied here) so this index actually backs the sort — a computed field
+// would defeat it. commentCount cannot drift negative in storage
+// (comments.service.ts clamps its decrement), so no floor is needed for
+// this field the way it is for likeCount/dislikeCount.
+PostSchema.index({ deletedAt: 1, commentCount: -1, _id: -1 });

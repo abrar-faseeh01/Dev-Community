@@ -5,19 +5,37 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
+import type { PipelineStage } from 'mongoose';
 import {
-  Error as MongooseError,
   isValidObjectId,
   Model,
+  Error as MongooseError,
   Types,
 } from 'mongoose';
 import { CommentsService } from '../comments/comments.service';
 import type { PopulatedAuthor } from '../users/author-summary';
 import { CreatePostDto } from './dto/create-post.dto';
+import type { PostSort } from './dto/list-posts.dto';
+import { COMMENT_WEIGHT, VOTE_WEIGHT, Z } from './ranking';
 import { Post } from './schemas/post.schema';
 
 // authorId is null when the author's account has since been deleted.
-export type PostWithAuthor = Post & { authorId: PopulatedAuthor | null };
+export type PostWithAuthor = Post & {
+  authorId: PopulatedAuthor | null;
+  // Only present on items returned by listTop's aggregation — the actual
+  // score MongoDB sorted by. undefined for listLatest/listDiscussed.
+  score?: number;
+};
+
+type ListResult = { items: PostWithAuthor[]; nextCursor: string | null };
+
+// The two fields carried by a keyset cursor for a non-latest sort (Day 13).
+// `sort` is embedded so a cursor from one sort can be rejected (400) when
+// replayed against another, rather than silently producing garbage order.
+interface KeysetCursor {
+  v: number;
+  id: Types.ObjectId;
+}
 
 @Injectable()
 export class PostsService {
@@ -153,16 +171,38 @@ export class PostsService {
     }
   }
 
+  // Entry point for GET /posts. Dispatches on sort; each branch owns its
+  // own cursor format, so a cursor issued under one sort is meaningless
+  // (and rejected) under another.
+  //
+  //discussed and top share the exact same
+  // {sort, v, id} cursor shape (v means different things per sort, but the
+  // decode/validate logic is identical)
+  async list(
+    limit: number,
+    cursor: string | undefined,
+    authorId: string | undefined,
+    sort: PostSort = 'latest',
+  ): Promise<ListResult> {
+    if (sort === 'discussed') {
+      return this.listDiscussed(limit, cursor, authorId);
+    }
+    if (sort === 'top') {
+      return this.listTop(limit, cursor, authorId);
+    }
+    return this.listLatest(limit, cursor, authorId);
+  }
+
   // Posts are only ever created in real time, never backdated, so _id
   // descending (ObjectIds embed a creation timestamp) already matches
   // createdAt descending — revised from an original {createdAt, _id} $or
   // cursor after .explain() showed that shape couldn't get tight index
   // bounds on a compound index (21 keys examined for 11 returned).
-  async list(
+  private async listLatest(
     limit: number,
-    cursor?: string,
-    authorId?: string,
-  ): Promise<{ items: PostWithAuthor[]; nextCursor: string | null }> {
+    cursor: string | undefined,
+    authorId: string | undefined,
+  ): Promise<ListResult> {
     const filter: Record<string, unknown> = { deletedAt: null };
 
     // Optional per-author listing ("posts made by you"). Same _id ordering
@@ -173,7 +213,7 @@ export class PostsService {
     }
 
     if (cursor) {
-      filter._id = { $lt: this.decodeCursor(cursor) };
+      filter._id = { $lt: this.decodeLatestCursor(cursor) };
     }
 
     // Fetch one extra document — its presence (not its content) is what
@@ -186,27 +226,264 @@ export class PostsService {
       .exec();
 
     const hasNextPage = docs.length > limit;
-    const items = (hasNextPage ? docs.slice(0, limit) : docs) as unknown as PostWithAuthor[];
+    const items = (hasNextPage
+      ? docs.slice(0, limit)
+      : docs) as unknown as PostWithAuthor[];
 
     const nextCursor = hasNextPage
-      ? this.encodeCursor(items[items.length - 1]._id as Types.ObjectId)
+      ? this.encodeLatestCursor(items[items.length - 1]._id as Types.ObjectId)
       : null;
 
     return { items, nextCursor };
   }
 
+  // sort=discussed: commentCount desc, _id desc. Sorted on the raw stored
+  // field (no displayCount floor) so the {deletedAt, commentCount, _id}
+  // index added in CP1 actually serves the sort — a computed floored field
+  // would defeat it. commentCount cannot drift negative in storage
+  // (comments.service.ts clamps its decrement), so there is nothing for a
+  // floor to protect against here the way there is for likeCount/dislikeCount
+  // in the eventual sort=top path.
+  private async listDiscussed(
+    limit: number,
+    cursor: string | undefined,
+    authorId: string | undefined,
+  ): Promise<ListResult> {
+    const filter: Record<string, unknown> = { deletedAt: null };
+
+    if (authorId) {
+      filter.authorId = new Types.ObjectId(authorId);
+    }
+
+    if (cursor) {
+      const { v, id } = this.decodeKeysetCursor(cursor, 'discussed');
+      // Keyset page condition for ORDER BY commentCount DESC, _id DESC:
+      // either strictly fewer comments than the last row seen, or the same
+      // comment count with a strictly smaller _id (the tie-breaker).
+      filter.$or = [
+        { commentCount: { $lt: v } },
+        { commentCount: v, _id: { $lt: id } },
+      ];
+    }
+
+    const docs = await this.postModel
+      .find(filter)
+      .sort({ commentCount: -1, _id: -1 })
+      .limit(limit + 1)
+      .populate('authorId', 'fullName headline')
+      .exec();
+
+    const hasNextPage = docs.length > limit;
+    const items = (hasNextPage
+      ? docs.slice(0, limit)
+      : docs) as unknown as PostWithAuthor[];
+
+    const nextCursor = hasNextPage
+      ? this.encodeKeysetCursor(
+          'discussed',
+          items[items.length - 1].commentCount,
+          items[items.length - 1]._id as Types.ObjectId,
+        )
+      : null;
+
+    return { items, nextCursor };
+  }
+  // sort=top: same Wilson-score formula as ranking.ts's computeRankScore,
+  // expressed in Mongo aggregation operators so it can back a paginated
+  // DB sort. The two are proved to match by posts-ranking.e2e-spec.ts's
+  // parity test (CP6) — not by construction. Each stage below corresponds
+  // 1:1 to a line of computeRankScore, in the same order, so the two are
+  // easy to read side by side.
+  //
+  // Cost: score is computed live, not denormalized, so this is a full
+  // collection scan for the {deletedAt: null} case (an authorId filter
+  // narrows the scanned set via the existing {authorId,deletedAt,_id}
+  // index before scoring runs, but the scoring/ordering step itself is
+  // still unindexed either way). Acceptable at this project's scale;
+  // documented as a known limitation, not silent. A future optimization
+  // (denormalized rankScore + periodic recompute job) is out of scope here.
+  private async listTop(
+    limit: number,
+    cursor: string | undefined,
+    authorId: string | undefined,
+  ): Promise<ListResult> {
+    const Z2 = Z * Z;
+
+    const match: Record<string, unknown> = { deletedAt: null };
+    if (authorId) {
+      match.authorId = new Types.ObjectId(authorId);
+    }
+
+    const pipeline: PipelineStage[] = [
+      { $match: match },
+
+      // likes/dislikes/comments floored, matching displayCount's
+      // Math.max(0, stored ?? 0) semantics used everywhere else a raw
+      // counter reaches a client.
+      {
+        $addFields: {
+          likes: { $max: [0, '$likeCount'] },
+          dislikes: { $max: [0, '$dislikeCount'] },
+          comments: { $max: [0, '$commentCount'] },
+        },
+      },
+
+      // n = likes + dislikes
+      { $addFields: { n: { $add: ['$likes', '$dislikes'] } } },
+
+      // p = likes / n, only when n > 0 — $cond means $divide is never
+      // evaluated for n = 0, so there is no divide-by-zero risk from
+      // this line (Mongo's $divide throws on a zero divisor, unlike JS).
+      {
+        $addFields: {
+          p: {
+            $cond: [{ $eq: ['$n', 0] }, 0, { $divide: ['$likes', '$n'] }],
+          },
+        },
+      },
+
+      // wilson = 0 when n == 0, else the Wilson lower bound. $cond again
+      // short-circuits the unused branch, so the $divide/$sqrt below it
+      // never runs for n = 0 either. max(0, ...) floors the rare tiny
+      // negative float artifact the same way ranking.ts's
+      // wilsonLowerBound does (verified: likes=0, dislikes=5 produces
+      // ~-3.14e-17 from independent rounding in the two halves of the
+      // numerator — a real float artifact, not hypothetical).
+      {
+        $addFields: {
+          wilson: {
+            $cond: [
+              { $eq: ['$n', 0] },
+              0,
+              {
+                $max: [
+                  0,
+                  {
+                    $divide: [
+                      {
+                        $subtract: [
+                          {
+                            $add: [
+                              '$p',
+                              { $divide: [Z2, { $multiply: [2, '$n'] }] },
+                            ],
+                          },
+                          {
+                            $multiply: [
+                              Z,
+                              {
+                                $sqrt: {
+                                  $add: [
+                                    {
+                                      $divide: [
+                                        {
+                                          $multiply: [
+                                            '$p',
+                                            { $subtract: [1, '$p'] },
+                                          ],
+                                        },
+                                        '$n',
+                                      ],
+                                    },
+                                    {
+                                      $divide: [
+                                        Z2,
+                                        {
+                                          $multiply: [
+                                            4,
+                                            { $multiply: ['$n', '$n'] },
+                                          ],
+                                        },
+                                      ],
+                                    },
+                                  ],
+                                },
+                              },
+                            ],
+                          },
+                        ],
+                      },
+                      { $add: [1, { $divide: [Z2, '$n'] }] },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      },
+
+      // score = wilson * VOTE_WEIGHT + comments * COMMENT_WEIGHT — same
+      // constants ranking.ts exports, imported rather than re-declared.
+      {
+        $addFields: {
+          score: {
+            $add: [
+              { $multiply: ['$wilson', VOTE_WEIGHT] },
+              { $multiply: ['$comments', COMMENT_WEIGHT] },
+            ],
+          },
+        },
+      },
+    ];
+
+    if (cursor) {
+      const { v, id } = this.decodeKeysetCursor(cursor, 'top');
+      // Same seek-pagination shape as listDiscussed: strictly lower
+      // score, or equal score with a strictly smaller _id tie-breaker.
+      pipeline.push({
+        $match: {
+          $or: [{ score: { $lt: v } }, { score: v, _id: { $lt: id } }],
+        },
+      });
+    }
+
+    pipeline.push({ $sort: { score: -1, _id: -1 } }, { $limit: limit + 1 });
+
+    const docs = await this.postModel.aggregate(pipeline).exec();
+
+    const hasNextPage = docs.length > limit;
+    const page = hasNextPage ? docs.slice(0, limit) : docs;
+
+    // aggregate() returns plain objects, not hydrated Mongoose documents —
+    // Model.populate() still works on them as long as the ref field
+    // (authorId) is present, which it is: $addFields only ever added new
+    // fields alongside it, never touched it.
+    const populated = await this.postModel.populate(page, {
+      path: 'authorId',
+      select: 'fullName headline',
+    });
+    const items = populated as unknown as PostWithAuthor[];
+
+    // v is read off this same aggregation output, never recomputed in JS,
+    // so the cursor's equality half (score == v on the next page) can't be
+    // thrown off by a JS/Mongo float divergence.
+    const nextCursor = hasNextPage
+      ? this.encodeKeysetCursor(
+          'top',
+          (page[page.length - 1] as { score: number }).score,
+          page[page.length - 1]._id as Types.ObjectId,
+        )
+      : null;
+
+    return { items, nextCursor };
+  }
   // Bare base64-encoded ObjectId, not a JSON wrapper — with only one field
-  // left in the cursor after dropping createdAt, a JSON envelope buys
-  // nothing (shorter cursor, and one less failure mode: no JSON.parse to
-  // fail defensively against).
-  private encodeCursor(id: Types.ObjectId): string {
+  // in a latest cursor, a JSON envelope buys nothing (shorter cursor, and
+  // one less failure mode: no JSON.parse to fail defensively against).
+  // Renamed from encodeCursor/decodeCursor (CP3) now that a second, JSON
+  // keyset cursor format exists for discussed/top.
+  private encodeLatestCursor(id: Types.ObjectId): string {
     return Buffer.from(String(id)).toString('base64');
   }
 
-  // Bad base64 and an invalid ObjectId are the only two failure modes now
-  // (no JSON, no date) — both still end up as a plain Error inside this
-  // try block, so both still produce the same clean 400 rather than a 500.
-  private decodeCursor(cursor: string): Types.ObjectId {
+  // Bad base64 and an invalid ObjectId are the only two failure modes —
+  // both still end up as a plain Error inside this try block, so both
+  // still produce the same clean 400 rather than a 500. A discussed/top
+  // cursor decoded here is JSON text, which is never a valid ObjectId, so
+  // it 400s the same way — no special-case check needed for the
+  // cross-sort-replay rejection in this direction.
+  private decodeLatestCursor(cursor: string): Types.ObjectId {
     try {
       const id = Buffer.from(cursor, 'base64').toString('utf8');
       if (!isValidObjectId(id)) {
@@ -216,5 +493,53 @@ export class PostsService {
     } catch {
       throw new BadRequestException('Invalid cursor');
     }
+  }
+
+  // Keyset cursor for discussed/top: base64(JSON{sort, v, id}). `sort` is
+  // embedded and checked against the request's own sort so a cursor from
+  // one sort is rejected (400), not silently misapplied, when replayed
+  // against another.
+  private encodeKeysetCursor(
+    sort: 'discussed' | 'top',
+    v: number,
+    id: Types.ObjectId,
+  ): string {
+    return Buffer.from(JSON.stringify({ sort, v, id: String(id) })).toString(
+      'base64',
+    );
+  }
+
+  // A latest cursor decoded here is a bare ObjectId string, not JSON, so
+  // JSON.parse throws and this 400s the same way — the cross-sort-replay
+  // rejection holds in both directions without a special-case check.
+  private decodeKeysetCursor(
+    cursor: string,
+    expectedSort: 'discussed' | 'top',
+  ): KeysetCursor {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(Buffer.from(cursor, 'base64').toString('utf8'));
+    } catch {
+      throw new BadRequestException('Invalid cursor');
+    }
+
+    if (typeof parsed !== 'object' || parsed === null) {
+      throw new BadRequestException('Invalid cursor');
+    }
+    const { sort, v, id } = parsed as Record<string, unknown>;
+
+    if (sort !== expectedSort) {
+      throw new BadRequestException(
+        `Cursor was issued for sort=${String(sort)}, not sort=${expectedSort}`,
+      );
+    }
+    if (typeof v !== 'number' || !Number.isFinite(v)) {
+      throw new BadRequestException('Invalid cursor');
+    }
+    if (typeof id !== 'string' || !isValidObjectId(id)) {
+      throw new BadRequestException('Invalid cursor');
+    }
+
+    return { v, id: new Types.ObjectId(id) };
   }
 }
