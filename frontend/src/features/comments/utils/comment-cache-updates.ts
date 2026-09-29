@@ -1,5 +1,9 @@
 import { postKeys } from "@/features/posts/queries/post-queries";
 import type { Post } from "@/features/posts/types/post";
+import {
+  adjustCommentCountInFeed,
+  type FeedData,
+} from "@/features/posts/utils/post-cache";
 import type { ReactionResult } from "@/features/reactions/types/reaction-result";
 import type { QueryClient } from "@tanstack/react-query";
 import { commentKeys } from "../queries/comment-queries";
@@ -16,6 +20,13 @@ import type { Comment, CommentTree } from "../types/comment";
 // After a create (+1) or a cascade delete (-deletedCount). Clamped at 0,
 // mirroring the backend's own clamp on Post.commentCount — defensive only;
 // a correctly-synced cache never needs it.
+//
+// Patches the detail entry, every cached sort of the feed, and every "mine"
+// list — the same feedAll()/mineAll() prefixes post-cache-updates.ts uses,
+// so the count is correct everywhere the post is cached, not just on its own
+// page. This doesn't reorder Most Discussed (a delta alone doesn't tell us
+// the post's new rank among the others); that still catches up on the next
+// invalidation/refetch, same as before.
 export function adjustPostCommentCount(
   queryClient: QueryClient,
   postId: string,
@@ -25,6 +36,14 @@ export function adjustPostCommentCount(
     post
       ? { ...post, commentCount: Math.max(0, post.commentCount + delta) }
       : post,
+  );
+  queryClient.setQueriesData<FeedData>(
+    { queryKey: postKeys.feedAll() },
+    (feed) => adjustCommentCountInFeed(feed, postId, delta),
+  );
+  queryClient.setQueriesData<FeedData>(
+    { queryKey: postKeys.mineAll() },
+    (feed) => adjustCommentCountInFeed(feed, postId, delta),
   );
 }
 

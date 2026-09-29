@@ -45,6 +45,31 @@ export function patchPostInFeed(
   };
 }
 
+// Adjust one post's commentCount in every cached page that has it, without
+// replacing the post the way patchPostInFeed does — a comment mutation only
+// knows the postId and the delta (+1 on create, -deletedCount on a cascade
+// delete), not a full updated Post. Clamped at 0, mirroring the backend's
+// own clamp. This only fixes the count; it doesn't move the post within a
+// sort like Most Discussed — that still needs a refetch, same as before.
+export function adjustCommentCountInFeed(
+  feed: FeedData | undefined,
+  postId: string,
+  delta: number,
+): FeedData | undefined {
+  if (!feed) return feed;
+  return {
+    ...feed,
+    pages: feed.pages.map((page) => ({
+      ...page,
+      items: page.items.map((post) =>
+        post.id === postId
+          ? { ...post, commentCount: Math.max(0, post.commentCount + delta) }
+          : post,
+      ),
+    })),
+  };
+}
+
 // Drop one post from every cached page. A page's nextCursor is the id of
 // its last item and the server filters on `_id < cursor`, so it stays valid
 // even when that item itself is the one removed.

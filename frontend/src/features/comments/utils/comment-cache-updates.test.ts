@@ -98,6 +98,53 @@ describe("adjustPostCommentCount", () => {
       queryClient.getQueryData<Post>(postKeys.detail("post-1")),
     ).toBeUndefined();
   });
+
+  it("patches the count under every cached sort and in the mine list, leaving other posts alone", () => {
+    const queryClient = new QueryClient();
+    const target = makePost({ id: "post-1", commentCount: 3 });
+    const other = makePost({ id: "post-2", commentCount: 7 });
+    const feedOf = (posts: Post[]) => ({
+      pages: [{ items: posts, nextCursor: null }],
+      pageParams: [undefined],
+    });
+
+    queryClient.setQueryData(postKeys.feed("latest"), feedOf([target, other]));
+    queryClient.setQueryData(postKeys.feed("top"), feedOf([other, target]));
+    queryClient.setQueryData(postKeys.feed("discussed"), feedOf([target]));
+    queryClient.setQueryData(postKeys.mine("author-1"), feedOf([target]));
+
+    adjustPostCommentCount(queryClient, "post-1", 1);
+
+    for (const sort of ["latest", "top", "discussed"] as const) {
+      const items = queryClient
+        .getQueryData<{ pages: { items: Post[] }[] }>(postKeys.feed(sort))
+        ?.pages[0].items;
+      expect(items?.find((p) => p.id === "post-1")?.commentCount).toBe(4);
+    }
+    // A different post in the same feed is left untouched.
+    expect(
+      queryClient
+        .getQueryData<{ pages: { items: Post[] }[] }>(postKeys.feed("latest"))
+        ?.pages[0].items.find((p) => p.id === "post-2")?.commentCount,
+    ).toBe(7);
+    expect(
+      queryClient
+        .getQueryData<{ pages: { items: Post[] }[] }>(
+          postKeys.mine("author-1"),
+        )
+        ?.pages[0].items[0].commentCount,
+    ).toBe(4);
+  });
+
+  it("does not create a feed entry for a sort that was never loaded", () => {
+    const queryClient = new QueryClient();
+
+    adjustPostCommentCount(queryClient, "post-1", 1);
+
+    expect(
+      queryClient.getQueryCache().findAll({ queryKey: postKeys.feedAll() }),
+    ).toHaveLength(0);
+  });
 });
 
 describe("patchCommentBody", () => {
