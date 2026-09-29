@@ -1,20 +1,20 @@
-import { createPost, deletePost, updatePost } from "@/services/api/posts";
-import { togglePostReaction } from "@/services/api/reactions";
 import { reactionMutationKeys } from "@/features/reactions/mutations/reaction-mutation-keys";
 import type { ReactionResult } from "@/features/reactions/types/reaction-result";
-import { applyReaction } from "@/features/reactions/utils/toggle";
 import {
   currentUserId,
   isSameSession,
 } from "@/features/reactions/utils/session-guard";
+import { applyReaction } from "@/features/reactions/utils/toggle";
+import { createPost, deletePost, updatePost } from "@/services/api/posts";
+import { togglePostReaction } from "@/services/api/reactions";
 import type { ReactionType } from "@/types/reaction";
 import {
   useMutation,
   useQueryClient,
   type UseMutationOptions,
 } from "@tanstack/react-query";
-import type { DeletedPost, Post } from "../types/post";
 import { postKeys } from "../queries/post-queries";
+import type { DeletedPost, Post } from "../types/post";
 import { hasStatus } from "../utils/errors";
 import {
   applyPostCreated,
@@ -99,7 +99,7 @@ export function usePostReaction(postId: string) {
     onMutate: async ({ type, current }: ReactionVars) => {
       await Promise.all([
         queryClient.cancelQueries({ queryKey: postKeys.detail(postId) }),
-        queryClient.cancelQueries({ queryKey: postKeys.feed() }),
+        queryClient.cancelQueries({ queryKey: postKeys.feedAll() }),
         queryClient.cancelQueries({ queryKey: postKeys.mineAll() }),
       ]);
 
@@ -122,9 +122,14 @@ export function usePostReaction(postId: string) {
       }
     },
     onSettled: () => {
-      if (queryClient.isMutating({ mutationKey: reactionMutationKeys.all }) === 1) {
-        queryClient.invalidateQueries({ queryKey: postKeys.detail(postId), exact: true });
-        queryClient.invalidateQueries({ queryKey: postKeys.feed() });
+      if (
+        queryClient.isMutating({ mutationKey: reactionMutationKeys.all }) === 1
+      ) {
+        queryClient.invalidateQueries({
+          queryKey: postKeys.detail(postId),
+          exact: true,
+        });
+        queryClient.invalidateQueries({ queryKey: postKeys.feedAll() });
         queryClient.invalidateQueries({ queryKey: postKeys.mineAll() });
       }
     },

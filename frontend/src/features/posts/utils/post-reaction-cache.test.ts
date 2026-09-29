@@ -128,15 +128,24 @@ describe("patchReactionInFeed", () => {
 });
 
 describe("writePostReaction", () => {
-  it("updates the detail entry, the feed and every mine list, leaving other posts alone", () => {
+  it("updates the detail entry, every sort's feed and every mine list, leaving other posts alone", () => {
     const queryClient = new QueryClient();
     const target = makePost({ id: "post-1", likeCount: 1 });
     const untouched = makePost({ id: "post-2", likeCount: 4 });
 
     queryClient.setQueryData(postKeys.detail("post-1"), target);
     queryClient.setQueryData<FeedData>(
-      postKeys.feed(),
+      postKeys.feed("latest"),
       makeFeed([target, untouched]),
+    );
+    // Same post, different position: Top orders it elsewhere.
+    queryClient.setQueryData<FeedData>(
+      postKeys.feed("top"),
+      makeFeed([untouched, target]),
+    );
+    queryClient.setQueryData<FeedData>(
+      postKeys.feed("discussed"),
+      makeFeed([target]),
     );
     queryClient.setQueryData<FeedData>(
       postKeys.mine("author-1"),
@@ -160,12 +169,25 @@ describe("writePostReaction", () => {
       myReaction: "like",
     });
 
-    const feed = queryClient.getQueryData<FeedData>(postKeys.feed());
-    expect(feed?.pages[0].items[0]).toMatchObject({
+    const latest = queryClient.getQueryData<FeedData>(postKeys.feed("latest"));
+    expect(latest?.pages[0].items[0]).toMatchObject({
       id: "post-1",
       likeCount: 2,
     });
-    expect(feed?.pages[0].items[1]).toEqual(untouched);
+    expect(latest?.pages[0].items[1]).toEqual(untouched);
+
+    const top = queryClient.getQueryData<FeedData>(postKeys.feed("top"));
+    expect(top?.pages[0].items[0]).toEqual(untouched);
+    expect(top?.pages[0].items[1]).toMatchObject({
+      id: "post-1",
+      likeCount: 2,
+      myReaction: "like",
+    });
+
+    expect(
+      queryClient.getQueryData<FeedData>(postKeys.feed("discussed"))?.pages[0]
+        .items[0],
+    ).toMatchObject({ likeCount: 2 });
 
     expect(
       queryClient.getQueryData<FeedData>(postKeys.mine("author-1"))?.pages[0]
@@ -179,18 +201,26 @@ describe("writePostReaction", () => {
 });
 
 describe("snapshotPostCaches / restorePostCaches", () => {
-  it("returns every entry to exactly its previous value", () => {
+  it("returns every entry, under every sort, to exactly its previous value", () => {
     const queryClient = new QueryClient();
     const target = makePost({ id: "post-1", likeCount: 1 });
 
     queryClient.setQueryData(postKeys.detail("post-1"), target);
-    queryClient.setQueryData<FeedData>(postKeys.feed(), makeFeed([target]));
+    queryClient.setQueryData<FeedData>(
+      postKeys.feed("latest"),
+      makeFeed([target]),
+    );
+    queryClient.setQueryData<FeedData>(
+      postKeys.feed("top"),
+      makeFeed([target]),
+    );
     queryClient.setQueryData<FeedData>(
       postKeys.mine("author-1"),
       makeFeed([target]),
     );
 
     const snapshot = snapshotPostCaches(queryClient, "post-1");
+    expect(snapshot.feed).toHaveLength(2);
 
     writePostReaction(queryClient, "post-1", {
       likeCount: 99,
@@ -201,7 +231,10 @@ describe("snapshotPostCaches / restorePostCaches", () => {
     restorePostCaches(queryClient, snapshot);
 
     expect(queryClient.getQueryData(postKeys.detail("post-1"))).toEqual(target);
-    expect(queryClient.getQueryData<FeedData>(postKeys.feed())).toEqual(
+    expect(queryClient.getQueryData<FeedData>(postKeys.feed("latest"))).toEqual(
+      makeFeed([target]),
+    );
+    expect(queryClient.getQueryData<FeedData>(postKeys.feed("top"))).toEqual(
       makeFeed([target]),
     );
     expect(

@@ -40,9 +40,9 @@ export function patchReactionInFeed(
 
 // main cache write function, called from the mutation's onSuccess and onMutate.
 // Writes a reaction result into every cached place a post can live: its
-// detail entry, the feed, and every cached "mine" list. Matched by prefix
-// (mineAll(), not mine(authorId)) so this keeps working once Day 14 adds a
-// filter argument to feed()/mine().
+// detail entry, the feed under every sort, and every cached "mine" list.
+// Matched by prefix (feedAll(), mineAll()) so a Top or Discussed feed is
+// patched too, not only the one on screen.
 export function writePostReaction(
   queryClient: QueryClient,
   postId: string,
@@ -52,7 +52,7 @@ export function writePostReaction(
     patchReactionOnPost(post, state),
   );
   queryClient.setQueriesData<FeedData>(
-    { queryKey: postKeys.feed() },
+    { queryKey: postKeys.feedAll() },
     (feed) => patchReactionInFeed(feed, postId, state),
   );
   queryClient.setQueriesData<FeedData>(
@@ -79,7 +79,9 @@ export function snapshotPostCaches(
       postKeys.detail(postId),
       queryClient.getQueryData<Post>(postKeys.detail(postId)),
     ],
-    feed: queryClient.getQueriesData<FeedData>({ queryKey: postKeys.feed() }),
+    feed: queryClient.getQueriesData<FeedData>({
+      queryKey: postKeys.feedAll(),
+    }),
     mine: queryClient.getQueriesData<FeedData>({
       queryKey: postKeys.mineAll(),
     }),

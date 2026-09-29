@@ -8,6 +8,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { postKeys } from "../queries/post-queries";
 import type { Post } from "../types/post";
+import type { PostSort } from "../utils/feed-sort";
 import type { FeedData } from "../utils/post-cache";
 import { usePostReaction } from "./post-mutations";
 
@@ -32,7 +33,11 @@ const OTHER_USER: AuthUser = {
   role: "user",
 };
 
-const START: ReactionResult = { likeCount: 1, dislikeCount: 0, myReaction: null };
+const START: ReactionResult = {
+  likeCount: 1,
+  dislikeCount: 0,
+  myReaction: null,
+};
 
 // A request the test settles by hand, so it can look at the cache while the
 // request is still "in flight".
@@ -77,8 +82,13 @@ function setup() {
   queryClient.setQueryData(authKeys.me, USER);
   queryClient.setQueryData(postKeys.detail("post-1"), makePost());
   queryClient.setQueryData<FeedData>(
-    postKeys.feed(),
+    postKeys.feed("latest"),
     feedOf([makePost(), makePost({ id: "post-2", likeCount: 4 })]),
+  );
+  // The same post in a different position under Top.
+  queryClient.setQueryData<FeedData>(
+    postKeys.feed("top"),
+    feedOf([makePost({ id: "post-2", likeCount: 4 }), makePost()]),
   );
   queryClient.setQueryData<FeedData>(
     postKeys.mine("author-1"),
@@ -95,7 +105,8 @@ function setup() {
 
 const detail = (qc: QueryClient) =>
   qc.getQueryData<Post>(postKeys.detail("post-1"));
-const feed = (qc: QueryClient) => qc.getQueryData<FeedData>(postKeys.feed());
+const feed = (qc: QueryClient, sort: PostSort = "latest") =>
+  qc.getQueryData<FeedData>(postKeys.feed(sort));
 const mine = (qc: QueryClient) =>
   qc.getQueryData<FeedData>(postKeys.mine("author-1"));
 
@@ -179,6 +190,44 @@ describe("usePostReaction", () => {
     });
   });
 
+  it("writes into the same post under every cached sort, wherever it sits", async () => {
+    const call = deferred<ReactionResult>();
+    mockToggle.mockReturnValue(call.promise);
+    const { queryClient, Wrapper } = setup();
+    const { result } = renderHook(() => usePostReaction("post-1"), {
+      wrapper: Wrapper,
+    });
+
+    act(() => {
+      result.current.mutate({ type: "like", current: START });
+    });
+    await waitFor(() =>
+      expect(feed(queryClient, "top")?.pages[0].items[1]).toMatchObject({
+        id: "post-1",
+        likeCount: 2,
+        myReaction: "like",
+      }),
+    );
+    expect(feed(queryClient, "top")?.pages[0].items[0]).toMatchObject({
+      id: "post-2",
+      likeCount: 4,
+    });
+
+    await act(async () => {
+      call.resolve({ likeCount: 5, dislikeCount: 2, myReaction: "like" });
+    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(feed(queryClient, "top")?.pages[0].items[1]).toMatchObject({
+      likeCount: 5,
+      dislikeCount: 2,
+    });
+    expect(feed(queryClient, "latest")?.pages[0].items[0]).toMatchObject({
+      likeCount: 5,
+      dislikeCount: 2,
+    });
+  });
+
   it("restores every cache exactly as it was when the request fails", async () => {
     const call = deferred<ReactionResult>();
     mockToggle.mockReturnValue(call.promise);
@@ -186,6 +235,7 @@ describe("usePostReaction", () => {
     const before = {
       detail: detail(queryClient),
       feed: feed(queryClient),
+      top: feed(queryClient, "top"),
       mine: mine(queryClient),
     };
     const { result } = renderHook(() => usePostReaction("post-1"), {
@@ -204,6 +254,7 @@ describe("usePostReaction", () => {
 
     expect(detail(queryClient)).toEqual(before.detail);
     expect(feed(queryClient)).toEqual(before.feed);
+    expect(feed(queryClient, "top")).toEqual(before.top);
     expect(mine(queryClient)).toEqual(before.mine);
   });
 
@@ -227,6 +278,9 @@ describe("usePostReaction", () => {
 
     expect(detail(queryClient)).toBeUndefined();
     expect(feed(queryClient)?.pages[0].items.map((p) => p.id)).toEqual([
+      "post-2",
+    ]);
+    expect(feed(queryClient, "top")?.pages[0].items.map((p) => p.id)).toEqual([
       "post-2",
     ]);
   });
@@ -263,6 +317,7 @@ describe("usePostReaction", () => {
     // The rollback must not put the first user's data back.
     expect(detail(queryClient)).toBeUndefined();
     expect(feed(queryClient)).toBeUndefined();
+    expect(feed(queryClient, "top")).toBeUndefined();
     expect(mine(queryClient)).toBeUndefined();
   });
 
@@ -303,6 +358,7 @@ describe("usePostReaction", () => {
 
     // The first user's late answer must not overwrite it.
     expect(detail(queryClient)).toEqual(theirs);
+    expect(feed(queryClient, "top")).toBeUndefined();
   });
 
   it("cancels reads still in flight for the caches it is about to write", async () => {
@@ -314,14 +370,15 @@ describe("usePostReaction", () => {
     const never = () => new Promise<never>(() => {});
     for (const queryKey of [
       postKeys.detail("post-1"),
-      postKeys.feed(),
+      postKeys.feed("latest"),
+      postKeys.feed("top"),
       postKeys.mine("author-1"),
     ]) {
       queryClient
         .fetchQuery({ queryKey, queryFn: never, staleTime: 0 })
         .catch(() => undefined);
     }
-    await waitFor(() => expect(queryClient.isFetching()).toBe(3));
+    await waitFor(() => expect(queryClient.isFetching()).toBe(4));
     const { result } = renderHook(() => usePostReaction("post-1"), {
       wrapper: Wrapper,
     });
@@ -336,7 +393,7 @@ describe("usePostReaction", () => {
     });
   });
 
-  it("marks the detail, feed and mine caches stale once it settles", async () => {
+  it("marks the detail, every feed and mine caches stale once it settles", async () => {
     mockToggle.mockResolvedValue({
       likeCount: 2,
       dislikeCount: 0,
@@ -357,7 +414,7 @@ describe("usePostReaction", () => {
       queryKey: postKeys.detail("post-1"),
       exact: true,
     });
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: postKeys.feed() });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: postKeys.feedAll() });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: postKeys.mineAll() });
   });
 
