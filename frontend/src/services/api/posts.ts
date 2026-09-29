@@ -1,23 +1,31 @@
-import type {
-  DeletedPost,
-  Post,
-  PostPage,
-} from "@/features/posts/types/post";
+import type { DeletedPost, Post, PostPage } from "@/features/posts/types/post";
+import type { PostSort } from "@/features/posts/utils/feed-sort";
 import { apiClient } from "@/lib/axios/client";
 import type { ApiSuccess } from "@/types/api";
 
 export const POSTS_PAGE_SIZE = 10;
 
+export type PostPageParams = {
+  cursor?: string;
+  authorId?: string;
+  sort?: PostSort;
+};
+
 // The query string is built here with URLSearchParams, which encodes the
 // cursor — it's base64, so it may contain characters that are special in a
-// URL.
-export async function getPostPage(
-  cursor?: string,
-  authorId?: string,
-): Promise<PostPage> {
+// URL. `sort` is sent whenever the caller gives one, including "latest", so
+// the request always matches the cache key it is stored under. The cursor
+// belongs to the sort that produced it: the API rejects a cursor replayed
+// against another sort with a 400, which the per-sort query keys prevent.
+export async function getPostPage({
+  cursor,
+  authorId,
+  sort,
+}: PostPageParams = {}): Promise<PostPage> {
   const params = new URLSearchParams({ limit: String(POSTS_PAGE_SIZE) });
   if (cursor) params.set("cursor", cursor);
   if (authorId) params.set("authorId", authorId);
+  if (sort) params.set("sort", sort);
   const res = await apiClient.get<ApiSuccess<PostPage>>(`/posts?${params}`);
   return res.data.data;
 }

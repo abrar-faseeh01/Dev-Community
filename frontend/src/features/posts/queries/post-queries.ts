@@ -1,3 +1,4 @@
+import type { PostSort } from "@/features/posts/utils/feed-sort";
 import type { ReactorTab } from "@/features/reactions/types/reactor";
 import { getPost, getPostPage } from "@/services/api/posts";
 import { getPostReactors } from "@/services/api/reactions";
@@ -5,11 +6,16 @@ import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 
 // One factory for every posts cache key, so a mutation can target exactly
 // the entries it affects. Everything nests under ["posts"], so
-// invalidating postKeys.all would hit both feed and detail. Day 14 adds a
-// filter argument to feed().
+// invalidating postKeys.all would hit both feed and detail.
 export const postKeys = {
   all: ["posts"] as const,
-  feed: () => [...postKeys.all, "feed"] as const,
+  // Prefix for the feed of every sort. Anything that must reach all of them
+  // (patching a post everywhere it is cached, cancelling or invalidating the
+  // feeds) targets this; feed(sort) is one sort's own entry. `sort` is
+  // required on feed(), so a call site that forgets it is a compile error
+  // rather than a write to the wrong cache entry.
+  feedAll: () => [...postKeys.all, "feed"] as const,
+  feed: (sort: PostSort) => [...postKeys.feedAll(), sort] as const,
   detail: (id: string) => [...postKeys.all, "detail", id] as const,
   // One author's posts ("Posts made by you"). mineAll is the prefix for every
   // author, so a mutation can update or invalidate all of them at once.
@@ -20,24 +26,26 @@ export const postKeys = {
     [...postKeys.all, "reactors", id, tab] as const,
 };
 
-// The cursor-paginated GET /posts: each page's `nextCursor` (null on the last
-// one) becomes the next page's param, so nothing computes an offset or a
-// page number.
-export function usePostFeed() {
+// The cursor-paginated GET /posts for one sort: each page's `nextCursor`
+// (null on the last one) becomes the next page's param, so nothing computes
+// an offset or a page number. Each sort has its own key, so its pages and
+// cursors are never mixed with another sort's.
+export function usePostFeed(sort: PostSort) {
   return useInfiniteQuery({
-    queryKey: postKeys.feed(),
-    queryFn: ({ pageParam }) => getPostPage(pageParam),
+    queryKey: postKeys.feed(sort),
+    queryFn: ({ pageParam }) => getPostPage({ cursor: pageParam, sort }),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
   });
 }
 
 // Same paging as the feed, filtered to one author, so the cursor and
-// ordering rules are identical.
+// ordering rules are identical. Always the default (latest) order — no sort
+// is sent.
 export function useMyPosts(authorId: string) {
   return useInfiniteQuery({
     queryKey: postKeys.mine(authorId),
-    queryFn: ({ pageParam }) => getPostPage(pageParam, authorId),
+    queryFn: ({ pageParam }) => getPostPage({ cursor: pageParam, authorId }),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
   });
