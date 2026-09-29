@@ -5,6 +5,7 @@ import { useAuth } from "@/features/auth/hooks/use-auth";
 import { CommentFeedLink } from "@/features/comments/components/comment-feed-link";
 import { usePostFeed } from "@/features/posts/queries/post-queries";
 import { describeLoadError } from "@/features/posts/utils/errors";
+import type { PostSort } from "@/features/posts/utils/feed-sort";
 import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
 import Link from "next/link";
 import { PostCard } from "./post-card";
@@ -21,12 +22,13 @@ const retryButtonClass =
 // The feed list. Reads the cursor-paginated GET /posts through
 // useInfiniteQuery: each page's `nextCursor` (null on the last one) becomes
 // the next page's param, so nothing here ever computes an offset or a page
-// number. Kept as its own component so the Day 14 feed tabs can reuse it
-// with a different query key.
-export function PostFeed() {
+// number. `sort` picks which of the three feeds it shows; each has its own
+// cache entry, so the parent remounts this per sort (key={sort}) and no
+// state, cursor or observer carries over from another tab.
+export function PostFeed({ sort }: { sort: PostSort }) {
   const { user } = useAuth();
 
-  const feed = usePostFeed();
+  const feed = usePostFeed(sort);
 
   // Auto-load only when nothing else is going on: there is a next page, no
   // fetch is already running (first load, next page, or a background

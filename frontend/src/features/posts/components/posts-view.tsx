@@ -1,9 +1,12 @@
 "use client";
 
 import { ROUTES } from "@/constants/routes";
-import { FeedNotice } from "@/features/posts/components/feed-notice";
-import { PostFeed } from "@/features/posts/components/post-feed";
 import { useAuth } from "@/features/auth/hooks/use-auth";
+import { FeedNotice } from "@/features/posts/components/feed-notice";
+import {
+  SortedPostFeed,
+  SortedPostFeedFallback,
+} from "@/features/posts/components/sorted-post-feed";
 import Link from "next/link";
 import { Suspense } from "react";
 
@@ -21,8 +24,12 @@ export function PostsView() {
       <div className="w-full max-w-2xl">
         <div className="mb-7 flex items-end justify-between gap-4">
           <div>
-            <p className="mb-1 text-sm font-medium text-emerald-400">Community</p>
-            <h1 className="text-2xl font-bold tracking-tight text-white">Posts</h1>
+            <p className="mb-1 text-sm font-medium text-emerald-400">
+              Community
+            </p>
+            <h1 className="text-2xl font-bold tracking-tight text-white">
+              Posts
+            </h1>
           </div>
 
           {canCreate && (
@@ -35,13 +42,14 @@ export function PostsView() {
           )}
         </div>
 
-        {/* FeedNotice reads the URL's search params, which needs a Suspense
-            boundary for `next build`. */}
+        {/* FeedNotice and SortedPostFeed read the URL's search params, which needs a Suspense boundary for next build. */}
         <Suspense fallback={null}>
           <FeedNotice />
         </Suspense>
 
-        <PostFeed />
+        <Suspense fallback={<SortedPostFeedFallback />}>
+          <SortedPostFeed />
+        </Suspense>
       </div>
     </main>
   );
