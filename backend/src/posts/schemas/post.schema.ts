@@ -62,3 +62,15 @@ PostSchema.index({ authorId: 1, deletedAt: 1, _id: -1 });
 // (comments.service.ts clamps its decrement), so no floor is needed for
 // this field the way it is for likeCount/dislikeCount.
 PostSchema.index({ deletedAt: 1, commentCount: -1, _id: -1 });
+
+// Full-text search: backs GET /posts/search. MongoDB allows one text
+// index per collection, and its weights can't be changed in place (it has to
+// be dropped and rebuilt), so they are fixed here. title:body is 10:1 rather
+// than a gentler 3:1 because a text score grows with how often a word
+// appears: at 3:1 a body that repeats a word several times can outscore a
+// post whose title is a near-exact match. A $text query throws if this index
+// doesn't exist, so it has to be built before the route is used.
+PostSchema.index(
+  { title: 'text', body: 'text' },
+  { weights: { title: 10, body: 1 } },
+);

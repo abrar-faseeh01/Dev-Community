@@ -25,11 +25,13 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { AuditService } from '../audit/audit.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Public } from '../auth/decorators/public.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
+
 import {
   assertOwnerOrAdmin,
   isAdminOverride,
@@ -50,7 +52,9 @@ import {
   DeletePostResponseDto,
   PostListResponseDto,
   PostResponseDto,
+  PostSearchResponseDto,
 } from './dto/post-response.dto';
+import { SearchPostsDto } from './dto/search-posts.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { PostsService, PostWithAuthor } from './posts.service';
 
@@ -191,6 +195,62 @@ export class PostsController {
         this.toPostResponse(post, mine.get(String(post._id)) ?? null),
       ),
       nextCursor,
+    };
+  }
+
+  // Declared before GET ':id' so the literal 'search' segment is matched here
+  // and not read as a post id.
+  //
+  // 40 a minute per IP is a judgment call: text search is the most expensive
+  // query in this controller, but a debounced search box fires a request per
+  // pause in typing, and 20 a minute is easy to reach in ordinary use. Day 18
+  // revisits rate limits for search.
+  @Public()
+  @UseGuards(OptionalJwtAuthGuard)
+  @Get('search')
+  @Throttle({ default: { limit: 40, ttl: 60000 } })
+  @ApiOperation({
+    summary: 'Full-text search over posts',
+    description:
+      "Public — no authentication required. Matches whole words (stemmed) in title and body, best matches first; a title match outranks a body match. Returns at most `limit` results with no next page: `hasMore` says whether more matched. Zero matches is a normal 200 with an empty list. Soft-deleted posts are excluded. When the request carries a valid session cookie, each post's `myReaction` is the caller's own reaction; otherwise null. `rankScore` is always null here.",
+  })
+  @ApiQuery({
+    name: 'q',
+    required: true,
+    description: 'Words to search for. Trimmed; 1-100 characters.',
+    schema: { type: 'string', minLength: 1, maxLength: 100 },
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    schema: { type: 'integer', minimum: 1, maximum: 20, default: 10 },
+  })
+  @ApiOkResponse({
+    type: PostSearchResponseDto,
+    description:
+      'Zero matches returns { items: [], hasMore: false } rather than an error.',
+  })
+  @ApiBadRequestResponse({
+    description:
+      'Missing, blank or whitespace-only `q`; `q` longer than 100 characters; `limit` outside 1-20 (rejected, not clamped); or any other query parameter.',
+    type: ErrorResponseDto,
+  })
+  async search(
+    @Query() dto: SearchPostsDto,
+    @CurrentUser() requester: RequestUser | null,
+  ) {
+    const { items, hasMore } = await this.postsService.search(dto.q, dto.limit);
+    // One query for the whole result, not one per post.
+    const mine = await this.reactionsService.findMineFor(
+      requester?.userId ?? null,
+      'post',
+      items.map((post) => String(post._id)),
+    );
+    return {
+      items: items.map((post) =>
+        this.toPostResponse(post, mine.get(String(post._id)) ?? null),
+      ),
+      hasMore,
     };
   }
 

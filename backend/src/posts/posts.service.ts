@@ -193,6 +193,43 @@ export class PostsService {
     return this.listLatest(limit, cursor, authorId);
   }
 
+  // Full-text search (Day 15): one capped page of the best matches, no
+  // cursor. Ranking by text score has many ties, so paging it would need a
+  // {score, _id} keyset cursor like sort=top's, for a search box that only
+  // shows the best few results — so hasMore is the only paging signal.
+  //
+  // Needs the text index on Post (post.schema.ts): without it MongoDB throws
+  // at query time, not at startup.
+  //
+  // The score is projected as `textScore`, never `score`: PostWithAuthor.score
+  // is sort=top's rank and the controller maps it to rankScore, so reusing
+  // that name could put a text-relevance number where a Top rank belongs.
+  async search(
+    q: string,
+    limit: number,
+  ): Promise<{ items: PostWithAuthor[]; hasMore: boolean }> {
+    const docs = await this.postModel
+      .find(
+        { deletedAt: null, $text: { $search: q } },
+        { textScore: { $meta: 'textScore' } },
+      )
+      // _id breaks ties: equal scores are common (two posts that each match
+      // the word once), and without a second key MongoDB doesn't promise a
+      // stable order for them between runs.
+      .sort({ textScore: { $meta: 'textScore' }, _id: -1 })
+      // One extra document: its presence, not its content, says there were
+      // more matches than we return — same trick as listLatest.
+      .limit(limit + 1)
+      .populate('authorId', 'fullName headline')
+      .exec();
+
+    const hasMore = docs.length > limit;
+    const items = (hasMore
+      ? docs.slice(0, limit)
+      : docs) as unknown as PostWithAuthor[];
+    return { items, hasMore };
+  }
+
   // Posts are only ever created in real time, never backdated, so _id
   // descending (ObjectIds embed a creation timestamp) already matches
   // createdAt descending — revised from an original {createdAt, _id} $or

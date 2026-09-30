@@ -19,13 +19,22 @@ export class PostDto {
   @ApiProperty({ example: 'Offset pagination degrades as pages get deeper...' })
   body: string;
 
-  @ApiProperty({ example: 3, description: 'How many users currently like this post.' })
+  @ApiProperty({
+    example: 3,
+    description: 'How many users currently like this post.',
+  })
   likeCount: number;
 
-  @ApiProperty({ example: 0, description: 'How many users currently dislike this post.' })
+  @ApiProperty({
+    example: 0,
+    description: 'How many users currently dislike this post.',
+  })
   dislikeCount: number;
 
-  @ApiProperty({ example: 0, description: 'Denormalized counter — inert until Day 9 (Comments).' })
+  @ApiProperty({
+    example: 0,
+    description: 'Denormalized counter — inert until Day 9 (Comments).',
+  })
   commentCount: number;
 
   @ApiProperty({
@@ -46,7 +55,13 @@ export class PostDto {
   })
   rankScore: number | null;
 
-  @ApiProperty({ type: 'string', format: 'date-time', nullable: true, example: null, description: 'Soft-delete timestamp; null while the post is live.' })
+  @ApiProperty({
+    type: 'string',
+    format: 'date-time',
+    nullable: true,
+    example: null,
+    description: 'Soft-delete timestamp; null while the post is live.',
+  })
   deletedAt: Date | null;
 
   @ApiProperty({ example: '2026-09-18T09:38:42.598Z' })
@@ -75,7 +90,8 @@ class PostListDataDto {
     type: 'string',
     nullable: true,
     example: 'NmFhZDA2YjQ0OWUyYzRlMDM0ZGE5ZTAx',
-    description: 'Pass as `cursor` to fetch the next page. null means there is no next page.',
+    description:
+      'Pass as `cursor` to fetch the next page. null means there is no next page.',
   })
   nextCursor: string | null;
 }
@@ -86,6 +102,30 @@ export class PostListResponseDto {
 
   @ApiProperty({ type: PostListDataDto })
   data: PostListDataDto;
+}
+
+class PostSearchDataDto {
+  @ApiProperty({
+    type: [PostDto],
+    description:
+      'Best matches first (highest text relevance; newest first among equal scores).',
+  })
+  items: PostDto[];
+
+  @ApiProperty({
+    example: false,
+    description:
+      'true when more posts matched than were returned. There is no next page to fetch: refine the search instead.',
+  })
+  hasMore: boolean;
+}
+
+export class PostSearchResponseDto {
+  @ApiProperty({ example: true })
+  success: true;
+
+  @ApiProperty({ type: PostSearchDataDto })
+  data: PostSearchDataDto;
 }
 
 class DeletePostDataDto {
