@@ -1,6 +1,6 @@
 import { QueryClient } from "@tanstack/react-query";
 import { postKeys } from "../queries/post-queries";
-import type { Post } from "../types/post";
+import type { Post, PostSearchPage } from "../types/post";
 import type { FeedData } from "./post-cache";
 import {
   applyPostCreated,
@@ -46,7 +46,36 @@ function seeded() {
     makeFeed([b, a]),
   );
   queryClient.setQueryData<FeedData>(postKeys.mine("author-1"), makeFeed([a]));
+  queryClient.setQueryData<PostSearchPage>(postKeys.search("react"), {
+    items: [a, b],
+    hasMore: false,
+  });
+  queryClient.setQueryData<PostSearchPage>(postKeys.search("vue"), {
+    items: [b],
+    hasMore: false,
+  });
   return { queryClient, a, b };
+}
+
+// Search results are marked stale so they refetch, never patched: their shape
+// is not a feed's, and the writers above must leave them exactly as cached.
+function expectSearchesInvalidated(queryClient: QueryClient) {
+  for (const term of ["react", "vue"]) {
+    expect(
+      queryClient.getQueryState(postKeys.search(term))?.isInvalidated,
+    ).toBe(true);
+  }
+}
+
+function expectSearchDataUntouched(queryClient: QueryClient, a: Post, b: Post) {
+  expect(queryClient.getQueryData(postKeys.search("react"))).toEqual({
+    items: [a, b],
+    hasMore: false,
+  });
+  expect(queryClient.getQueryData(postKeys.search("vue"))).toEqual({
+    items: [b],
+    hasMore: false,
+  });
 }
 
 describe("applyPostCreated", () => {
@@ -99,6 +128,29 @@ describe("applyPostCreated", () => {
     expect(
       queryClient.getQueryState(postKeys.mine("author-1"))?.isInvalidated,
     ).toBe(true);
+  });
+});
+
+describe("search cache", () => {
+  it("applyPostCreated marks every cached search stale", () => {
+    const { queryClient, a, b } = seeded();
+    applyPostCreated(queryClient, makePost({ id: "new" }));
+    expectSearchesInvalidated(queryClient);
+    expectSearchDataUntouched(queryClient, a, b);
+  });
+
+  it("applyPostUpdate marks every cached search stale, without patching it", () => {
+    const { queryClient, a, b } = seeded();
+    applyPostUpdate(queryClient, makePost({ id: "a", title: "edited" }));
+    expectSearchesInvalidated(queryClient);
+    expectSearchDataUntouched(queryClient, a, b);
+  });
+
+  it("forgetPost marks every cached search stale, without patching it", () => {
+    const { queryClient, a, b } = seeded();
+    forgetPost(queryClient, "a");
+    expectSearchesInvalidated(queryClient);
+    expectSearchDataUntouched(queryClient, a, b);
   });
 });
 

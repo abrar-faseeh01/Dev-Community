@@ -1,5 +1,11 @@
-import type { DeletedPost, Post, PostPage } from "@/features/posts/types/post";
+import type {
+  DeletedPost,
+  Post,
+  PostPage,
+  PostSearchPage,
+} from "@/features/posts/types/post";
 import type { PostSort } from "@/features/posts/utils/feed-sort";
+import { SEARCH_MAX_LIMIT } from "@/features/posts/utils/search-limits";
 import { apiClient } from "@/lib/axios/client";
 import type { ApiSuccess } from "@/types/api";
 
@@ -72,6 +78,27 @@ export async function deletePost(
   const res = await apiClient.delete<ApiSuccess<DeletedPost>>(
     `/posts/${encodeURIComponent(id)}`,
     { data: reason ? { reason } : undefined },
+  );
+  return res.data.data;
+}
+// GET /posts/search. `q` is sent as given — the caller normalizes it — and
+// URLSearchParams encodes it. `limit` defaults to the backend's maximum: there
+// is no "load more", so one request should return as many matches as the API
+// allows. `signal` is handed to axios so that TanStack Query can cancel the
+// request when its query is no longer wanted.
+export async function searchPosts({
+  q,
+  limit = SEARCH_MAX_LIMIT,
+  signal,
+}: {
+  q: string;
+  limit?: number;
+  signal?: AbortSignal;
+}): Promise<PostSearchPage> {
+  const params = new URLSearchParams({ q, limit: String(limit) });
+  const res = await apiClient.get<ApiSuccess<PostSearchPage>>(
+    `/posts/search?${params}`,
+    { signal },
   );
   return res.data.data;
 }

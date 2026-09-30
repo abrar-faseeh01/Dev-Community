@@ -37,6 +37,8 @@ export function applyPostCreated(queryClient: QueryClient, created: Post) {
   }
   queryClient.invalidateQueries({ queryKey: postKeys.feedAll() });
   queryClient.invalidateQueries({ queryKey: postKeys.mineAll() });
+  // A new post may match a search that is already cached.
+  queryClient.invalidateQueries({ queryKey: postKeys.searchAll() });
 }
 
 // After an edit: the detail page and every cached copy of the post — under
@@ -53,6 +55,10 @@ export function applyPostUpdate(queryClient: QueryClient, updated: Post) {
     { queryKey: postKeys.mineAll() },
     (feed) => patchPostInFeed(feed, updated),
   );
+  // Cached search results are a different shape from a feed, so they are
+  // marked stale rather than patched. The title and body they show are the
+  // ones this edit just changed.
+  queryClient.invalidateQueries({ queryKey: postKeys.searchAll() });
 }
 
 // After a delete, or after finding out the post is already gone: take it out
@@ -77,4 +83,7 @@ export function forgetPost(queryClient: QueryClient, id: string) {
     exact: true,
     type: "inactive",
   });
+  // A deleted post must not stay in a cached search. Marked stale, not
+  // patched, for the same reason as in applyPostUpdate.
+  queryClient.invalidateQueries({ queryKey: postKeys.searchAll() });
 }

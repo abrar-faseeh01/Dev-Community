@@ -45,3 +45,11 @@ export type DeletedPost = {
   id: string;
   deletedAt: string;
 };
+
+// GET /posts/search. A single capped page ordered by relevance: no cursor, so
+// there is no next page to ask for. `hasMore` says the cap cut the results
+// off, i.e. more posts matched than `items` holds.
+export type PostSearchPage = {
+  items: Post[];
+  hasMore: boolean;
+};

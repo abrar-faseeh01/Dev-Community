@@ -1,6 +1,6 @@
 import type { PostSort } from "@/features/posts/utils/feed-sort";
 import type { ReactorTab } from "@/features/reactions/types/reactor";
-import { getPost, getPostPage } from "@/services/api/posts";
+import { getPost, getPostPage, searchPosts } from "@/services/api/posts";
 import { getPostReactors } from "@/services/api/reactions";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 
@@ -21,6 +21,12 @@ export const postKeys = {
   // author, so a mutation can update or invalidate all of them at once.
   mineAll: () => [...postKeys.all, "mine"] as const,
   mine: (authorId: string) => [...postKeys.mineAll(), authorId] as const,
+
+  // Search results, one entry per normalized term. searchAll is the prefix,
+  // so a mutation can mark every cached search stale at once.
+  searchAll: () => [...postKeys.all, "search"] as const,
+  search: (term: string) => [...postKeys.searchAll(), term] as const,
+
   // The "who reacted" list of one post, one entry per tab.
   reactors: (id: string, tab: ReactorTab) =>
     [...postKeys.all, "reactors", id, tab] as const,
@@ -74,5 +80,17 @@ export function usePostReactors(
     queryFn: () => getPostReactors(postId, tab === "all" ? undefined : tab),
     enabled,
     staleTime: 0,
+  });
+}
+
+// GET /posts/search for one term. The caller passes the term already
+// normalized (trimmed, collapsed, clamped) and debounced, so this hook stays
+// as plain as usePost. An empty term never fetches. `signal` is forwarded so
+// that a term the user has moved past is cancelled rather than left to finish.
+export function useSearchPosts(term: string) {
+  return useQuery({
+    queryKey: postKeys.search(term),
+    queryFn: ({ signal }) => searchPosts({ q: term, signal }),
+    enabled: term.length > 0,
   });
 }
