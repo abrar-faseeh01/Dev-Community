@@ -14,6 +14,7 @@ import { PostDetail } from "@/features/posts/components/post-detail";
 import { PostDetailSkeleton } from "@/features/posts/components/post-detail-skeleton";
 import { PostReactionSummary } from "@/features/posts/components/post-reaction-summary";
 import { PostReactions } from "@/features/posts/components/post-reactions";
+import { SummarizeLayout } from "@/features/posts/components/summarize-layout";
 import { postKeys, usePost } from "@/features/posts/queries/post-queries";
 import {
   describeLoadError,
@@ -28,6 +29,15 @@ import { Suspense, useEffect, useRef } from "react";
 
 const retryButtonClass =
   "shrink-0 rounded-lg border border-red-900/50 bg-neutral-900 px-3 py-1.5 text-sm font-medium text-red-300 transition-colors hover:bg-red-950/40 focus:outline-none focus:ring-2 focus:ring-red-500/30 disabled:cursor-not-allowed disabled:opacity-60";
+
+const backLink = (
+  <Link
+    href={ROUTES.POSTS}
+    className="mb-5 inline-flex items-center gap-1 text-sm font-medium text-emerald-400 hover:underline"
+  >
+    <span aria-hidden="true">←</span> Back to feed
+  </Link>
+);
 
 export function PostPageView({ id }: { id: string }) {
   const { user } = useAuth();
@@ -78,7 +88,10 @@ export function PostPageView({ id }: { id: string }) {
 
   return (
     <main className="flex flex-1 justify-center bg-neutral-950 px-4 py-8 sm:py-12">
-      <div className="w-full max-w-2xl">
+      {/* Wide enough for the post and the widest the summary panel gets, side
+          by side. Every state except a loaded post is a single column of the
+          old width. */}
+      <div className="w-full max-w-6xl">
         {/* Reads ?comment=1 (set by a feed card's CommentFeedLink), which
             needs a Suspense boundary for `next build` — same reason
             FeedNotice is split out on the feed page. Renders nothing. */}
@@ -86,73 +99,19 @@ export function PostPageView({ id }: { id: string }) {
           <CommentFocusHandler postLoaded={postQuery.isSuccess} />
         </Suspense>
 
-        <Link
-          href={ROUTES.POSTS}
-          className="mb-5 inline-flex items-center gap-1 text-sm font-medium text-emerald-400 hover:underline"
-        >
-          <span aria-hidden="true">←</span> Back to feed
-        </Link>
-
-        {postQuery.isPending ? (
-          <div role="status" aria-busy="true" className="flex flex-col gap-4">
-            {/* A heading, not a bare span: every page needs an h1, including
-                while its content is still on the way. */}
-            <h1 className="sr-only">Loading post…</h1>
-            {/* Only once the first attempt has failed and a retry is
-                running — otherwise a dead backend looks like a slow one. */}
-            {postQuery.failureCount > 0 && (
-              <p className="text-sm text-neutral-400">
-                Trouble reaching the server — retrying (attempt{" "}
-                {postQuery.failureCount + 1})…
-              </p>
-            )}
-            <PostDetailSkeleton />
-          </div>
-        ) : postQuery.isError ? (
-          isPostNotFound(postQuery.error) ? (
-            <div className="rounded-xl border border-dashed border-neutral-800 bg-neutral-900 p-8 text-center">
-              <h1 className="text-lg font-semibold text-white">
-                Post not found
-              </h1>
-              <p className="mt-1 text-sm text-neutral-400">
-                It may have been deleted, or the link may be wrong.
-              </p>
-              <Link
-                href={ROUTES.POSTS}
-                className="mt-4 inline-block rounded-lg bg-emerald-400 px-4 py-2 text-sm font-semibold text-neutral-950 transition-colors hover:bg-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-400/40"
-              >
-                Go to the feed
-              </Link>
-            </div>
-          ) : (
-            <div
-              role="alert"
-              className="flex flex-col gap-3 rounded-xl border border-red-900/50 bg-red-950/40 p-5 sm:flex-row sm:items-center sm:justify-between"
-            >
-              <div>
-                <h1 className="text-sm font-semibold text-red-300">
-                  Couldn&rsquo;t load this post
-                </h1>
-                <p className="text-sm text-red-300">
-                  {describeLoadError(postQuery.error, "Failed to load post.")}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => postQuery.refetch()}
-                disabled={postQuery.isFetching}
-                className={retryButtonClass}
-              >
-                {postQuery.isFetching ? "Retrying…" : "Retry"}
-              </button>
-            </div>
-          )
-        ) : (
-          postQuery.isSuccess && (
-            <>
+        {postQuery.isSuccess ? (
+          // key: this component can be reused for another post (a cached post
+          // renders without passing through the loading state), and a summary
+          // must never carry over to it.
+          <SummarizeLayout
+            key={postQuery.data.id}
+            postId={postQuery.data.id}
+            top={backLink}
+            post={(summarizeButton) => (
               <PostDetail
                 post={postQuery.data}
                 linkAuthor={!!user}
+                bylineAction={summarizeButton}
                 headerAction={
                   actor ? (
                     <>
@@ -189,6 +148,8 @@ export function PostPageView({ id }: { id: string }) {
                   </div>
                 }
               />
+            )}
+            after={
               <div className="mt-8">
                 <CommentList
                   postId={id}
@@ -196,8 +157,70 @@ export function PostPageView({ id }: { id: string }) {
                   postAuthorId={postQuery.data.author.id}
                 />
               </div>
-            </>
-          )
+            }
+          />
+        ) : (
+          <div className="mx-auto w-full max-w-2xl">
+            {backLink}
+
+            {postQuery.isPending ? (
+              <div
+                role="status"
+                aria-busy="true"
+                className="flex flex-col gap-4"
+              >
+                {/* A heading, not a bare span: every page needs an h1,
+                    including while its content is still on the way. */}
+                <h1 className="sr-only">Loading post…</h1>
+                {/* Only once the first attempt has failed and a retry is
+                    running — otherwise a dead backend looks like a slow one. */}
+                {postQuery.failureCount > 0 && (
+                  <p className="text-sm text-neutral-400">
+                    Trouble reaching the server — retrying (attempt{" "}
+                    {postQuery.failureCount + 1})…
+                  </p>
+                )}
+                <PostDetailSkeleton />
+              </div>
+            ) : isPostNotFound(postQuery.error) ? (
+              <div className="rounded-xl border border-dashed border-neutral-800 bg-neutral-900 p-8 text-center">
+                <h1 className="text-lg font-semibold text-white">
+                  Post not found
+                </h1>
+                <p className="mt-1 text-sm text-neutral-400">
+                  It may have been deleted, or the link may be wrong.
+                </p>
+                <Link
+                  href={ROUTES.POSTS}
+                  className="mt-4 inline-block rounded-lg bg-emerald-400 px-4 py-2 text-sm font-semibold text-neutral-950 transition-colors hover:bg-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-400/40"
+                >
+                  Go to the feed
+                </Link>
+              </div>
+            ) : (
+              <div
+                role="alert"
+                className="flex flex-col gap-3 rounded-xl border border-red-900/50 bg-red-950/40 p-5 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div>
+                  <h1 className="text-sm font-semibold text-red-300">
+                    Couldn&rsquo;t load this post
+                  </h1>
+                  <p className="text-sm text-red-300">
+                    {describeLoadError(postQuery.error, "Failed to load post.")}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => postQuery.refetch()}
+                  disabled={postQuery.isFetching}
+                  className={retryButtonClass}
+                >
+                  {postQuery.isFetching ? "Retrying…" : "Retry"}
+                </button>
+              </div>
+            )}
+          </div>
         )}
       </div>
     </main>

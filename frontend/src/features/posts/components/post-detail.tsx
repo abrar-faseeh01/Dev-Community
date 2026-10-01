@@ -6,6 +6,8 @@ type PostDetailProps = {
   post: Post;
   // Whether the author's name links to their profile (see PostByline).
   linkAuthor?: boolean;
+  // Sits at the right of the author row — the Summarize button.
+  bylineAction?: ReactNode;
   // Sits at the right of the title row — the Edit link for whoever may edit.
   headerAction?: ReactNode;
   // Below the body — the Delete button for whoever may delete, and later
@@ -21,12 +23,20 @@ type PostDetailProps = {
 export function PostDetail({
   post,
   linkAuthor = false,
+  bylineAction,
   headerAction,
   footer,
 }: PostDetailProps) {
   return (
     <article className="rounded-xl border border-neutral-800 bg-neutral-900 p-5 sm:p-8">
-      <PostByline post={post} linkAuthor={linkAuthor} showAvatar />
+      {bylineAction ? (
+        <div className="flex items-start justify-between gap-3">
+          <PostByline post={post} linkAuthor={linkAuthor} showAvatar />
+          {bylineAction}
+        </div>
+      ) : (
+        <PostByline post={post} linkAuthor={linkAuthor} showAvatar />
+      )}
 
       <div className="mt-4 flex items-start justify-between gap-4">
         <h1 className="min-w-0 text-2xl font-bold tracking-tight text-white wrap-anywhere">
