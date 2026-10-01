@@ -3,6 +3,7 @@ import type {
   Post,
   PostPage,
   PostSearchPage,
+  PostSummary,
 } from "@/features/posts/types/post";
 import type { PostSort } from "@/features/posts/utils/feed-sort";
 import { SEARCH_MAX_LIMIT } from "@/features/posts/utils/search-limits";
@@ -99,6 +100,24 @@ export async function searchPosts({
   const res = await apiClient.get<ApiSuccess<PostSearchPage>>(
     `/posts/search?${params}`,
     { signal },
+  );
+  return res.data.data;
+}
+
+// The backend gives its summarizer at most 15 s (SUMMARIZER_TIMEOUT_MS is
+// capped there). This is longer than that, so a slow summarizer is reported
+// by the server as a 504 first; it only fires when the server itself is hung,
+// so the page can't sit on "Summarizing…" forever. axios reports it as an
+// error with no status, the same as being offline.
+export const SUMMARIZE_TIMEOUT_MS = 20_000;
+
+// POST /posts/:id/summarize. No body: the server reads the post itself and
+// only ever sends its title and body to the summarizer.
+export async function summarizePost(id: string): Promise<PostSummary> {
+  const res = await apiClient.post<ApiSuccess<PostSummary>>(
+    `/posts/${encodeURIComponent(id)}/summarize`,
+    undefined,
+    { timeout: SUMMARIZE_TIMEOUT_MS },
   );
   return res.data.data;
 }

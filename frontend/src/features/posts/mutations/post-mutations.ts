@@ -5,7 +5,12 @@ import {
   isSameSession,
 } from "@/features/reactions/utils/session-guard";
 import { applyReaction } from "@/features/reactions/utils/toggle";
-import { createPost, deletePost, updatePost } from "@/services/api/posts";
+import {
+  createPost,
+  deletePost,
+  summarizePost,
+  updatePost,
+} from "@/services/api/posts";
 import { togglePostReaction } from "@/services/api/reactions";
 import type { ReactionType } from "@/types/reaction";
 import {
@@ -80,6 +85,25 @@ export function useDeletePost(
     onError: (...args) => {
       if (hasStatus(args[0], 404)) forgetPost(queryClient, postId);
       return options.onError?.(...args);
+    },
+  });
+}
+
+// A summary is generated on request and thrown away: it is not written to any
+// query cache, because the post does not change and a stored copy could go
+// stale. The caller reads it from the mutation's own `data` (and its
+// isPending / isError / error), and it disappears with the component.
+export function useSummarizePost(postId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => summarizePost(postId),
+    // Every call can spend model quota, so a failure is never retried
+    // automatically; the reader chooses to try again.
+    retry: false,
+    onError: (error) => {
+      // The post was deleted while it was on screen: take it out of the
+      // feeds, same as a reaction or a delete that finds it gone.
+      if (hasStatus(error, 404)) forgetPost(queryClient, postId);
     },
   });
 }

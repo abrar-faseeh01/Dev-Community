@@ -46,6 +46,18 @@ export type DeletedPost = {
   deletedAt: string;
 };
 
+// POST /posts/:id/summarize. Mirrors backend/src/summarizer/dto/summarize-response.dto.ts.
+// `summary` and `tags` come from a model (or the mock) and are untrusted text:
+// render them as plain text only. `source` says which summarizer produced
+// them, and 'mock' is a crude extractive fallback, not a model. `truncated` is
+// true when only the first part of a very long post was summarized.
+export type PostSummary = {
+  summary: string;
+  tags: string[];
+  source: "mock" | "gemini";
+  truncated: boolean;
+};
+
 // GET /posts/search. A single capped page ordered by relevance: no cursor, so
 // there is no next page to ask for. `hasMore` says the cap cut the results
 // off, i.e. more posts matched than `items` holds.

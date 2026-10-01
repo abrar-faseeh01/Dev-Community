@@ -2,12 +2,15 @@ import { SEARCH_MAX_LIMIT } from "@/features/posts/utils/search-limits";
 import { apiClient } from "@/lib/axios/client";
 import {
   POSTS_PAGE_SIZE,
+  SUMMARIZE_TIMEOUT_MS,
   getPostPage,
   searchPosts,
+  summarizePost,
 } from "@/services/api/posts";
 
 jest.mock("@/lib/axios/client");
 const mockGet = apiClient.get as jest.Mock;
+const mockPost = apiClient.post as jest.Mock;
 
 function requestedParams() {
   const url = mockGet.mock.calls[0][0] as string;
@@ -99,5 +102,43 @@ describe("searchPosts", () => {
     const page = { items: [], hasMore: true };
     mockGet.mockResolvedValue({ data: { data: page } });
     await expect(searchPosts({ q: "react" })).resolves.toEqual(page);
+  });
+});
+
+describe("summarizePost", () => {
+  const summary = {
+    summary: "A short summary.",
+    tags: ["React"],
+    source: "mock",
+    truncated: false,
+  };
+
+  beforeEach(() => {
+    mockPost.mockResolvedValue({ data: { data: summary } });
+  });
+
+  it("posts to the post's summarize route with no body", async () => {
+    await summarizePost("abc123");
+    expect(mockPost).toHaveBeenCalledTimes(1);
+    const [url, body] = mockPost.mock.calls[0];
+    expect(url).toBe("/posts/abc123/summarize");
+    expect(body).toBeUndefined();
+  });
+
+  it("gives the request its own timeout, longer than the backend's maximum", async () => {
+    await summarizePost("abc123");
+    expect(mockPost.mock.calls[0][2]).toEqual({
+      timeout: SUMMARIZE_TIMEOUT_MS,
+    });
+    expect(SUMMARIZE_TIMEOUT_MS).toBeGreaterThan(15_000);
+  });
+
+  it("encodes the id so it can't change the path", async () => {
+    await summarizePost("a/b?c");
+    expect(mockPost.mock.calls[0][0]).toBe("/posts/a%2Fb%3Fc/summarize");
+  });
+
+  it("returns the unwrapped summary", async () => {
+    await expect(summarizePost("abc123")).resolves.toEqual(summary);
   });
 });
