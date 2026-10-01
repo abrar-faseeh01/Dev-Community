@@ -41,6 +41,16 @@ const neverThrottle = {
 // same pass it fails with "Cannot require() ES Module ... in a cycle". In
 // production Node loads them natively and there is no such problem.
 export async function createE2eApp(): Promise<INestApplication> {
+  // The summarizer must never call the real Gemini API from a test, even when
+  // backend/.env holds a real SUMMARIZER_API_KEY (that would spend the shared
+  // daily quota). ConfigModule.forRoot() runs when AppModule is first
+  // imported and takes a one-time snapshot of .env merged with process.env,
+  // with process.env winning, so these two lines must stay ABOVE the
+  // AppModule import below. The provider override further down does not
+  // depend on that ordering, so the mock is forced even if it ever breaks.
+  process.env.SUMMARIZER_PROVIDER = 'mock';
+  process.env.SUMMARIZER_API_KEY = '';
+
   const { Test } = await import('@nestjs/testing');
   await import('@nestjs/common');
   const { ThrottlerStorage } = await import('@nestjs/throttler');
@@ -48,12 +58,20 @@ export async function createE2eApp(): Promise<INestApplication> {
   // in this module mode. jest-e2e.json maps them back to the .ts files.
   const { AppModule } = await import('../../src/app.module.js');
   const { configureApp } = await import('../../src/configure-app.js');
+  const { SUMMARIZER } = await import(
+    '../../src/summarizer/summarizer.interface.js'
+  );
+  const { MockSummarizer } = await import(
+    '../../src/summarizer/mock-summarizer.js'
+  );
 
   const moduleRef = await Test.createTestingModule({
     imports: [AppModule],
   })
     .overrideProvider(ThrottlerStorage)
     .useValue(neverThrottle)
+    .overrideProvider(SUMMARIZER)
+    .useValue(new MockSummarizer())
     .compile();
 
   const app = moduleRef.createNestApplication();

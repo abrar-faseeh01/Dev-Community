@@ -12,6 +12,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { PostsModule } from './posts/posts.module';
 import { ProfilesModule } from './profiles/profiles.module';
 import { ReactionsModule } from './reactions/reactions.module';
+import { SummarizerModule } from './summarizer/summarizer.module';
 import { UsersModule } from './users/users.module';
 
 @Module({
@@ -38,6 +39,7 @@ import { UsersModule } from './users/users.module';
     PostsModule,
     CommentsModule,
     ReactionsModule,
+    SummarizerModule,
   ],
   controllers: [AppController],
   providers: [AppService],
