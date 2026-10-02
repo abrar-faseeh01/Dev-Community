@@ -1,0 +1,4040 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`OpenAPI document matches the committed snapshot 1`] = `
+{
+  "components": {
+    "schemas": {
+      "AddExperienceDto": {
+        "properties": {
+          "company": {
+            "example": "Acme Corp",
+            "type": "string",
+          },
+          "description": {
+            "example": "Worked on the payments team.",
+            "type": "string",
+          },
+          "from": {
+            "description": "Free text, not a parsed date — e.g. "2019" or "Jan 2021".",
+            "example": "2021",
+            "type": "string",
+          },
+          "reason": {
+            "description": "Recorded on the audit log entry when an admin edits someone else's profile.",
+            "example": "added missing role at user's request",
+            "type": "string",
+          },
+          "title": {
+            "example": "Software Engineer",
+            "type": "string",
+          },
+          "to": {
+            "description": "Omit for an ongoing role.",
+            "example": "2023",
+            "type": "string",
+          },
+        },
+        "required": [
+          "title",
+          "company",
+          "from",
+        ],
+        "type": "object",
+      },
+      "AuditLogDto": {
+        "properties": {
+          "_id": {
+            "example": "64f1c2e5a1b2c3d4e5f6a7d0",
+            "type": "string",
+          },
+          "action": {
+            "enum": [
+              "update_skills",
+              "add_experience",
+              "update_experience",
+              "remove_experience",
+              "update_fullname",
+              "update_headline",
+              "update_bio",
+              "update_portfolio_projects",
+              "delete_user",
+              "update_post",
+              "delete_post",
+              "delete_comment",
+            ],
+            "example": "update_post",
+            "type": "string",
+          },
+          "adminFullName": {
+            "example": "Site Admin",
+            "type": "string",
+          },
+          "adminId": {
+            "description": "The admin who performed the override.",
+            "example": "64f1c2e5a1b2c3d4e5f6a7b8",
+            "type": "string",
+          },
+          "createdAt": {
+            "example": "2026-09-18T09:40:43.628Z",
+            "format": "date-time",
+            "type": "string",
+          },
+          "newState": {
+            "additionalProperties": true,
+            "description": "null for delete_user and delete_post. For delete_comment it is \`{ deletedCount }\` — how many comments the delete removed (the comment plus its replies).",
+            "example": {
+              "postId": "64f1c2e5a1b2c3d4e5f6a7c0",
+              "title": "New title",
+            },
+            "nullable": true,
+            "type": "object",
+          },
+          "previousState": {
+            "additionalProperties": true,
+            "description": "Only the changed shape, not the whole document.",
+            "example": {
+              "postId": "64f1c2e5a1b2c3d4e5f6a7c0",
+              "title": "Old title",
+            },
+            "nullable": true,
+            "type": "object",
+          },
+          "reason": {
+            "example": "violates community guidelines",
+            "type": "string",
+          },
+          "targetFullName": {
+            "example": "Ada Lovelace",
+            "type": "string",
+          },
+          "targetUserId": {
+            "description": "The user whose data was changed.",
+            "example": "64f1c2e5a1b2c3d4e5f6a7b9",
+            "type": "string",
+          },
+        },
+        "required": [
+          "_id",
+          "adminId",
+          "adminFullName",
+          "targetUserId",
+          "targetFullName",
+          "action",
+          "previousState",
+          "newState",
+          "createdAt",
+        ],
+        "type": "object",
+      },
+      "AuditLogListResponseDto": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/AuditLogDto",
+            },
+            "type": "array",
+          },
+          "success": {
+            "example": true,
+            "type": "boolean",
+          },
+        },
+        "required": [
+          "success",
+          "data",
+        ],
+        "type": "object",
+      },
+      "AuthResponseDto": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AuthUserDto",
+          },
+          "success": {
+            "example": true,
+            "type": "boolean",
+          },
+        },
+        "required": [
+          "success",
+          "data",
+        ],
+        "type": "object",
+      },
+      "AuthUserDto": {
+        "properties": {
+          "email": {
+            "example": "ada@example.com",
+            "type": "string",
+          },
+          "fullName": {
+            "example": "Ada Lovelace",
+            "type": "string",
+          },
+          "id": {
+            "example": "64f1c2e5a1b2c3d4e5f6a7b8",
+            "type": "string",
+          },
+          "role": {
+            "enum": [
+              "admin",
+              "user",
+            ],
+            "example": "user",
+            "type": "string",
+          },
+        },
+        "required": [
+          "id",
+          "fullName",
+          "email",
+          "role",
+        ],
+        "type": "object",
+      },
+      "AuthorSummaryDto": {
+        "properties": {
+          "fullName": {
+            "description": ""Deleted user" when the author's account has been deleted.",
+            "example": "Ada Lovelace",
+            "type": "string",
+          },
+          "headline": {
+            "description": "Absent when the author has no headline; null when the author's account has been deleted.",
+            "example": "Senior Backend Engineer @ Acme",
+            "nullable": true,
+            "type": "string",
+          },
+          "id": {
+            "description": "null when the author's account has been deleted.",
+            "example": "64f1c2e5a1b2c3d4e5f6a7b8",
+            "nullable": true,
+            "type": "string",
+          },
+        },
+        "required": [
+          "id",
+          "fullName",
+        ],
+        "type": "object",
+      },
+      "CommentDto": {
+        "properties": {
+          "author": {
+            "$ref": "#/components/schemas/AuthorSummaryDto",
+          },
+          "body": {
+            "example": "The cursor approach also keeps the page stable while new posts arrive.",
+            "type": "string",
+          },
+          "createdAt": {
+            "example": "2026-09-21T09:38:42.598Z",
+            "format": "date-time",
+            "type": "string",
+          },
+          "dislikeCount": {
+            "description": "How many users currently dislike this comment.",
+            "example": 0,
+            "type": "number",
+          },
+          "id": {
+            "example": "64f1c2e5a1b2c3d4e5f6a7c0",
+            "type": "string",
+          },
+          "likeCount": {
+            "description": "How many users currently like this comment.",
+            "example": 3,
+            "type": "number",
+          },
+          "myReaction": {
+            "description": "The caller's own reaction to this comment. null when the caller has none, is not signed in, or (on a just-created comment) cannot have one yet.",
+            "enum": [
+              "like",
+              "dislike",
+            ],
+            "example": null,
+            "nullable": true,
+            "type": "string",
+          },
+          "parentCommentId": {
+            "description": "null for a top-level comment; otherwise the comment this one replies to.",
+            "example": null,
+            "nullable": true,
+            "type": "string",
+          },
+          "postId": {
+            "example": "64f1c2e5a1b2c3d4e5f6a7b9",
+            "type": "string",
+          },
+          "replies": {
+            "description": "This comment's full reply thread, oldest first. A reply nests here normally up to depth 2; anything deeper is included here too, as a direct entry, keeping its own true parentCommentId rather than nesting further. In practice this means only a top-level comment's replies is ever non-empty.",
+            "items": {
+              "$ref": "#/components/schemas/CommentDto",
+            },
+            "type": "array",
+          },
+          "updatedAt": {
+            "description": "Equal to createdAt until the comment is edited. Compare the two to show an "edited" indicator — the value itself is not meant to be displayed.",
+            "example": "2026-09-21T09:38:42.598Z",
+            "format": "date-time",
+            "type": "string",
+          },
+        },
+        "required": [
+          "id",
+          "postId",
+          "parentCommentId",
+          "body",
+          "createdAt",
+          "updatedAt",
+          "likeCount",
+          "dislikeCount",
+          "myReaction",
+          "author",
+          "replies",
+        ],
+        "type": "object",
+      },
+      "CommentListResponseDto": {
+        "properties": {
+          "data": {
+            "description": "Top-level comments, newest first, each carrying its replies. The whole tree for the post is returned — there is no pagination.",
+            "items": {
+              "$ref": "#/components/schemas/CommentDto",
+            },
+            "type": "array",
+          },
+          "success": {
+            "example": true,
+            "type": "boolean",
+          },
+        },
+        "required": [
+          "success",
+          "data",
+        ],
+        "type": "object",
+      },
+      "CommentResponseDto": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/CommentDto",
+          },
+          "success": {
+            "example": true,
+            "type": "boolean",
+          },
+        },
+        "required": [
+          "success",
+          "data",
+        ],
+        "type": "object",
+      },
+      "CreateCommentDto": {
+        "properties": {
+          "body": {
+            "description": "Plain text. Trimmed before validation, so the length limit applies to what is actually stored and a whitespace-only body is rejected.",
+            "example": "The cursor approach also keeps the page stable while new posts arrive.",
+            "maxLength": 2000,
+            "type": "string",
+          },
+          "parentCommentId": {
+            "description": "The comment being replied to. Omit it, or send null, for a top-level comment. It must be a live comment on this same post (a parent from another post is a 400, a deleted or unknown one a 404) — a reply is accepted at any depth, however deep the thread already runs.",
+            "example": "64f1c2e5a1b2c3d4e5f6a7c0",
+            "nullable": true,
+            "type": "string",
+          },
+        },
+        "required": [
+          "body",
+        ],
+        "type": "object",
+      },
+      "CreatePostDto": {
+        "properties": {
+          "body": {
+            "example": "Offset pagination degrades as pages get deeper — here's what we moved to instead...",
+            "maxLength": 20000,
+            "type": "string",
+          },
+          "title": {
+            "example": "Why we switched to cursor pagination",
+            "maxLength": 200,
+            "type": "string",
+          },
+        },
+        "required": [
+          "title",
+          "body",
+        ],
+        "type": "object",
+      },
+      "DeleteCommentDataDto": {
+        "properties": {
+          "deletedAt": {
+            "example": "2026-09-21T09:52:34.218Z",
+            "format": "date-time",
+            "type": "string",
+          },
+          "deletedCount": {
+            "description": "How many comments this call deleted: the target plus every reply beneath it.",
+            "example": 3,
+            "type": "number",
+          },
+          "id": {
+            "example": "64f1c2e5a1b2c3d4e5f6a7c0",
+            "type": "string",
+          },
+        },
+        "required": [
+          "id",
+          "deletedAt",
+          "deletedCount",
+        ],
+        "type": "object",
+      },
+      "DeleteCommentResponseDto": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/DeleteCommentDataDto",
+          },
+          "success": {
+            "example": true,
+            "type": "boolean",
+          },
+        },
+        "required": [
+          "success",
+          "data",
+        ],
+        "type": "object",
+      },
+      "DeletePostDataDto": {
+        "properties": {
+          "deletedAt": {
+            "example": "2026-09-18T09:52:34.218Z",
+            "format": "date-time",
+            "type": "string",
+          },
+          "id": {
+            "example": "64f1c2e5a1b2c3d4e5f6a7c0",
+            "type": "string",
+          },
+        },
+        "required": [
+          "id",
+          "deletedAt",
+        ],
+        "type": "object",
+      },
+      "DeletePostResponseDto": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/DeletePostDataDto",
+          },
+          "success": {
+            "example": true,
+            "type": "boolean",
+          },
+        },
+        "required": [
+          "success",
+          "data",
+        ],
+        "type": "object",
+      },
+      "EditCommentDataDto": {
+        "properties": {
+          "body": {
+            "example": "The cursor approach also keeps the page stable while new posts arrive — edited for clarity.",
+            "type": "string",
+          },
+          "id": {
+            "example": "64f1c2e5a1b2c3d4e5f6a7c0",
+            "type": "string",
+          },
+          "updatedAt": {
+            "description": "The new edit timestamp — always different from the comment's createdAt after this call.",
+            "example": "2026-09-22T10:15:00.598Z",
+            "format": "date-time",
+            "type": "string",
+          },
+        },
+        "required": [
+          "id",
+          "body",
+          "updatedAt",
+        ],
+        "type": "object",
+      },
+      "EditCommentResponseDto": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/EditCommentDataDto",
+          },
+          "success": {
+            "example": true,
+            "type": "boolean",
+          },
+        },
+        "required": [
+          "success",
+          "data",
+        ],
+        "type": "object",
+      },
+      "ErrorResponseDto": {
+        "properties": {
+          "errors": {
+            "description": "Field-level validation messages, when applicable.",
+            "example": [],
+            "items": {
+              "type": "string",
+            },
+            "type": "array",
+          },
+          "message": {
+            "example": "Database not connected",
+            "type": "string",
+          },
+          "statusCode": {
+            "example": 503,
+            "type": "number",
+          },
+          "success": {
+            "example": false,
+            "type": "boolean",
+          },
+        },
+        "required": [
+          "success",
+          "statusCode",
+          "message",
+          "errors",
+        ],
+        "type": "object",
+      },
+      "ExperienceResponseDto": {
+        "properties": {
+          "_id": {
+            "example": "64f1c2e5a1b2c3d4e5f6a7b9",
+            "type": "string",
+          },
+          "company": {
+            "example": "Acme Corp",
+            "type": "string",
+          },
+          "description": {
+            "example": "Worked on the payments team.",
+            "type": "string",
+          },
+          "from": {
+            "example": "2021",
+            "type": "string",
+          },
+          "title": {
+            "example": "Software Engineer",
+            "type": "string",
+          },
+          "to": {
+            "example": "2023",
+            "type": "string",
+          },
+        },
+        "required": [
+          "_id",
+          "title",
+          "company",
+          "from",
+        ],
+        "type": "object",
+      },
+      "HealthDataDto": {
+        "properties": {
+          "api": {
+            "example": "ok",
+            "type": "string",
+          },
+          "database": {
+            "example": "connected",
+            "type": "string",
+          },
+        },
+        "required": [
+          "api",
+          "database",
+        ],
+        "type": "object",
+      },
+      "HealthResponseDto": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/HealthDataDto",
+          },
+          "success": {
+            "example": true,
+            "type": "boolean",
+          },
+        },
+        "required": [
+          "success",
+          "data",
+        ],
+        "type": "object",
+      },
+      "LoginDto": {
+        "properties": {
+          "email": {
+            "example": "ada@example.com",
+            "type": "string",
+          },
+          "password": {
+            "example": "correct-horse-battery-staple",
+            "type": "string",
+          },
+        },
+        "required": [
+          "email",
+          "password",
+        ],
+        "type": "object",
+      },
+      "NotificationDto": {
+        "properties": {
+          "_id": {
+            "example": "64f1c2e5a1b2c3d4e5f6a7e0",
+            "type": "string",
+          },
+          "createdAt": {
+            "example": "2026-09-18T09:40:43.891Z",
+            "format": "date-time",
+            "type": "string",
+          },
+          "message": {
+            "example": "An administrator updated your post.",
+            "type": "string",
+          },
+          "read": {
+            "example": false,
+            "type": "boolean",
+          },
+          "updatedAt": {
+            "example": "2026-09-18T09:40:43.891Z",
+            "format": "date-time",
+            "type": "string",
+          },
+          "userId": {
+            "example": "64f1c2e5a1b2c3d4e5f6a7b8",
+            "type": "string",
+          },
+        },
+        "required": [
+          "_id",
+          "userId",
+          "message",
+          "read",
+          "createdAt",
+          "updatedAt",
+        ],
+        "type": "object",
+      },
+      "NotificationListResponseDto": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/NotificationDto",
+            },
+            "type": "array",
+          },
+          "success": {
+            "example": true,
+            "type": "boolean",
+          },
+        },
+        "required": [
+          "success",
+          "data",
+        ],
+        "type": "object",
+      },
+      "NotificationResponseDto": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/NotificationDto",
+          },
+          "success": {
+            "example": true,
+            "type": "boolean",
+          },
+        },
+        "required": [
+          "success",
+          "data",
+        ],
+        "type": "object",
+      },
+      "NullDataResponseDto": {
+        "properties": {
+          "data": {
+            "additionalProperties": true,
+            "example": null,
+            "nullable": true,
+            "type": "object",
+          },
+          "success": {
+            "example": true,
+            "type": "boolean",
+          },
+        },
+        "required": [
+          "success",
+          "data",
+        ],
+        "type": "object",
+      },
+      "PortfolioProjectDto": {
+        "properties": {
+          "description": {
+            "example": "A WebSocket-based chat app with rooms and presence.",
+            "maxLength": 1000,
+            "type": "string",
+          },
+          "endDate": {
+            "description": "Required when isCurrent is false; must be omitted (or later validated against) when isCurrent is true.",
+            "example": "2025-06-30",
+            "type": "string",
+          },
+          "githubUrl": {
+            "example": "https://github.com/example/chat-app",
+            "type": "string",
+          },
+          "isCurrent": {
+            "example": false,
+            "type": "boolean",
+          },
+          "liveUrl": {
+            "example": "https://chat-demo.example.com",
+            "type": "string",
+          },
+          "startDate": {
+            "example": "2025-01-15",
+            "type": "string",
+          },
+          "technologies": {
+            "example": [
+              "typescript",
+              "socket.io",
+              "redis",
+            ],
+            "items": {
+              "type": "string",
+            },
+            "maxItems": 20,
+            "type": "array",
+          },
+          "title": {
+            "example": "Realtime Chat App",
+            "maxLength": 120,
+            "type": "string",
+          },
+        },
+        "required": [
+          "title",
+          "liveUrl",
+          "githubUrl",
+          "technologies",
+          "startDate",
+          "isCurrent",
+        ],
+        "type": "object",
+      },
+      "PortfolioProjectResponseDto": {
+        "properties": {
+          "_id": {
+            "example": "64f1c2e5a1b2c3d4e5f6a7ba",
+            "type": "string",
+          },
+          "description": {
+            "example": "A WebSocket-based chat app with rooms and presence.",
+            "type": "string",
+          },
+          "endDate": {
+            "example": "2025-06-30T00:00:00.000Z",
+            "format": "date-time",
+            "type": "string",
+          },
+          "githubUrl": {
+            "example": "https://github.com/example/chat-app",
+            "type": "string",
+          },
+          "isCurrent": {
+            "example": false,
+            "type": "boolean",
+          },
+          "liveUrl": {
+            "example": "https://chat-demo.example.com",
+            "type": "string",
+          },
+          "startDate": {
+            "example": "2025-01-15T00:00:00.000Z",
+            "format": "date-time",
+            "type": "string",
+          },
+          "technologies": {
+            "example": [
+              "typescript",
+              "socket.io",
+              "redis",
+            ],
+            "items": {
+              "type": "string",
+            },
+            "type": "array",
+          },
+          "title": {
+            "example": "Realtime Chat App",
+            "type": "string",
+          },
+        },
+        "required": [
+          "_id",
+          "title",
+          "liveUrl",
+          "githubUrl",
+          "technologies",
+          "startDate",
+          "isCurrent",
+        ],
+        "type": "object",
+      },
+      "PostDto": {
+        "properties": {
+          "author": {
+            "$ref": "#/components/schemas/AuthorSummaryDto",
+          },
+          "body": {
+            "example": "Offset pagination degrades as pages get deeper...",
+            "type": "string",
+          },
+          "commentCount": {
+            "description": "Denormalized counter — inert until Day 9 (Comments).",
+            "example": 0,
+            "type": "number",
+          },
+          "createdAt": {
+            "example": "2026-09-18T09:38:42.598Z",
+            "format": "date-time",
+            "type": "string",
+          },
+          "deletedAt": {
+            "description": "Soft-delete timestamp; null while the post is live.",
+            "example": null,
+            "format": "date-time",
+            "nullable": true,
+            "type": "string",
+          },
+          "dislikeCount": {
+            "description": "How many users currently dislike this post.",
+            "example": 0,
+            "type": "number",
+          },
+          "id": {
+            "example": "64f1c2e5a1b2c3d4e5f6a7c0",
+            "type": "string",
+          },
+          "likeCount": {
+            "description": "How many users currently like this post.",
+            "example": 3,
+            "type": "number",
+          },
+          "myReaction": {
+            "description": "The caller's own reaction to this post. null when the caller has none, is not signed in, or (on a just-created post) cannot have one yet.",
+            "enum": [
+              "like",
+              "dislike",
+            ],
+            "example": null,
+            "nullable": true,
+            "type": "string",
+          },
+          "rankScore": {
+            "description": "The ranking score this post was sorted by under sort=top, read directly from the database query, never recomputed. null under sort=latest/discussed, where no score is computed.",
+            "example": 92.2157,
+            "nullable": true,
+            "type": "number",
+          },
+          "title": {
+            "example": "Why we switched to cursor pagination",
+            "type": "string",
+          },
+          "updatedAt": {
+            "example": "2026-09-18T09:38:42.598Z",
+            "format": "date-time",
+            "type": "string",
+          },
+        },
+        "required": [
+          "id",
+          "title",
+          "body",
+          "likeCount",
+          "dislikeCount",
+          "commentCount",
+          "myReaction",
+          "rankScore",
+          "deletedAt",
+          "createdAt",
+          "updatedAt",
+          "author",
+        ],
+        "type": "object",
+      },
+      "PostListDataDto": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PostDto",
+            },
+            "type": "array",
+          },
+          "nextCursor": {
+            "description": "Pass as \`cursor\` to fetch the next page. null means there is no next page.",
+            "example": "NmFhZDA2YjQ0OWUyYzRlMDM0ZGE5ZTAx",
+            "nullable": true,
+            "type": "string",
+          },
+        },
+        "required": [
+          "items",
+          "nextCursor",
+        ],
+        "type": "object",
+      },
+      "PostListResponseDto": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PostListDataDto",
+          },
+          "success": {
+            "example": true,
+            "type": "boolean",
+          },
+        },
+        "required": [
+          "success",
+          "data",
+        ],
+        "type": "object",
+      },
+      "PostResponseDto": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PostDto",
+          },
+          "success": {
+            "example": true,
+            "type": "boolean",
+          },
+        },
+        "required": [
+          "success",
+          "data",
+        ],
+        "type": "object",
+      },
+      "PostSearchDataDto": {
+        "properties": {
+          "hasMore": {
+            "description": "true when more posts matched than were returned. There is no next page to fetch: refine the search instead.",
+            "example": false,
+            "type": "boolean",
+          },
+          "items": {
+            "description": "Best matches first (highest text relevance; newest first among equal scores).",
+            "items": {
+              "$ref": "#/components/schemas/PostDto",
+            },
+            "type": "array",
+          },
+        },
+        "required": [
+          "items",
+          "hasMore",
+        ],
+        "type": "object",
+      },
+      "PostSearchResponseDto": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PostSearchDataDto",
+          },
+          "success": {
+            "example": true,
+            "type": "boolean",
+          },
+        },
+        "required": [
+          "success",
+          "data",
+        ],
+        "type": "object",
+      },
+      "PostSummaryDto": {
+        "properties": {
+          "source": {
+            "description": "Which summarizer produced this. 'mock' is the deterministic extractive fallback (first sentences plus keyword tags), not a model-written summary.",
+            "enum": [
+              "mock",
+              "gemini",
+            ],
+            "example": "gemini",
+            "type": "string",
+          },
+          "summary": {
+            "example": "The author explains why they moved from offset to cursor pagination and what it changed.",
+            "maxLength": 600,
+            "type": "string",
+          },
+          "tags": {
+            "description": "Skill or technology tags, each up to 30 characters. Plain text: render it as text, never as markup.",
+            "example": [
+              "pagination",
+              "MongoDB",
+            ],
+            "items": {
+              "type": "string",
+            },
+            "maxItems": 5,
+            "minItems": 1,
+            "type": "array",
+          },
+          "truncated": {
+            "description": "true when the post was longer than 8000 characters and only the first part was summarized.",
+            "example": false,
+            "type": "boolean",
+          },
+        },
+        "required": [
+          "summary",
+          "tags",
+          "source",
+          "truncated",
+        ],
+        "type": "object",
+      },
+      "PostSummaryResponseDto": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PostSummaryDto",
+          },
+          "success": {
+            "example": true,
+            "type": "boolean",
+          },
+        },
+        "required": [
+          "success",
+          "data",
+        ],
+        "type": "object",
+      },
+      "ProfileDto": {
+        "properties": {
+          "bio": {
+            "example": "I build backend systems and enjoy mentoring junior engineers.",
+            "type": "string",
+          },
+          "email": {
+            "example": "ada@example.com",
+            "type": "string",
+          },
+          "experiences": {
+            "items": {
+              "$ref": "#/components/schemas/ExperienceResponseDto",
+            },
+            "type": "array",
+          },
+          "fullName": {
+            "example": "Ada Lovelace",
+            "type": "string",
+          },
+          "headline": {
+            "example": "Senior Backend Engineer @ Acme",
+            "type": "string",
+          },
+          "id": {
+            "example": "64f1c2e5a1b2c3d4e5f6a7b8",
+            "type": "string",
+          },
+          "portfolioProjects": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioProjectResponseDto",
+            },
+            "type": "array",
+          },
+          "role": {
+            "enum": [
+              "admin",
+              "user",
+            ],
+            "example": "user",
+            "type": "string",
+          },
+          "skills": {
+            "example": [
+              "typescript",
+              "nestjs",
+              "mongodb",
+            ],
+            "items": {
+              "type": "string",
+            },
+            "type": "array",
+          },
+        },
+        "required": [
+          "id",
+          "fullName",
+          "email",
+          "role",
+          "skills",
+          "experiences",
+          "portfolioProjects",
+        ],
+        "type": "object",
+      },
+      "ProfileResponseDto": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ProfileDto",
+          },
+          "success": {
+            "example": true,
+            "type": "boolean",
+          },
+        },
+        "required": [
+          "success",
+          "data",
+        ],
+        "type": "object",
+      },
+      "ReactionResponseDto": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ReactionResultDto",
+          },
+          "success": {
+            "example": true,
+            "type": "boolean",
+          },
+        },
+        "required": [
+          "success",
+          "data",
+        ],
+        "type": "object",
+      },
+      "ReactionResultDto": {
+        "properties": {
+          "dislikeCount": {
+            "description": "The target's dislike count after this request.",
+            "example": 1,
+            "type": "number",
+          },
+          "likeCount": {
+            "description": "The target's like count after this request.",
+            "example": 4,
+            "type": "number",
+          },
+          "myReaction": {
+            "description": "The caller's own reaction after this request: the type they asked for after a create or a switch, null after a remove.",
+            "enum": [
+              "like",
+              "dislike",
+            ],
+            "example": "like",
+            "nullable": true,
+            "type": "string",
+          },
+        },
+        "required": [
+          "likeCount",
+          "dislikeCount",
+          "myReaction",
+        ],
+        "type": "object",
+      },
+      "ReactorDto": {
+        "properties": {
+          "type": {
+            "enum": [
+              "like",
+              "dislike",
+            ],
+            "example": "like",
+            "type": "string",
+          },
+          "user": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AuthorSummaryDto",
+              },
+            ],
+            "description": "Who reacted: id, name and headline only. A deleted account is the "Deleted user" placeholder.",
+          },
+        },
+        "required": [
+          "user",
+          "type",
+        ],
+        "type": "object",
+      },
+      "ReactorListDto": {
+        "properties": {
+          "dislikeCount": {
+            "description": "The target's total dislike count. Not affected by \`type\` or by the cap.",
+            "example": 2,
+            "type": "number",
+          },
+          "items": {
+            "description": "The most recent reactors first, at most 50. Filtered by \`type\` when that is given.",
+            "items": {
+              "$ref": "#/components/schemas/ReactorDto",
+            },
+            "type": "array",
+          },
+          "likeCount": {
+            "description": "The target's total like count, the same number shown next to the buttons. Not affected by \`type\` or by the 50 cap.",
+            "example": 12,
+            "type": "number",
+          },
+        },
+        "required": [
+          "items",
+          "likeCount",
+          "dislikeCount",
+        ],
+        "type": "object",
+      },
+      "ReactorListResponseDto": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ReactorListDto",
+          },
+          "success": {
+            "example": true,
+            "type": "boolean",
+          },
+        },
+        "required": [
+          "success",
+          "data",
+        ],
+        "type": "object",
+      },
+      "ReasonDto": {
+        "properties": {
+          "reason": {
+            "description": "Only meaningful when an admin acts on someone else's data — recorded on the audit log entry and appended to the notification sent to the affected user. Ignored on a self-action.",
+            "example": "violates community guidelines",
+            "type": "string",
+          },
+        },
+        "type": "object",
+      },
+      "SignupDto": {
+        "properties": {
+          "email": {
+            "example": "ada@example.com",
+            "type": "string",
+          },
+          "fullName": {
+            "example": "Ada Lovelace",
+            "minLength": 2,
+            "type": "string",
+          },
+          "password": {
+            "example": "correct-horse-battery-staple",
+            "minLength": 8,
+            "type": "string",
+          },
+        },
+        "required": [
+          "fullName",
+          "email",
+          "password",
+        ],
+        "type": "object",
+      },
+      "ToggleReactionDto": {
+        "properties": {
+          "type": {
+            "description": "The reaction being asked for. Sending the type the caller already has removes it; sending the opposite type switches it.",
+            "enum": [
+              "like",
+              "dislike",
+            ],
+            "example": "like",
+            "type": "string",
+          },
+        },
+        "required": [
+          "type",
+        ],
+        "type": "object",
+      },
+      "UnreadCountResponseDto": {
+        "properties": {
+          "data": {
+            "example": 3,
+            "type": "number",
+          },
+          "success": {
+            "example": true,
+            "type": "boolean",
+          },
+        },
+        "required": [
+          "success",
+          "data",
+        ],
+        "type": "object",
+      },
+      "UpdateBioDto": {
+        "properties": {
+          "bio": {
+            "example": "I build backend systems and enjoy mentoring junior engineers.",
+            "maxLength": 1000,
+            "type": "string",
+          },
+          "reason": {
+            "description": "Recorded on the audit log entry when an admin edits someone else's profile.",
+            "example": "removed inappropriate content",
+            "type": "string",
+          },
+        },
+        "required": [
+          "bio",
+        ],
+        "type": "object",
+      },
+      "UpdateCommentDto": {
+        "properties": {
+          "body": {
+            "description": "The comment's new body. Trimmed before validation, so a whitespace-only value is rejected the same as an empty one, the same rule as on create.",
+            "example": "The cursor approach also keeps the page stable while new posts arrive — edited for clarity.",
+            "maxLength": 2000,
+            "type": "string",
+          },
+        },
+        "required": [
+          "body",
+        ],
+        "type": "object",
+      },
+      "UpdateCredentialsDto": {
+        "properties": {
+          "currentPassword": {
+            "description": "Required to change any credential, even just the name.",
+            "example": "correct-horse-battery-staple",
+            "type": "string",
+          },
+          "newEmail": {
+            "example": "ada.new@example.com",
+            "type": "string",
+          },
+          "newFullName": {
+            "example": "Ada K. Lovelace",
+            "minLength": 2,
+            "type": "string",
+          },
+          "newPassword": {
+            "example": "new-correct-horse-battery",
+            "minLength": 8,
+            "type": "string",
+          },
+        },
+        "required": [
+          "currentPassword",
+        ],
+        "type": "object",
+      },
+      "UpdateExperienceDto": {
+        "properties": {
+          "company": {
+            "example": "Acme Corp",
+            "type": "string",
+          },
+          "description": {
+            "example": "Promoted; led the payments team.",
+            "type": "string",
+          },
+          "from": {
+            "description": "Free text, not a parsed date.",
+            "example": "2021",
+            "type": "string",
+          },
+          "reason": {
+            "description": "Recorded on the audit log entry when an admin edits someone else's profile.",
+            "example": "corrected job title",
+            "type": "string",
+          },
+          "title": {
+            "example": "Senior Software Engineer",
+            "type": "string",
+          },
+          "to": {
+            "example": "2023",
+            "type": "string",
+          },
+        },
+        "type": "object",
+      },
+      "UpdateHeadlineDto": {
+        "properties": {
+          "headline": {
+            "example": "Senior Backend Engineer @ Acme",
+            "maxLength": 120,
+            "type": "string",
+          },
+          "reason": {
+            "description": "Recorded on the audit log entry when an admin edits someone else's profile.",
+            "example": "corrected outdated title",
+            "type": "string",
+          },
+        },
+        "required": [
+          "headline",
+        ],
+        "type": "object",
+      },
+      "UpdatePortfolioProjectsDto": {
+        "properties": {
+          "portfolioProjects": {
+            "description": "Full replacement of the portfolio projects list.",
+            "items": {
+              "$ref": "#/components/schemas/PortfolioProjectDto",
+            },
+            "maxItems": 20,
+            "type": "array",
+          },
+          "reason": {
+            "description": "Recorded on the audit log entry when an admin edits someone else's profile.",
+            "example": "removed a project that violated content policy",
+            "type": "string",
+          },
+        },
+        "required": [
+          "portfolioProjects",
+        ],
+        "type": "object",
+      },
+      "UpdatePostDto": {
+        "properties": {
+          "body": {
+            "example": "Updated with benchmark numbers from production.",
+            "maxLength": 20000,
+            "type": "string",
+          },
+          "reason": {
+            "description": "Recorded on the audit log entry when an admin edits someone else's post.",
+            "example": "contains a policy violation",
+            "type": "string",
+          },
+          "title": {
+            "description": "At least one of title or body is required.",
+            "example": "Why we switched to cursor pagination (updated)",
+            "maxLength": 200,
+            "type": "string",
+          },
+        },
+        "type": "object",
+      },
+      "UpdateProfileDto": {
+        "properties": {
+          "bio": {
+            "example": "I build backend systems and enjoy mentoring junior engineers.",
+            "maxLength": 1000,
+            "type": "string",
+          },
+          "headline": {
+            "example": "Senior Backend Engineer @ Acme",
+            "maxLength": 120,
+            "type": "string",
+          },
+          "portfolioProjects": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioProjectDto",
+            },
+            "maxItems": 20,
+            "type": "array",
+          },
+          "skills": {
+            "example": [
+              "typescript",
+              "nestjs",
+              "mongodb",
+            ],
+            "items": {
+              "type": "string",
+            },
+            "maxItems": 50,
+            "type": "array",
+          },
+        },
+        "type": "object",
+      },
+      "UpdateSkillsDto": {
+        "properties": {
+          "reason": {
+            "description": "Recorded on the audit log entry when an admin edits someone else's profile.",
+            "example": "added missing skills at user's request",
+            "type": "string",
+          },
+          "skills": {
+            "description": "Full replacement of the skills list — an empty array clears it.",
+            "example": [
+              "typescript",
+              "nestjs",
+              "mongodb",
+            ],
+            "items": {
+              "type": "string",
+            },
+            "type": "array",
+          },
+        },
+        "required": [
+          "skills",
+        ],
+        "type": "object",
+      },
+      "UserListItemDto": {
+        "properties": {
+          "createdAt": {
+            "example": "2026-09-01T10:00:00.000Z",
+            "format": "date-time",
+            "type": "string",
+          },
+          "email": {
+            "example": "ada@example.com",
+            "type": "string",
+          },
+          "fullName": {
+            "example": "Ada Lovelace",
+            "type": "string",
+          },
+          "id": {
+            "example": "64f1c2e5a1b2c3d4e5f6a7b8",
+            "type": "string",
+          },
+          "role": {
+            "enum": [
+              "admin",
+              "user",
+            ],
+            "example": "user",
+            "type": "string",
+          },
+        },
+        "required": [
+          "id",
+          "fullName",
+          "email",
+          "role",
+          "createdAt",
+        ],
+        "type": "object",
+      },
+      "UsersListResponseDto": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/UserListItemDto",
+            },
+            "type": "array",
+          },
+          "success": {
+            "example": true,
+            "type": "boolean",
+          },
+        },
+        "required": [
+          "success",
+          "data",
+        ],
+        "type": "object",
+      },
+    },
+    "securitySchemes": {
+      "access_token": {
+        "description": "httpOnly JWT cookie set by POST /auth/login.",
+        "in": "cookie",
+        "name": "access_token",
+        "type": "apiKey",
+      },
+    },
+  },
+  "info": {
+    "contact": {},
+    "description": "API documentation for the Developer Community Platform. Every response follows the shared envelope: {success:true, data} on success or {success:false, statusCode, message, errors} on failure. Auth is an httpOnly \`access_token\` cookie set by POST /auth/login — there is no bearer header. In Swagger UI, use POST /auth/login's Try it out (with \`credentials: 'include'\`-equivalent cookie handling) once, then the cookie is sent automatically by the browser on subsequent Try it out calls for protected routes.",
+    "title": "Developer Community API",
+    "version": "1.0",
+  },
+  "openapi": "3.0.0",
+  "paths": {
+    "/": {
+      "get": {
+        "operationId": "AppController_getHello",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+          },
+        },
+        "tags": [
+          "App",
+        ],
+      },
+    },
+    "/admin/audit-log": {
+      "get": {
+        "description": "Newest first. No filtering or pagination yet — every admin override across users, profiles, and posts is returned.",
+        "operationId": "AuditController_findAll",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditLogListResponseDto",
+                },
+              },
+            },
+            "description": "",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Missing, invalid, or expired session cookie.",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Caller is not an admin.",
+          },
+        },
+        "security": [
+          {
+            "access_token": [],
+          },
+        ],
+        "summary": "List every admin-override audit entry (admin only)",
+        "tags": [
+          "admin",
+        ],
+      },
+    },
+    "/auth/login": {
+      "post": {
+        "description": "Sets an httpOnly \`access_token\` cookie on success. Rate-limited to 5 requests/minute per IP.",
+        "operationId": "AuthController_login",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginDto",
+              },
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponseDto",
+                },
+              },
+            },
+            "description": "Logged in.",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Invalid email or password.",
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Rate limit exceeded.",
+          },
+        },
+        "summary": "Log in",
+        "tags": [
+          "auth",
+        ],
+      },
+    },
+    "/auth/logout": {
+      "post": {
+        "description": "Clears the \`access_token\` cookie. Never requires a valid session, so a client can always log itself out.",
+        "operationId": "AuthController_logout",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NullDataResponseDto",
+                },
+              },
+            },
+            "description": "Logged out.",
+          },
+        },
+        "summary": "Log out",
+        "tags": [
+          "auth",
+        ],
+      },
+    },
+    "/auth/me": {
+      "get": {
+        "operationId": "AuthController_me",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponseDto",
+                },
+              },
+            },
+            "description": "",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Missing, invalid, or expired session cookie.",
+          },
+        },
+        "security": [
+          {
+            "access_token": [],
+          },
+        ],
+        "summary": "Get the current authenticated user",
+        "tags": [
+          "auth",
+        ],
+      },
+      "patch": {
+        "description": "Requires \`currentPassword\` regardless of which field is changing. Only admins may change \`newEmail\`. Issues a fresh cookie reflecting the new credentials. Rate-limited to 10 requests/minute per IP.",
+        "operationId": "AuthController_updateMe",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCredentialsDto",
+              },
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponseDto",
+                },
+              },
+            },
+            "description": "Credentials updated.",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Wrong currentPassword, or no new field provided.",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "A non-admin tried to change newEmail.",
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "newEmail already in use, or a concurrent update.",
+          },
+        },
+        "security": [
+          {
+            "access_token": [],
+          },
+        ],
+        "summary": "Update your own name, email, and/or password",
+        "tags": [
+          "auth",
+        ],
+      },
+    },
+    "/auth/signup": {
+      "post": {
+        "description": "Rate-limited to 5 requests/minute per IP.",
+        "operationId": "AuthController_signup",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignupDto",
+              },
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponseDto",
+                },
+              },
+            },
+            "description": "Account created.",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Validation failed (weak password, invalid email, etc.).",
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Email already in use.",
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Rate limit exceeded.",
+          },
+        },
+        "summary": "Create an account",
+        "tags": [
+          "auth",
+        ],
+      },
+    },
+    "/comments/{id}": {
+      "delete": {
+        "description": "Sets \`deletedAt\` on the comment and on every reply beneath it in one atomic operation — there is no placeholder left behind; the whole branch stops appearing in reads. Allowed for the comment's author, for the author of the post the comment is on, and for an administrator. \`deletedCount\` in the response is how many comments this call deleted (the comment plus its replies). Decrements the post's \`commentCount\` by that number. When an administrator deletes someone else's comment, the deletion is audit-logged (\`delete_comment\`, with the reason if one is given and how many comments went with it) and the comment's author is notified. A post's author removing a comment on their post is not audit-logged and does not notify anyone.",
+        "operationId": "CommentsController_remove",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "example": "64f1c2e5a1b2c3d4e5f6a7c0",
+              "type": "string",
+            },
+          },
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReasonDto",
+              },
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteCommentResponseDto",
+                },
+              },
+            },
+            "description": "",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Malformed comment id.",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Missing, invalid, or expired session cookie.",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "The caller is not the comment's author, not the author of the post it is on, and not an administrator.",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "The comment does not exist, was already deleted, or was deleted by a concurrent request.",
+          },
+        },
+        "security": [
+          {
+            "access_token": [],
+          },
+        ],
+        "summary": "Delete a comment and its replies (soft delete)",
+        "tags": [
+          "comments",
+        ],
+      },
+      "patch": {
+        "description": "Only the comment's own author may edit it — not an administrator, and not the author of the post it is on (unlike delete, this has no override). Nothing about the comment other than its body ever changes: not its post, not its parent, not who wrote it. \`updatedAt\` in the response is how a client detects an edit (compare it against \`createdAt\`); the value itself is not meant to be shown.",
+        "operationId": "CommentsController_update",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "example": "64f1c2e5a1b2c3d4e5f6a7c0",
+              "type": "string",
+            },
+          },
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCommentDto",
+              },
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EditCommentResponseDto",
+                },
+              },
+            },
+            "description": "",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Malformed comment id, or a blank, whitespace-only or over-2000-character body.",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Missing, invalid, or expired session cookie.",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "The caller is not the comment's author.",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "The comment does not exist or has been deleted.",
+          },
+        },
+        "security": [
+          {
+            "access_token": [],
+          },
+        ],
+        "summary": "Edit a comment's body",
+        "tags": [
+          "comments",
+        ],
+      },
+    },
+    "/comments/{id}/reaction": {
+      "post": {
+        "description": "Regular (\`user\`-role) accounts only. One endpoint for every reaction change, decided by what the caller already has: no reaction → creates it; the same type again → removes it; the opposite type → switches it in place (one counter goes down and the other up). Not idempotent by design — sending the same request twice gives different results (react, then un-react). The response is the target's counters after the change plus the caller's own reaction (\`myReaction\`, null after a remove).",
+        "operationId": "ReactionsController_toggleComment",
+        "parameters": [
+          {
+            "description": "The comment id.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "example": "64f1c2e5a1b2c3d4e5f6a7c0",
+              "type": "string",
+            },
+          },
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToggleReactionDto",
+              },
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReactionResponseDto",
+                },
+              },
+            },
+            "description": "",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Malformed comment id, a \`type\` other than \`like\` or \`dislike\`, or an unknown property in the body.",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Missing, invalid, or expired session cookie.",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Administrator accounts cannot react (role check: only the \`user\` role may) — admins moderate, they do not participate.",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "The comment does not exist or has been deleted.",
+          },
+        },
+        "security": [
+          {
+            "access_token": [],
+          },
+        ],
+        "summary": "Like or dislike a comment (toggle)",
+        "tags": [
+          "reactions",
+        ],
+      },
+    },
+    "/comments/{id}/reactions": {
+      "get": {
+        "description": "Public — no authentication required, the same as reading the post or comment itself. The most recent reactors first, at most 50, each as \`{ user: { id, fullName, headline }, type }\` (a deleted account is the "Deleted user" placeholder). \`type\` narrows the list to likes or dislikes. \`likeCount\` and \`dislikeCount\` are the target's true totals, unaffected by the filter or the cap.",
+        "operationId": "ReactionsController_listCommentReactors",
+        "parameters": [
+          {
+            "description": "The comment id.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "example": "64f1c2e5a1b2c3d4e5f6a7c0",
+              "type": "string",
+            },
+          },
+          {
+            "description": "Only list people who gave this reaction. Omit for everyone. The counts in the response are unaffected.",
+            "in": "query",
+            "name": "type",
+            "required": false,
+            "schema": {
+              "enum": [
+                "like",
+                "dislike",
+              ],
+              "type": "string",
+            },
+          },
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReactorListResponseDto",
+                },
+              },
+            },
+            "description": "",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Malformed comment id, a \`type\` other than \`like\` or \`dislike\`, or an unknown query parameter.",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "The comment does not exist or has been deleted.",
+          },
+        },
+        "summary": "Who reacted to a comment",
+        "tags": [
+          "reactions",
+        ],
+      },
+    },
+    "/health": {
+      "get": {
+        "operationId": "HealthController_check",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponseDto",
+                },
+              },
+            },
+            "description": "API and database are both reachable.",
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "The API is up but the database is not connected.",
+          },
+        },
+        "tags": [
+          "health",
+        ],
+      },
+    },
+    "/notifications": {
+      "get": {
+        "description": "Newest first.",
+        "operationId": "NotificationsController_findMine",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationListResponseDto",
+                },
+              },
+            },
+            "description": "",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Missing, invalid, or expired session cookie.",
+          },
+        },
+        "security": [
+          {
+            "access_token": [],
+          },
+        ],
+        "summary": "List your own notifications",
+        "tags": [
+          "notifications",
+        ],
+      },
+    },
+    "/notifications/unread-count": {
+      "get": {
+        "operationId": "NotificationsController_unreadCount",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnreadCountResponseDto",
+                },
+              },
+            },
+            "description": "",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Missing, invalid, or expired session cookie.",
+          },
+        },
+        "security": [
+          {
+            "access_token": [],
+          },
+        ],
+        "summary": "Count your unread notifications",
+        "tags": [
+          "notifications",
+        ],
+      },
+    },
+    "/notifications/{id}/read": {
+      "patch": {
+        "description": "Scoped to the caller — a notificationId belonging to another user 404s, not 403, so existence of another user's notification is never revealed.",
+        "operationId": "NotificationsController_markRead",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "example": "64f1c2e5a1b2c3d4e5f6a7e0",
+              "type": "string",
+            },
+          },
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationResponseDto",
+                },
+              },
+            },
+            "description": "",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Missing, invalid, or expired session cookie.",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Notification not found (or belongs to someone else).",
+          },
+        },
+        "security": [
+          {
+            "access_token": [],
+          },
+        ],
+        "summary": "Mark one of your notifications as read",
+        "tags": [
+          "notifications",
+        ],
+      },
+    },
+    "/posts": {
+      "get": {
+        "description": "Public — no authentication required. Sorted newest-first by _id. Soft-deleted posts are excluded. When the request carries a valid session cookie, each post's \`myReaction\` is the caller's own reaction to it (looked up for the whole page in one query); otherwise it is null.",
+        "operationId": "PostsController_list",
+        "parameters": [
+          {
+            "description": "Page size.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 10,
+              "maximum": 50,
+              "minimum": 1,
+              "type": "integer",
+            },
+          },
+          {
+            "description": "Previous response's nextCursor. Omit for the first page.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "example": "NmFhZDA2YjQ0OWUyYzRlMDM0ZGE5ZTAx",
+              "type": "string",
+            },
+          },
+          {
+            "description": "Only posts written by this user (a valid user id). Used for the "posts made by you" page.",
+            "in": "query",
+            "name": "authorId",
+            "required": false,
+            "schema": {
+              "example": "64f1c2e5a1b2c3d4e5f6a7b8",
+              "type": "string",
+            },
+          },
+          {
+            "description": "Feed ordering: 'latest' (default), 'top' (ranked score) or 'discussed' (most comments). A cursor is only valid for the sort that produced it.",
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "enum": [
+                "latest",
+                "top",
+                "discussed",
+              ],
+              "type": "string",
+            },
+          },
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostListResponseDto",
+                },
+              },
+            },
+            "description": "Requesting past the last page returns { items: [], nextCursor: null } rather than an error.",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Malformed cursor (bad encoding or not a valid post id), or a malformed authorId.",
+          },
+        },
+        "summary": "List posts (cursor-paginated feed)",
+        "tags": [
+          "posts",
+        ],
+      },
+      "post": {
+        "description": "Regular (\`user\`-role) accounts only. The author is always the authenticated caller — never client-supplied. Administrators get 403: they can moderate any post but cannot create one.",
+        "operationId": "PostsController_create",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePostDto",
+              },
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostResponseDto",
+                },
+              },
+            },
+            "description": "",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Missing, invalid, or expired session cookie.",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Administrator accounts cannot create posts (role check: only the \`user\` role may). Admins can still edit or delete any post.",
+          },
+        },
+        "security": [
+          {
+            "access_token": [],
+          },
+        ],
+        "summary": "Create a post",
+        "tags": [
+          "posts",
+        ],
+      },
+    },
+    "/posts/search": {
+      "get": {
+        "description": "Public — no authentication required. Matches whole words (stemmed) in title and body, best matches first; a title match outranks a body match. Returns at most \`limit\` results with no next page: \`hasMore\` says whether more matched. Zero matches is a normal 200 with an empty list. Soft-deleted posts are excluded. When the request carries a valid session cookie, each post's \`myReaction\` is the caller's own reaction; otherwise null. \`rankScore\` is always null here.",
+        "operationId": "PostsController_search",
+        "parameters": [
+          {
+            "description": "Words to search for. Trimmed; 1-100 characters.",
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "maxLength": 100,
+              "minLength": 1,
+              "type": "string",
+            },
+          },
+          {
+            "description": "How many results to return at most.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 10,
+              "maximum": 20,
+              "minimum": 1,
+              "type": "integer",
+            },
+          },
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostSearchResponseDto",
+                },
+              },
+            },
+            "description": "Zero matches returns { items: [], hasMore: false } rather than an error.",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Missing, blank or whitespace-only \`q\`; \`q\` longer than 100 characters; \`limit\` outside 1-20 (rejected, not clamped); or any other query parameter.",
+          },
+        },
+        "summary": "Full-text search over posts",
+        "tags": [
+          "posts",
+        ],
+      },
+    },
+    "/posts/{id}": {
+      "delete": {
+        "description": "Owner-or-admin. Sets deletedAt rather than removing the document — the post then 404s on every read route and never appears in the list. Its comments are soft-deleted along with it (their replies included), so they stop appearing in reads too. When an admin deletes someone else's post, it is audit-logged and the author is notified.",
+        "operationId": "PostsController_remove",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "example": "64f1c2e5a1b2c3d4e5f6a7c0",
+              "type": "string",
+            },
+          },
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReasonDto",
+              },
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletePostResponseDto",
+                },
+              },
+            },
+            "description": "",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Missing, invalid, or expired session cookie.",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Caller is neither the post's author nor an admin.",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Post not found (or already soft-deleted).",
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "The post was modified concurrently by someone else (optimistic concurrency). Reload and retry.",
+          },
+        },
+        "security": [
+          {
+            "access_token": [],
+          },
+        ],
+        "summary": "Delete a post (soft delete)",
+        "tags": [
+          "posts",
+        ],
+      },
+      "get": {
+        "description": "Public — no authentication required. A soft-deleted post 404s the same as a nonexistent one. When the request carries a valid session cookie, \`myReaction\` is the caller's own reaction to the post; otherwise it is null.",
+        "operationId": "PostsController_findById",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "example": "64f1c2e5a1b2c3d4e5f6a7c0",
+              "type": "string",
+            },
+          },
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostResponseDto",
+                },
+              },
+            },
+            "description": "",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Post not found (or already soft-deleted).",
+          },
+        },
+        "summary": "Get a single post",
+        "tags": [
+          "posts",
+        ],
+      },
+      "patch": {
+        "description": "Owner-or-admin. Partial update — at least one of title/body is required. When an admin edits someone else's post, the change is audit-logged (identifying the post, not just the author) and the author is notified.",
+        "operationId": "PostsController_update",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "example": "64f1c2e5a1b2c3d4e5f6a7c0",
+              "type": "string",
+            },
+          },
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePostDto",
+              },
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostResponseDto",
+                },
+              },
+            },
+            "description": "",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Missing, invalid, or expired session cookie.",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Caller is neither the post's author nor an admin.",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Post not found (or already soft-deleted).",
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "The post was modified concurrently by someone else (optimistic concurrency). Reload and retry.",
+          },
+        },
+        "security": [
+          {
+            "access_token": [],
+          },
+        ],
+        "summary": "Update a post",
+        "tags": [
+          "posts",
+        ],
+      },
+    },
+    "/posts/{id}/reaction": {
+      "post": {
+        "description": "Regular (\`user\`-role) accounts only. One endpoint for every reaction change, decided by what the caller already has: no reaction → creates it; the same type again → removes it; the opposite type → switches it in place (one counter goes down and the other up). Not idempotent by design — sending the same request twice gives different results (react, then un-react). The response is the target's counters after the change plus the caller's own reaction (\`myReaction\`, null after a remove).",
+        "operationId": "ReactionsController_togglePost",
+        "parameters": [
+          {
+            "description": "The post id.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "example": "64f1c2e5a1b2c3d4e5f6a7b9",
+              "type": "string",
+            },
+          },
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToggleReactionDto",
+              },
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReactionResponseDto",
+                },
+              },
+            },
+            "description": "",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Malformed post id, a \`type\` other than \`like\` or \`dislike\`, or an unknown property in the body.",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Missing, invalid, or expired session cookie.",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Administrator accounts cannot react (role check: only the \`user\` role may) — admins moderate, they do not participate.",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "The post does not exist or has been deleted.",
+          },
+        },
+        "security": [
+          {
+            "access_token": [],
+          },
+        ],
+        "summary": "Like or dislike a post (toggle)",
+        "tags": [
+          "reactions",
+        ],
+      },
+    },
+    "/posts/{id}/reactions": {
+      "get": {
+        "description": "Public — no authentication required, the same as reading the post or comment itself. The most recent reactors first, at most 50, each as \`{ user: { id, fullName, headline }, type }\` (a deleted account is the "Deleted user" placeholder). \`type\` narrows the list to likes or dislikes. \`likeCount\` and \`dislikeCount\` are the target's true totals, unaffected by the filter or the cap.",
+        "operationId": "ReactionsController_listPostReactors",
+        "parameters": [
+          {
+            "description": "The post id.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "example": "64f1c2e5a1b2c3d4e5f6a7b9",
+              "type": "string",
+            },
+          },
+          {
+            "description": "Only list people who gave this reaction. Omit for everyone. The counts in the response are unaffected.",
+            "in": "query",
+            "name": "type",
+            "required": false,
+            "schema": {
+              "enum": [
+                "like",
+                "dislike",
+              ],
+              "type": "string",
+            },
+          },
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReactorListResponseDto",
+                },
+              },
+            },
+            "description": "",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Malformed post id, a \`type\` other than \`like\` or \`dislike\`, or an unknown query parameter.",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "The post does not exist or has been deleted.",
+          },
+        },
+        "summary": "Who reacted to a post",
+        "tags": [
+          "reactions",
+        ],
+      },
+    },
+    "/posts/{id}/summarize": {
+      "post": {
+        "description": "Any signed-in user, administrators included. Only the post's title and body are sent to the summarizer, never the author or the caller. With a model key configured the summary comes from Gemini (\`source: 'gemini'\`); otherwise from a deterministic extractive fallback (\`source: 'mock'\`), which is not real summarization. A body over 8000 characters is cut to its first 8000 and \`truncated\` is true. A body under 200 characters is rejected. Results are not stored: every call is computed fresh. The summary and tags are plain text and must be rendered as text.",
+        "operationId": "SummarizerController_summarize",
+        "parameters": [
+          {
+            "description": "The post id.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "example": "64f1c2e5a1b2c3d4e5f6a7c0",
+              "type": "string",
+            },
+          },
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostSummaryResponseDto",
+                },
+              },
+            },
+            "description": "",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Malformed post id.",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Missing, invalid, or expired session cookie.",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Post not found (or already soft-deleted).",
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "The post body is under 200 characters, too short to summarize.",
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "More than 10 summarize requests in a minute from one IP.",
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "The summarizer answered with something unusable (not valid JSON, no summary, or no valid tags).",
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "The summarizer is temporarily unavailable (unreachable, rate-limited or daily quota used up). Retrying right away may not help.",
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "The summarizer took too long to respond.",
+          },
+        },
+        "security": [
+          {
+            "access_token": [],
+          },
+        ],
+        "summary": "Summarize a post (summary text and skill tags)",
+        "tags": [
+          "posts",
+        ],
+      },
+    },
+    "/posts/{postId}/comments": {
+      "get": {
+        "description": "Public — no authentication required. Returns every live comment on the post as a nested tree: top-level comments newest first, each with its full reply thread in \`replies\` (oldest first), nested up to a maximum depth of 2 — a reply deeper than that still appears in its root's \`replies\`, keeping its own true \`parentCommentId\`, rather than nesting further. Deleted comments and their replies are not included. There is no pagination, so the response grows with the number of comments on the post. When the request carries a valid session cookie, each comment's \`myReaction\` is the caller's own reaction to it (looked up for the whole thread in one query); otherwise it is null.",
+        "operationId": "CommentsController_list",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "postId",
+            "required": true,
+            "schema": {
+              "example": "64f1c2e5a1b2c3d4e5f6a7b9",
+              "type": "string",
+            },
+          },
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommentListResponseDto",
+                },
+              },
+            },
+            "description": "",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Malformed post id.",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "The post does not exist or has been deleted.",
+          },
+        },
+        "summary": "List a post's comments as a tree",
+        "tags": [
+          "comments",
+        ],
+      },
+      "post": {
+        "description": "Regular (\`user\`-role) accounts only. Creates a top-level comment, or a reply when \`parentCommentId\` is given (omit it, or send null, for top level) — there is no separate reply endpoint. The post comes from the URL and the author is always the authenticated caller; neither is accepted in the body. A reply is accepted at any depth — there is no limit on how many times people may reply to each other; depth only affects how deep the returned tree nests (see GET), never whether a reply is allowed. Increments the post's \`commentCount\`.",
+        "operationId": "CommentsController_create",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "postId",
+            "required": true,
+            "schema": {
+              "example": "64f1c2e5a1b2c3d4e5f6a7b9",
+              "type": "string",
+            },
+          },
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCommentDto",
+              },
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommentResponseDto",
+                },
+              },
+            },
+            "description": "",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Malformed post id or parentCommentId; a blank, whitespace-only or over-2000-character body; an unknown property in the body; or a parent comment that belongs to a different post.",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Missing, invalid, or expired session cookie.",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Administrator accounts cannot create comments (role check: only the \`user\` role may). Admins can still delete any comment.",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "The post does not exist or has been deleted, or the parent comment does not exist or has been deleted.",
+          },
+        },
+        "security": [
+          {
+            "access_token": [],
+          },
+        ],
+        "summary": "Create a comment",
+        "tags": [
+          "comments",
+        ],
+      },
+    },
+    "/profile/me": {
+      "get": {
+        "operationId": "ProfilesController_getMyProfile",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileResponseDto",
+                },
+              },
+            },
+            "description": "",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Missing, invalid, or expired session cookie.",
+          },
+        },
+        "security": [
+          {
+            "access_token": [],
+          },
+        ],
+        "summary": "Get your own profile",
+        "tags": [
+          "profiles",
+        ],
+      },
+      "patch": {
+        "description": "Partial update — only the fields present in the body are changed. Each provided array field (skills, portfolioProjects) is fully replaced, not merged.",
+        "operationId": "ProfilesController_updateMyProfile",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProfileDto",
+              },
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileResponseDto",
+                },
+              },
+            },
+            "description": "",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Missing, invalid, or expired session cookie.",
+          },
+        },
+        "security": [
+          {
+            "access_token": [],
+          },
+        ],
+        "summary": "Update your own profile",
+        "tags": [
+          "profiles",
+        ],
+      },
+    },
+    "/profile/{id}": {
+      "get": {
+        "description": "Any authenticated user may view any other user's profile.",
+        "operationId": "ProfilesController_getProfileById",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "example": "64f1c2e5a1b2c3d4e5f6a7b8",
+              "type": "string",
+            },
+          },
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileResponseDto",
+                },
+              },
+            },
+            "description": "",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Missing, invalid, or expired session cookie.",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "User not found.",
+          },
+        },
+        "security": [
+          {
+            "access_token": [],
+          },
+        ],
+        "summary": "Get another user's profile",
+        "tags": [
+          "profiles",
+        ],
+      },
+    },
+    "/profile/{id}/bio": {
+      "patch": {
+        "description": "Owner-or-admin. When an admin edits someone else's bio, the change is audit-logged and the user is notified.",
+        "operationId": "ProfilesController_updateBio",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "example": "64f1c2e5a1b2c3d4e5f6a7b8",
+              "type": "string",
+            },
+          },
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateBioDto",
+              },
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileResponseDto",
+                },
+              },
+            },
+            "description": "",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Missing, invalid, or expired session cookie.",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Caller is neither the profile owner nor an admin.",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "User not found.",
+          },
+        },
+        "security": [
+          {
+            "access_token": [],
+          },
+        ],
+        "summary": "Replace a user's bio",
+        "tags": [
+          "profiles",
+        ],
+      },
+    },
+    "/profile/{id}/experiences": {
+      "post": {
+        "description": "Owner-or-admin. Appends to the experiences array. When an admin adds an entry for someone else, it is audit-logged and the user is notified.",
+        "operationId": "ProfilesController_addExperience",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "example": "64f1c2e5a1b2c3d4e5f6a7b8",
+              "type": "string",
+            },
+          },
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddExperienceDto",
+              },
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileResponseDto",
+                },
+              },
+            },
+            "description": "",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Missing, invalid, or expired session cookie.",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Caller is neither the profile owner nor an admin.",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "User not found.",
+          },
+        },
+        "security": [
+          {
+            "access_token": [],
+          },
+        ],
+        "summary": "Add a work experience entry",
+        "tags": [
+          "profiles",
+        ],
+      },
+    },
+    "/profile/{id}/experiences/{experienceId}": {
+      "delete": {
+        "description": "Owner-or-admin. When an admin removes an entry for someone else, it is audit-logged and the user is notified.",
+        "operationId": "ProfilesController_removeExperience",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "example": "64f1c2e5a1b2c3d4e5f6a7b8",
+              "type": "string",
+            },
+          },
+          {
+            "in": "path",
+            "name": "experienceId",
+            "required": true,
+            "schema": {
+              "example": "64f1c2e5a1b2c3d4e5f6a7b9",
+              "type": "string",
+            },
+          },
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReasonDto",
+              },
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileResponseDto",
+                },
+              },
+            },
+            "description": "",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Missing, invalid, or expired session cookie.",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Caller is neither the profile owner nor an admin.",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "User or experience not found.",
+          },
+        },
+        "security": [
+          {
+            "access_token": [],
+          },
+        ],
+        "summary": "Remove a work experience entry",
+        "tags": [
+          "profiles",
+        ],
+      },
+      "patch": {
+        "description": "Owner-or-admin. Partial update — only the fields present are changed. When an admin edits an entry for someone else, it is audit-logged and the user is notified.",
+        "operationId": "ProfilesController_updateExperience",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "example": "64f1c2e5a1b2c3d4e5f6a7b8",
+              "type": "string",
+            },
+          },
+          {
+            "in": "path",
+            "name": "experienceId",
+            "required": true,
+            "schema": {
+              "example": "64f1c2e5a1b2c3d4e5f6a7b9",
+              "type": "string",
+            },
+          },
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateExperienceDto",
+              },
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileResponseDto",
+                },
+              },
+            },
+            "description": "",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Missing, invalid, or expired session cookie.",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Caller is neither the profile owner nor an admin.",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "User or experience not found.",
+          },
+        },
+        "security": [
+          {
+            "access_token": [],
+          },
+        ],
+        "summary": "Update a work experience entry",
+        "tags": [
+          "profiles",
+        ],
+      },
+    },
+    "/profile/{id}/headline": {
+      "patch": {
+        "description": "Owner-or-admin. When an admin edits someone else's headline, the change is audit-logged and the user is notified.",
+        "operationId": "ProfilesController_updateHeadline",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "example": "64f1c2e5a1b2c3d4e5f6a7b8",
+              "type": "string",
+            },
+          },
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateHeadlineDto",
+              },
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileResponseDto",
+                },
+              },
+            },
+            "description": "",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Missing, invalid, or expired session cookie.",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Caller is neither the profile owner nor an admin.",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "User not found.",
+          },
+        },
+        "security": [
+          {
+            "access_token": [],
+          },
+        ],
+        "summary": "Replace a user's headline",
+        "tags": [
+          "profiles",
+        ],
+      },
+    },
+    "/profile/{id}/portfolio-projects": {
+      "patch": {
+        "description": "Owner-or-admin. Full replace of the array. When an admin edits someone else's projects, the change is audit-logged and the user is notified.",
+        "operationId": "ProfilesController_updatePortfolioProjects",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "example": "64f1c2e5a1b2c3d4e5f6a7b8",
+              "type": "string",
+            },
+          },
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePortfolioProjectsDto",
+              },
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileResponseDto",
+                },
+              },
+            },
+            "description": "",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Missing, invalid, or expired session cookie.",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Caller is neither the profile owner nor an admin.",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "User not found.",
+          },
+        },
+        "security": [
+          {
+            "access_token": [],
+          },
+        ],
+        "summary": "Replace a user's portfolio projects",
+        "tags": [
+          "profiles",
+        ],
+      },
+    },
+    "/profile/{id}/skills": {
+      "patch": {
+        "description": "Owner-or-admin. When an admin edits someone else's skills, the change is audit-logged and the user is notified.",
+        "operationId": "ProfilesController_updateSkills",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "example": "64f1c2e5a1b2c3d4e5f6a7b8",
+              "type": "string",
+            },
+          },
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSkillsDto",
+              },
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileResponseDto",
+                },
+              },
+            },
+            "description": "",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Missing, invalid, or expired session cookie.",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Caller is neither the profile owner nor an admin.",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "User not found.",
+          },
+        },
+        "security": [
+          {
+            "access_token": [],
+          },
+        ],
+        "summary": "Replace a user's skills",
+        "tags": [
+          "profiles",
+        ],
+      },
+    },
+    "/users": {
+      "get": {
+        "operationId": "UsersController_listUsers",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsersListResponseDto",
+                },
+              },
+            },
+            "description": "",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Missing, invalid, or expired session cookie.",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Caller is not an admin.",
+          },
+        },
+        "security": [
+          {
+            "access_token": [],
+          },
+        ],
+        "summary": "List all users (admin only)",
+        "tags": [
+          "users",
+        ],
+      },
+    },
+    "/users/{id}": {
+      "delete": {
+        "description": "Hard delete — not soft delete. Admin accounts cannot be deleted through this route, including by themselves.",
+        "operationId": "UsersController_deleteUser",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "example": "64f1c2e5a1b2c3d4e5f6a7b8",
+              "type": "string",
+            },
+          },
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReasonDto",
+              },
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NullDataResponseDto",
+                },
+              },
+            },
+            "description": "",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Missing, invalid, or expired session cookie.",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Caller is not an admin, or the target is an admin account.",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "User not found.",
+          },
+        },
+        "security": [
+          {
+            "access_token": [],
+          },
+        ],
+        "summary": "Permanently delete a user (admin only)",
+        "tags": [
+          "users",
+        ],
+      },
+    },
+  },
+  "servers": [],
+  "tags": [],
+}
+`;
