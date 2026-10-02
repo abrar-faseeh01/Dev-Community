@@ -6,38 +6,13 @@ import {
   Post,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import {
-  ApiBadGatewayResponse,
-  ApiBadRequestResponse,
-  ApiCookieAuth,
-  ApiGatewayTimeoutResponse,
-  ApiNotFoundResponse,
-  ApiOkResponse,
-  ApiOperation,
-  ApiParam,
-  ApiServiceUnavailableResponse,
-  ApiTags,
-  ApiTooManyRequestsResponse,
-  ApiUnauthorizedResponse,
-  ApiUnprocessableEntityResponse,
-} from '@nestjs/swagger';
+import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { Model } from 'mongoose';
-import { ErrorResponseDto } from '../common/dto/error-response.dto';
 import { ParseObjectIdPipe } from '../common/pipes/parse-object-id.pipe';
-// Aliased: `Post` is also the route decorator imported above.
 import { Post as PostEntity } from '../posts/schemas/post.schema';
-import { PostSummaryResponseDto } from './dto/summarize-response.dto';
 import { SummarizerService } from './summarizer.service';
-
-const UNAUTHORIZED = {
-  description: 'Missing, invalid, or expired session cookie.',
-  type: ErrorResponseDto,
-};
-const NOT_FOUND = {
-  description: 'Post not found (or already soft-deleted).',
-  type: ErrorResponseDto,
-};
+import { ApiSummarizePost } from './summarizer.swagger';
 
 // No shared route prefix, the same as ReactionsController and
 // CommentsController: the route belongs to the post resource, so it spells out
@@ -73,47 +48,7 @@ export class SummarizerController {
   @Post('posts/:id/summarize')
   @HttpCode(200)
   @Throttle({ default: { limit: 10, ttl: 60000 } })
-  @ApiCookieAuth('access_token')
-  @ApiOperation({
-    summary: 'Summarize a post (summary text and skill tags)',
-    description:
-      "Any signed-in user, administrators included. Only the post's title and body are sent to the summarizer, never the author or the caller. With a model key configured the summary comes from Gemini (`source: 'gemini'`); otherwise from a deterministic extractive fallback (`source: 'mock'`), which is not real summarization. A body over 8000 characters is cut to its first 8000 and `truncated` is true. A body under 200 characters is rejected. Results are not stored: every call is computed fresh. The summary and tags are plain text and must be rendered as text.",
-  })
-  @ApiParam({
-    name: 'id',
-    description: 'The post id.',
-    example: '64f1c2e5a1b2c3d4e5f6a7c0',
-  })
-  @ApiOkResponse({ type: PostSummaryResponseDto })
-  @ApiBadRequestResponse({
-    description: 'Malformed post id.',
-    type: ErrorResponseDto,
-  })
-  @ApiUnauthorizedResponse(UNAUTHORIZED)
-  @ApiNotFoundResponse(NOT_FOUND)
-  @ApiUnprocessableEntityResponse({
-    description:
-      'The post body is under 200 characters, too short to summarize.',
-    type: ErrorResponseDto,
-  })
-  @ApiTooManyRequestsResponse({
-    description: 'More than 10 summarize requests in a minute from one IP.',
-    type: ErrorResponseDto,
-  })
-  @ApiBadGatewayResponse({
-    description:
-      'The summarizer answered with something unusable (not valid JSON, no summary, or no valid tags).',
-    type: ErrorResponseDto,
-  })
-  @ApiServiceUnavailableResponse({
-    description:
-      'The summarizer is temporarily unavailable (unreachable, rate-limited or daily quota used up). Retrying right away may not help.',
-    type: ErrorResponseDto,
-  })
-  @ApiGatewayTimeoutResponse({
-    description: 'The summarizer took too long to respond.',
-    type: ErrorResponseDto,
-  })
+  @ApiSummarizePost()
   async summarize(@Param('id', ParseObjectIdPipe) id: string) {
     // deletedAt: null, the same live-post filter PostsService uses, so a
     // soft-deleted post 404s exactly like a missing one.
