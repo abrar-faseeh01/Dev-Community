@@ -307,6 +307,20 @@ I handed the two frontend checkpoints to it while I was on other work, with a st
 
 **What's checked and what isn't.** The full frontend suite (491 tests, 49 suites), `tsc --noEmit`, and `eslint` pass. To confirm the tests have teeth, it temporarily removed the double-click guard and, separately, the scroll, and showed that the tests covering each failed, then restored them. Not covered by any automated test: how the page actually lays out and scrolls in a real browser at phone and tablet widths, since jsdom has no layout engine, so that part rests on checking it by hand (the alignment bug above only showed up that way).
 
+### Backend clean-up — moving Swagger decorators out of the controllers
+
+After Day 16 I noticed the controllers had become hard for anyone else to read, because the Swagger decorators drowned the actual route logic, and I asked whether it could be cleaned up without breaking anything. I asked for the answer and a plan first, with no code, and then approved all controllers (not just the four biggest) and a permanent test for it.
+
+**The proof came before the change.** The plan was to move the decorators, not delete documentation, and to prove nothing changed by snapshotting the full generated OpenAPI document before touching any controller, then keeping it green, unchanged, after each one. It wrote that test first, against the untouched code. To be sure it really fails when the documentation changes, it made one deliberate edit to a description, showed the test failing on exactly that line, and restored it. Only then did it start moving anything.
+
+**It used a throwaway script to move the decorators verbatim instead of retyping them.** Retyping hundreds of lines of descriptions is how a clean-up quietly loses a sentence. The script lived outside the repo. It still hit several snags that the checks caught, not me reading code: it dropped an inline `type RequestUser` import and a default import, it didn't understand an aliased import (`Post as PostEntity`) in the summarizer controller, and the typecheck flagged each one right away. Each time it restored the original controller from a backup it had kept outside the repo and fixed the script, rather than patching the output by hand. A last check with `tsc --noUnusedLocals` found three unused `Public` imports in the new files, because the script had matched the word "Public" inside description text; those were removed.
+
+**One subtle thing it flagged before it could bite.** The order of a route's parameters in the generated document depends on the order the decorators are applied, and TypeScript applies stacked decorators bottom to top while `applyDecorators` applies them in array order. So the decorators in each new file are listed in reverse, and the snapshot is what guards that.
+
+**A second check, on behaviour.** Besides the snapshot, it compared every non-Swagger decorator (`@Roles`, `@Public`, `@HttpCode`, `@Throttle`, the guards) in every controller before and after: all identical. It also pointed out that one pre-existing warning (an unused `notificationsService` in the users controller) was already there before the change, not caused by it.
+
+**What's checked and what isn't.** The OpenAPI snapshot passed after every one of the ten controllers with no update to it, the 246 backend unit tests pass, and `tsc --noEmit` is clean. One e2e run early on failed with a flood of database connection errors; the identical spec passed on the next run, so I treated it as a one-off connection problem and not something the change caused. Not verified by me: how `/docs` looks in the browser. The snapshot proves the document is identical, but a visual check was not part of this.
+
 ## Where this leaves me
 
 Nothing here shipped because it "looked right" on the first pass. Every
