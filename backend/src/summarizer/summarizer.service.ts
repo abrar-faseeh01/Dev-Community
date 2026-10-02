@@ -54,12 +54,12 @@ export class SummarizerService {
 
     let raw: unknown;
     try {
-      raw = await this.summarizer.summarize(payload);
+      raw = await this.summarizer.summarize(payload); // storing the raw output from the summarizer
     } catch (error) {
       this.rethrowAsHttp(error);
     }
 
-    const parsed = parseSummaryOutput(raw);
+    const parsed = parseSummaryOutput(raw); // parsing the raw output from the summarizer
     if (!parsed.ok) {
       this.logger.warn(
         `Summarizer (${this.summarizer.source}) output rejected: ${parsed.reason}`,
