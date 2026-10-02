@@ -121,6 +121,14 @@ export class E2eData {
     return { id, email, fullName, role, cookie: `access_token=${token}` };
   }
 
+  // For tests that sign a user up through the real POST /auth/signup instead
+  // of createUser(). Same marker, run id and counter as createUser(), so the
+  // address is one the sweep can recognise and trackUser() will accept.
+  nextEmail(): string {
+    const n = ++this.counter;
+    return `${MARKER}${this.runId}-${n}${EMAIL_DOMAIN}`;
+  }
+
   trackPost(id: string): void {
     this.postIds.add(id);
   }
@@ -264,7 +272,9 @@ export class E2eData {
     }
 
     if (postIds.length) {
-      const posts = await this.models.post.deleteMany({ _id: { $in: postIds } });
+      const posts = await this.models.post.deleteMany({
+        _id: { $in: postIds },
+      });
       result.posts = posts.deletedCount;
     }
 
