@@ -6,6 +6,7 @@ import {
   type InternalAxiosRequestConfig,
 } from "axios";
 import { ApiError } from "./api-error";
+import { isSignedOut } from "./session-state";
 
 declare module "axios" {
   interface AxiosRequestConfig {
@@ -60,6 +61,9 @@ function toApiError(error: AxiosError): ApiError {
 //   3. If it worked, the original request is sent again, exactly once.
 //   4. If the refresh itself 401s, the session is over: go to /login.
 //
+// None of that applies once the user has signed out on purpose (session-state.ts):
+// their 401s are expected, so steps 2 to 4 are switched off.
+//
 // A loop is impossible by construction: the refresh request and a repeated
 // request are both marked so a 401 on either never starts another refresh.
 export function attachInterceptors(
@@ -104,6 +108,10 @@ export function attachInterceptors(
   }
 
   function endSession() {
+    // Third read of the signed-out flag (the others are in the 401 branch
+    // below): a refresh already running when the user signed out can still come
+    // back 401 afterwards, and that must not be reported as an expired session.
+    if (isSignedOut()) return;
     if (redirecting) return; // several calls can fail together; leave once
     redirecting = true;
     redirectToLogin();
@@ -120,6 +128,10 @@ export function attachInterceptors(
         config &&
         error.response?.status === 401
       ) {
+        // The user signed out on purpose (see session-state.ts): their cookies
+        // are gone, so this 401 is expected. No refresh, no redirect.
+        if (isSignedOut()) return Promise.reject(toApiError(error));
+
         if (!config.skipAuthRefresh && !config._retried) {
           try {
             await ensureFreshSession(config);
@@ -133,6 +145,9 @@ export function attachInterceptors(
             }
             return Promise.reject(refreshError);
           }
+          // Signed out while the refresh was running: do not send the request
+          // again for someone who has just logged out.
+          if (isSignedOut()) return Promise.reject(toApiError(error));
           return client.request({ ...config, _retried: true });
         }
 

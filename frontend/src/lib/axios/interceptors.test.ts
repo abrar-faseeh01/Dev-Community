@@ -5,6 +5,7 @@ import axios, {
 } from "axios";
 import { ApiError } from "./api-error";
 import { REFRESH_URL, attachInterceptors } from "./interceptors";
+import { markSignedIn, markSignedOut } from "./session-state";
 
 // The real interceptors on a real axios instance. Only the transport is fake:
 // a custom adapter plays the backend, answering from a tiny in-memory model of
@@ -100,7 +101,31 @@ async function failure(promise: Promise<unknown>): Promise<ApiError> {
   throw new Error("expected the request to fail");
 }
 
+// A refresh that is running, held back until the test lets it finish, so a
+// sign-out can be made to happen while it is in flight.
+function heldRefresh(reply: Reply) {
+  let release: () => void = () => undefined;
+  const gate = new Promise<void>((resolve) => (release = resolve));
+  let started: () => void = () => undefined;
+  const refreshStarted = new Promise<void>((resolve) => (started = resolve));
+
+  const extra = async (
+    config: InternalAxiosRequestConfig,
+  ): Promise<Reply | undefined> => {
+    if (config.url !== REFRESH_URL) return undefined;
+    started();
+    await gate;
+    return reply;
+  };
+  return { extra, refreshStarted, release };
+}
+
 describe("attachInterceptors", () => {
+  // The signed-out flag is module state shared by every client, so no test may
+  // leave it set for the next one.
+  beforeEach(() => markSignedIn());
+  afterEach(() => markSignedIn());
+
   describe("a request that works", () => {
     it("passes through untouched, with no refresh", async () => {
       const { client, calls } = setup({ accessValid: true });
@@ -342,6 +367,114 @@ describe("attachInterceptors", () => {
       expect(error.status).toBeUndefined();
       expect(error.message).toBe("Request failed");
       expect(calls).toEqual([PROTECTED]);
+    });
+  });
+
+  // After the user clicks Logout their cookies are gone on purpose, so a 401
+  // from a protected call that is still running (the notification bell polls
+  // one) is expected. It must not be mistaken for an expired session, which
+  // would send them to /login?reason=session-expired.
+  describe("after a deliberate sign-out", () => {
+    it("a protected 401 is just an error: no refresh and no redirect", async () => {
+      markSignedOut();
+      const { client, calls, redirectToLogin } = setup();
+
+      const error = await failure(client.get("/posts/mine"));
+
+      expect(error.status).toBe(401);
+      expect(error.message).toBe("Unauthorized");
+      expect(calls).toEqual([PROTECTED]);
+      expect(redirectToLogin).not.toHaveBeenCalled();
+    });
+
+    it("the same for a call that opted out of refreshing but not out of the redirect", async () => {
+      markSignedOut();
+      const { client, calls, redirectToLogin } = setup();
+
+      const error = await failure(
+        client.get("/posts/mine", { skipAuthRefresh: true }),
+      );
+
+      expect(error.status).toBe(401);
+      expect(calls).toEqual([PROTECTED]);
+      expect(redirectToLogin).not.toHaveBeenCalled();
+    });
+
+    it("a refresh already running when the user signs out can come back 401 without a redirect", async () => {
+      const held = heldRefresh({ status: 401 });
+      const { client, calls, redirectToLogin } = setup({}, held.extra);
+
+      const pending = failure(client.get("/posts/mine")); // 401 -> refresh starts
+      await held.refreshStarted;
+      markSignedOut(); // the user clicks Logout while it is in flight
+      held.release();
+      const error = await pending;
+
+      expect(error.status).toBe(401);
+      expect(error.message).toBe("Unauthorized"); // the original 401
+      expect(calls).toEqual([PROTECTED, REFRESH]);
+      expect(redirectToLogin).not.toHaveBeenCalled();
+    });
+
+    it("a refresh that succeeds after the user signed out is not followed by a repeat", async () => {
+      const held = heldRefresh({ status: 200 });
+      const { client, calls, redirectToLogin } = setup({}, held.extra);
+
+      const pending = failure(client.get("/posts/mine"));
+      await held.refreshStarted;
+      markSignedOut();
+      held.release();
+      const error = await pending;
+
+      expect(error.status).toBe(401);
+      expect(calls).toEqual([PROTECTED, REFRESH]); // no second PROTECTED
+      expect(redirectToLogin).not.toHaveBeenCalled();
+    });
+
+    it("leaves a request that works untouched", async () => {
+      markSignedOut();
+      const { client, calls } = setup({ accessValid: true });
+
+      const res = await client.get("/posts/mine");
+
+      expect(res.data).toEqual({ ok: true });
+      expect(calls).toEqual([PROTECTED]);
+    });
+
+    it("leaves other errors untouched", async () => {
+      markSignedOut();
+      const { client, redirectToLogin } = setup({ accessValid: true }, () => ({
+        status: 500,
+        data: { message: "boom", errors: [] },
+      }));
+
+      const error = await failure(client.get("/posts/mine"));
+
+      expect(error.status).toBe(500);
+      expect(error.message).toBe("boom");
+      expect(redirectToLogin).not.toHaveBeenCalled();
+    });
+
+    it("signing in again switches the normal behaviour back on: refresh, then repeat", async () => {
+      markSignedOut();
+      markSignedIn();
+      const { client, calls, redirectToLogin } = setup();
+
+      const res = await client.get("/posts/mine");
+
+      expect(res.status).toBe(200);
+      expect(calls).toEqual([PROTECTED, REFRESH, PROTECTED]);
+      expect(redirectToLogin).not.toHaveBeenCalled();
+    });
+
+    it("and a session that is really over goes to login once again", async () => {
+      markSignedOut();
+      markSignedIn();
+      const { client, redirectToLogin } = setup({ refresh: { status: 401 } });
+
+      await failure(client.get("/posts/mine"));
+
+      expect(redirectToLogin).toHaveBeenCalledTimes(1);
     });
   });
 });
