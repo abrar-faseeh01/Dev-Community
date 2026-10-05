@@ -12,9 +12,10 @@ import { E2eData } from './helpers/e2e-data';
 // ValidationPipe stripping a client-sent role, the cookie's flags, passport
 // accepting or rejecting the cookie, and the global RolesGuard on POST /posts.
 //
-// Not covered: the 5-a-minute limit on signup and login. createE2eApp() swaps
-// the throttler's storage for one that never counts, so a 429 cannot be
-// provoked here.
+// Not covered here: the 5-a-minute limit on signup and login. createE2eApp()
+// swaps the throttler's storage for one that never counts, so a 429 cannot be
+// provoked here; rate-limits.e2e-spec.ts keeps the real throttler and covers it.
+// The refresh cookie and refresh route are in refresh.e2e-spec.ts.
 const PASSWORD = 'correct-horse-battery';
 
 // The access_token cookie out of a response's Set-Cookie headers, or undefined.

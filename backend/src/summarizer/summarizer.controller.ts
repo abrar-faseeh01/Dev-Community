@@ -44,7 +44,8 @@ export class SummarizerController {
   //
   // 10 a minute per IP. Gemini's free quota is shared by the whole project,
   // not per user, so this cannot guarantee it is never exceeded; an upstream
-  // 429 is mapped to 503 by the service. Day 18 tunes the number.
+  // 429 is mapped to 503 by the service. Reviewed on Day 18 and kept: there is
+  // no real usage data to justify another number.
   @Post('posts/:id/summarize')
   @HttpCode(200)
   @Throttle({ default: { limit: 10, ttl: 60000 } })

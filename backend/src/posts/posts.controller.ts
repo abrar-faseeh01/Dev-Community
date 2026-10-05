@@ -38,11 +38,11 @@ import { UpdatePostDto } from './dto/update-post.dto';
 import { PostsService, PostWithAuthor } from './posts.service';
 import {
   ApiCreatePost,
+  ApiDeletePost,
+  ApiGetPost,
   ApiListPosts,
   ApiSearchPosts,
-  ApiGetPost,
   ApiUpdatePost,
-  ApiDeletePost,
 } from './posts.swagger';
 
 @ApiTags('posts')
@@ -121,8 +121,8 @@ export class PostsController {
   //
   // 40 a minute per IP is a judgment call: text search is the most expensive
   // query in this controller, but a debounced search box fires a request per
-  // pause in typing, and 20 a minute is easy to reach in ordinary use. Day 18
-  // revisits rate limits for search.
+  // pause in typing, and 20 a minute is easy to reach in ordinary use. Reviewed
+  // on Day 18 and kept: there is no real usage data to justify another number.
   @Public()
   @UseGuards(OptionalJwtAuthGuard)
   @Get('search')
