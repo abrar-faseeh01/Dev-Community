@@ -82,6 +82,13 @@ export class User extends Document {
   @Prop({ required: true, select: false })
   passwordHash: string;
 
+  // SHA-256 hashes of this user's live refresh tokens, one per signed-in
+  // device, newest last and capped at 5 (see UsersService.addRefreshHash). The
+  // token itself is never stored. select:false and the toJSON strip below are
+  // the same two layers as passwordHash.
+  @Prop({ type: [String], default: [], select: false })
+  refreshTokenHashes: string[];
+
   @Prop({ required: true, enum: ['admin', 'user'], default: 'user' })
   role: UserRole;
 
@@ -111,6 +118,7 @@ export const UserSchema = SchemaFactory.createForClass(User);
 UserSchema.set('toJSON', {
   transform: (_doc, ret: Record<string, any>) => {
     delete ret.passwordHash;
+    delete ret.refreshTokenHashes;
     delete ret.__v;
     return ret;
   },

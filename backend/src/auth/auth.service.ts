@@ -5,9 +5,13 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import mongoose from 'mongoose';
+import type { StringValue } from 'ms';
+import ms from 'ms';
+import { createHash, randomUUID } from 'node:crypto';
 import { UsersService } from '../users/users.service';
 import { LoginDto } from './dto/login.dto';
 import { SignupDto } from './dto/signup.dto';
@@ -15,12 +19,56 @@ import { UpdateCredentialsDto } from './dto/update-credentials.dto';
 
 const SALT_ROUNDS = 12;
 
+type RefreshPayload = { sub?: string; type?: string; exp?: number };
+
+// Only this hash is stored, never the token: a database leak then does not hand
+// out working sessions. SHA-256 is enough (no salt, no bcrypt) because the input
+// is a signed JWT carrying a random jti, not a guessable password.
+function hashToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex');
+}
+
 @Injectable()
 export class AuthService {
+  private readonly refreshSecret: string;
+  private readonly refreshExpiresIn: string;
+
   constructor(
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
-  ) {}
+    config: ConfigService,
+  ) {
+    this.refreshSecret = config.getOrThrow<string>('JWT_REFRESH_SECRET');
+    this.refreshExpiresIn = config.get<string>('JWT_REFRESH_EXPIRES_IN', '7d');
+  }
+
+  private signAccessToken(user: { _id: unknown; email: string; role: string }) {
+    return this.jwtService.sign({
+      sub: user._id,
+      email: user.email,
+      role: user.role,
+    });
+  }
+
+  // Own secret and lifetime, passed per call so the one JwtService (and the
+  // access-token settings it was registered with) stays untouched. The jti makes
+  // two tokens issued in the same second differ, so each login gets its own
+  // hash and logging out one device cannot revoke another's.
+  private async issueRefreshToken(userId: unknown) {
+    const refreshToken = this.jwtService.sign(
+      { sub: String(userId), type: 'refresh', jti: randomUUID() },
+      {
+        secret: this.refreshSecret,
+        expiresIn: this.refreshExpiresIn as StringValue,
+      },
+    );
+    const lifetimeMs = ms(this.refreshExpiresIn as StringValue);
+    return {
+      refreshToken,
+      hash: hashToken(refreshToken),
+      refreshExpiresAt: Date.now() + lifetimeMs,
+    };
+  }
 
   async signup(dto: SignupDto) {
     const existing = await this.usersService.findByEmail(dto.email);
@@ -56,11 +104,78 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const payload = { sub: user._id, email: user.email, role: user.role };
-    const accessToken = this.jwtService.sign(payload);
+    const accessToken = this.signAccessToken(user);
+    const { refreshToken, hash, refreshExpiresAt } =
+      await this.issueRefreshToken(user._id);
+    await this.usersService.addRefreshHash(String(user._id), hash);
 
-    return { accessToken, user };
+    return { accessToken, refreshToken, refreshExpiresAt, user };
   }
+
+  // Trades a valid refresh token for a new access token. Every way it can fail
+  // gives the same 401, so a caller cannot tell a forged token from an expired,
+  // revoked or evicted one. The token is not rotated: it stays valid, so two
+  // tabs refreshing at once cannot invalidate each other.
+  async refresh(refreshToken: string | undefined) {
+    const invalid = () => new UnauthorizedException('Invalid refresh token');
+    if (!refreshToken) throw invalid();
+
+    let payload: RefreshPayload;
+    try {
+      payload = await this.jwtService.verifyAsync<RefreshPayload>(
+        refreshToken,
+        { secret: this.refreshSecret },
+      );
+    } catch {
+      throw invalid(); // bad signature, malformed, or expired
+    }
+    if (payload.type !== 'refresh' || !payload.sub || !payload.exp) {
+      throw invalid();
+    }
+
+    // Signature and expiry alone are not enough: logout, eviction by a sixth
+    // login and a credential change all remove the hash, and that must end the
+    // session even though the token itself has not expired.
+    const live = await this.usersService.hasRefreshHash(
+      payload.sub,
+      hashToken(refreshToken),
+    );
+    if (!live) throw invalid();
+
+    const user = await this.usersService.findById(payload.sub);
+    if (!user) throw invalid();
+
+    return {
+      accessToken: this.signAccessToken(user),
+      refreshExpiresAt: payload.exp * 1000,
+      user,
+    };
+  }
+
+  // Revokes just this device's token. An expired token is still accepted (the
+  // signature is checked, the expiry is not), so a user whose refresh token
+  // lapsed can still be logged out cleanly. A missing or invalid token is not an
+  // error: there is nothing to revoke, and logout must always succeed.
+  async logout(refreshToken: string | undefined): Promise<void> {
+    if (!refreshToken) return;
+
+    let payload: RefreshPayload;
+    try {
+      payload = await this.jwtService.verifyAsync<RefreshPayload>(
+        refreshToken,
+        { secret: this.refreshSecret, ignoreExpiration: true },
+      );
+    } catch {
+      return;
+    }
+    if (payload.type !== 'refresh' || !payload.sub) return;
+
+    await this.usersService.removeRefreshHash(
+      payload.sub,
+      hashToken(refreshToken),
+    );
+  }
+
   async updateCredentials(userId: string, dto: UpdateCredentialsDto) {
     const user = await this.usersService.findByIdWithPassword(userId);
     if (!user) throw new UnauthorizedException();
@@ -122,15 +237,14 @@ export class AuthService {
       throw err;
     }
 
-    // Create a fresh JWT containing the updated email and existing role.
-    const payload = {
-      sub: user._id,
-      email: user.email,
-      role: user.role,
-    };
+    // Fresh tokens carrying the updated email and existing role. The refresh
+    // hashes are replaced, not appended to: changing credentials signs out every
+    // other device, so a session opened with the old password cannot outlive it.
+    const accessToken = this.signAccessToken(user);
+    const { refreshToken, hash, refreshExpiresAt } =
+      await this.issueRefreshToken(user._id);
+    await this.usersService.replaceRefreshHashes(String(user._id), [hash]);
 
-    const accessToken = this.jwtService.sign(payload);
-
-    return { accessToken, user };
+    return { accessToken, refreshToken, refreshExpiresAt, user };
   }
 }

@@ -7,6 +7,9 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { User, UserRole } from './schemas/user.schema';
 
+// Signed-in devices a user can have at once. A sixth login evicts the oldest.
+export const MAX_REFRESH_SESSIONS = 5;
+
 @Injectable()
 export class UsersService {
   constructor(@InjectModel(User.name) private userModel: Model<User>) {}
@@ -32,6 +35,58 @@ export class UsersService {
     return this.userModel.findById(id).select('+passwordHash').exec();
   }
 
+  // Refresh-token bookkeeping. Each of these is one atomic updateOne, not a
+  // load-modify-save: two logins or a login and a logout racing each other must
+  // not overwrite one another's change, and save() would also trip the user
+  // schema's optimisticConcurrency. timestamps:false keeps updatedAt meaning
+  // "the profile changed", not "someone signed in".
+  addRefreshHash(userId: string, hash: string) {
+    return this.userModel
+      .updateOne(
+        { _id: userId },
+        {
+          // $slice keeps the newest MAX_REFRESH_SESSIONS, so a sixth login
+          // evicts the oldest session.
+          $push: {
+            refreshTokenHashes: {
+              $each: [hash],
+              $slice: -MAX_REFRESH_SESSIONS,
+            },
+          },
+        },
+        { timestamps: false },
+      )
+      .exec();
+  }
+
+  async hasRefreshHash(userId: string, hash: string): Promise<boolean> {
+    const found = await this.userModel
+      .exists({ _id: userId, refreshTokenHashes: hash })
+      .exec();
+    return found !== null;
+  }
+
+  removeRefreshHash(userId: string, hash: string) {
+    return this.userModel
+      .updateOne(
+        { _id: userId },
+        { $pull: { refreshTokenHashes: hash } },
+        { timestamps: false },
+      )
+      .exec();
+  }
+
+  // A credential change ends every other session: only the new one survives.
+  replaceRefreshHashes(userId: string, hashes: string[]) {
+    return this.userModel
+      .updateOne(
+        { _id: userId },
+        { $set: { refreshTokenHashes: hashes } },
+        { timestamps: false },
+      )
+      .exec();
+  }
+
   // AuthService.signup() will always call this without `role`,
   // so it defaults to 'user' — role is never client-controlled.
   create(data: {
@@ -51,10 +106,7 @@ export class UsersService {
   // Admin-only listing — hand-picked fields, no pagination (per spec: no
   // real users exist yet, and this isn't meant to scale to that yet either).
   async findAll() {
-    return this.userModel
-      .find()
-      .select('fullName email role createdAt')
-      .exec();
+    return this.userModel.find().select('fullName email role createdAt').exec();
   }
 
   async deleteUser(id: string) {

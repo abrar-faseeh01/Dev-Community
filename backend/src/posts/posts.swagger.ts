@@ -10,9 +10,11 @@ import {
   ApiOperation,
   ApiParam,
   ApiQuery,
+  ApiTooManyRequestsResponse,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { ErrorResponseDto } from '../common/dto/error-response.dto';
+import { UNAUTHORIZED_RESPONSE } from '../common/swagger/session-required';
 import { POST_SORTS } from './dto/list-posts.dto';
 import {
   DeletePostResponseDto,
@@ -20,7 +22,6 @@ import {
   PostResponseDto,
   PostSearchResponseDto,
 } from './dto/post-response.dto';
-import { UNAUTHORIZED_RESPONSE } from '../common/swagger/session-required';
 
 const ID_PARAM = { name: 'id', example: '64f1c2e5a1b2c3d4e5f6a7c0' };
 
@@ -105,6 +106,10 @@ export function ApiListPosts() {
 
 export function ApiSearchPosts() {
   return applyDecorators(
+    ApiTooManyRequestsResponse({
+      description: 'More than 40 search requests in a minute from one IP.',
+      type: ErrorResponseDto,
+    }),
     ApiBadRequestResponse({
       description:
         'Missing, blank or whitespace-only `q`; `q` longer than 100 characters; `limit` outside 1-20 (rejected, not clamped); or any other query parameter.',

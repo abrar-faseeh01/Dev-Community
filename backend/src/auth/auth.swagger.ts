@@ -53,7 +53,30 @@ export function ApiLogin() {
     ApiOperation({
       summary: 'Log in',
       description:
-        'Sets an httpOnly `access_token` cookie on success. Rate-limited to 5 requests/minute per IP.',
+        'Sets an httpOnly `access_token` cookie (a 15-minute JWT) and an httpOnly `refresh_token` cookie (valid 7 days, sent only to the auth routes) on success. Up to 5 devices can be signed in at once; a sixth login signs out the oldest. Rate-limited to 5 requests/minute per IP.',
+    }),
+  );
+}
+
+export function ApiRefresh() {
+  return applyDecorators(
+    ApiTooManyRequestsResponse({
+      description: 'Rate limit exceeded.',
+      type: ErrorResponseDto,
+    }),
+    ApiUnauthorizedResponse({
+      description:
+        'Refresh cookie missing, malformed, expired, or revoked (logged out, evicted by a sixth login, or credentials changed). Both cookies are cleared.',
+      type: ErrorResponseDto,
+    }),
+    ApiOkResponse({
+      description: 'A new `access_token` cookie was issued.',
+      type: AuthResponseDto,
+    }),
+    ApiOperation({
+      summary: 'Renew the access token',
+      description:
+        'Authenticated by the httpOnly `refresh_token` cookie, because the `access_token` is expired by the time this is called. The refresh token is not rotated. Rate-limited to 20 requests/minute per IP.',
     }),
   );
 }
@@ -64,7 +87,7 @@ export function ApiLogout() {
     ApiOperation({
       summary: 'Log out',
       description:
-        'Clears the `access_token` cookie. Never requires a valid session, so a client can always log itself out.',
+        'Clears the `access_token` and `refresh_token` cookies and revokes the refresh token of this device. Never requires a valid session, so a client can always log itself out.',
     }),
   );
 }
@@ -102,7 +125,7 @@ export function ApiUpdateMe() {
     ApiOperation({
       summary: 'Update your own name, email, and/or password',
       description:
-        'Requires `currentPassword` regardless of which field is changing. Only admins may change `newEmail`. Issues a fresh cookie reflecting the new credentials. Rate-limited to 10 requests/minute per IP.',
+        'Requires `currentPassword` regardless of which field is changing. Only admins may change `newEmail`. Issues fresh `access_token` and `refresh_token` cookies reflecting the new credentials and signs out every other device. Rate-limited to 10 requests/minute per IP.',
     }),
     ApiCookieAuth('access_token'),
   );

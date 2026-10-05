@@ -5,16 +5,21 @@ import {
   ForbiddenException,
   UnauthorizedException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import mongoose from 'mongoose';
-import { UsersService } from '../users/users.service';
+import { createHash } from 'node:crypto';
+import { MAX_REFRESH_SESSIONS, UsersService } from '../users/users.service';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { SignupDto } from './dto/signup.dto';
 import { UpdateCredentialsDto } from './dto/update-credentials.dto';
 
-// Only UsersService and JwtService are faked. bcrypt is the REAL module: the
+// UsersService is always faked. The first describe also fakes JwtService (a
+// stub that returns 'signed-token'); the "refresh sessions" describe uses a
+// REAL JwtService so tokens can be verified, tampered with and expired.
+// bcrypt is the REAL module: the
 // service imports it as a namespace, which Jest's ESM mode cannot mock, and a
 // real hash is what lets these tests prove "the stored value is a hash of the
 // password" instead of "a mock was called". Fixtures are hashed at cost 4
@@ -55,11 +60,23 @@ async function caught(promise: Promise<unknown>): Promise<unknown> {
   throw new Error('expected the promise to reject, but it resolved');
 }
 
+// The two settings AuthService reads from ConfigService.
+const ACCESS_SECRET = 'a'.repeat(40);
+const REFRESH_SECRET = 'r'.repeat(40);
+function configStub(): ConfigService {
+  return {
+    getOrThrow: () => REFRESH_SECRET,
+    get: (_key: string, fallback: unknown) => fallback,
+  } as unknown as ConfigService;
+}
+
 describe('AuthService', () => {
   const findByEmail = jest.fn<AsyncFn>();
   const findByEmailWithPassword = jest.fn<AsyncFn>();
   const findByIdWithPassword = jest.fn<AsyncFn>();
   const create = jest.fn<AsyncFn>();
+  const addRefreshHash = jest.fn<AsyncFn>();
+  const replaceRefreshHashes = jest.fn<AsyncFn>();
   const sign = jest.fn<SyncFn>();
 
   const usersService = {
@@ -67,6 +84,8 @@ describe('AuthService', () => {
     findByEmailWithPassword,
     findByIdWithPassword,
     create,
+    addRefreshHash,
+    replaceRefreshHashes,
   } as unknown as UsersService;
   const jwtService = { sign } as unknown as JwtService;
 
@@ -77,9 +96,11 @@ describe('AuthService', () => {
     findByEmailWithPassword.mockReset();
     findByIdWithPassword.mockReset();
     create.mockReset();
+    addRefreshHash.mockReset();
+    replaceRefreshHashes.mockReset();
     sign.mockReset();
     sign.mockReturnValue('signed-token');
-    service = new AuthService(usersService, jwtService);
+    service = new AuthService(usersService, jwtService, configStub());
   });
 
   /*     SIGNUP     */
@@ -193,19 +214,45 @@ describe('AuthService', () => {
       );
     });
 
-    it('signs a token with sub, email and role, and returns it with the user', async () => {
+    it('signs an access token with sub, email and role, and returns it with the user', async () => {
       const user = makeUser({ role: 'admin' });
       findByEmailWithPassword.mockResolvedValue(user);
 
       const result = await service.login(dto);
 
-      expect(sign).toHaveBeenCalledTimes(1);
+      // Two tokens: the access token and the refresh token.
+      expect(sign).toHaveBeenCalledTimes(2);
       expect(sign).toHaveBeenCalledWith({
         sub: user._id,
         email: user.email,
         role: 'admin',
       });
-      expect(result).toEqual({ accessToken: 'signed-token', user });
+      expect(result).toEqual({
+        accessToken: 'signed-token',
+        refreshToken: 'signed-token',
+        refreshExpiresAt: expect.any(Number),
+        user,
+      });
+    });
+
+    it('stores the hash of the refresh token, not the token', async () => {
+      findByEmailWithPassword.mockResolvedValue(makeUser());
+
+      await service.login(dto);
+
+      expect(addRefreshHash).toHaveBeenCalledTimes(1);
+      expect(addRefreshHash).toHaveBeenCalledWith(
+        'u1',
+        createHash('sha256').update('signed-token').digest('hex'),
+      );
+    });
+
+    it('stores nothing when the login is rejected', async () => {
+      findByEmailWithPassword.mockResolvedValue(null);
+
+      await caught(service.login(dto));
+
+      expect(addRefreshHash).not.toHaveBeenCalled();
     });
   });
 
@@ -269,7 +316,7 @@ describe('AuthService', () => {
         email: 'ada@x.test',
         role: 'user',
       });
-      expect(result).toEqual({ accessToken: 'signed-token', user });
+      expect(result).toMatchObject({ accessToken: 'signed-token', user });
     });
 
     it('forbids a non-admin from changing their email (403) and saves nothing', async () => {
@@ -360,6 +407,33 @@ describe('AuthService', () => {
       expect(user.save).toHaveBeenCalledTimes(1);
     });
 
+    it('replaces every refresh hash with just the new one (other devices are signed out)', async () => {
+      findByIdWithPassword.mockResolvedValue(makeUser());
+
+      await service.updateCredentials('u1', {
+        ...base,
+        newFullName: 'New Name',
+      });
+
+      expect(replaceRefreshHashes).toHaveBeenCalledTimes(1);
+      expect(replaceRefreshHashes).toHaveBeenCalledWith('u1', [
+        createHash('sha256').update('signed-token').digest('hex'),
+      ]);
+    });
+
+    it('leaves the refresh hashes alone when the update is rejected', async () => {
+      findByIdWithPassword.mockResolvedValue(makeUser());
+
+      await caught(
+        service.updateCredentials('u1', {
+          currentPassword: 'wrong-password',
+          newFullName: 'New Name',
+        }),
+      );
+
+      expect(replaceRefreshHashes).not.toHaveBeenCalled();
+    });
+
     it('turns a concurrent-update VersionError into 409', async () => {
       const user = makeUser();
       // The constructor only reads doc._doc._id for its message.
@@ -391,6 +465,326 @@ describe('AuthService', () => {
       );
 
       expect(err).toBe(boom);
+    });
+  });
+
+  /*     REFRESH SESSIONS (real JwtService)     */
+
+  describe('refresh sessions', () => {
+    const sha = (t: string) => createHash('sha256').update(t).digest('hex');
+    const dto: LoginDto = { email: 'ada@x.test', password: PASSWORD };
+
+    // Same semantics as the Mongo updates in UsersService, kept in memory:
+    // append and keep the newest MAX_REFRESH_SESSIONS; remove one; replace all.
+    // The real operators are checked against Mongo in the e2e specs.
+    function setup() {
+      const hashes = new Map<string, string[]>();
+      const user = makeUser();
+      const users = {
+        findByEmailWithPassword: async () => user,
+        findByIdWithPassword: async () => user,
+        findByEmail: async () => null,
+        findById: async (id: string) => (id === 'u1' ? user : null),
+        addRefreshHash: async (id: string, h: string) => {
+          hashes.set(
+            id,
+            [...(hashes.get(id) ?? []), h].slice(-MAX_REFRESH_SESSIONS),
+          );
+        },
+        hasRefreshHash: async (id: string, h: string) =>
+          (hashes.get(id) ?? []).includes(h),
+        removeRefreshHash: async (id: string, h: string) => {
+          hashes.set(
+            id,
+            (hashes.get(id) ?? []).filter((x) => x !== h),
+          );
+        },
+        replaceRefreshHashes: async (id: string, hs: string[]) => {
+          hashes.set(id, hs);
+        },
+      } as unknown as UsersService;
+      const jwt = new JwtService({
+        secret: ACCESS_SECRET,
+        signOptions: { expiresIn: '15m' },
+      });
+      return {
+        hashes,
+        user,
+        jwt,
+        service: new AuthService(users, jwt, configStub()),
+      };
+    }
+
+    const stored = (h: Map<string, string[]>) => h.get('u1') ?? [];
+
+    // A refresh token signed the way the service does, for tampering and
+    // expiry cases the service would never produce itself.
+    const signRefresh = (
+      jwt: JwtService,
+      payload: Record<string, unknown>,
+      opts: { secret?: string; expiresIn?: string | number } = {},
+    ) =>
+      jwt.sign(
+        { sub: 'u1', type: 'refresh', jti: 'x', ...payload },
+        {
+          secret: opts.secret ?? REFRESH_SECRET,
+          expiresIn: (opts.expiresIn ?? '7d') as never,
+        },
+      );
+
+    describe('login', () => {
+      it('issues a refresh token with its own secret, type and jti, and an access token with the access secret', async () => {
+        const { service, jwt } = setup();
+
+        const { accessToken, refreshToken } = await service.login(dto);
+
+        const refresh = jwt.verify(refreshToken, { secret: REFRESH_SECRET });
+        expect(refresh).toMatchObject({ sub: 'u1', type: 'refresh' });
+        expect(typeof refresh.jti).toBe('string');
+        expect(() =>
+          jwt.verify(refreshToken, { secret: ACCESS_SECRET }),
+        ).toThrow();
+
+        const access = jwt.verify(accessToken, { secret: ACCESS_SECRET });
+        expect(access).toMatchObject({ sub: 'u1', email: 'ada@x.test' });
+        expect(() =>
+          jwt.verify(accessToken, { secret: REFRESH_SECRET }),
+        ).toThrow();
+      });
+
+      it('stores the sha256 of the refresh token and never the token itself', async () => {
+        const { service, hashes } = setup();
+
+        const { refreshToken } = await service.login(dto);
+
+        expect(stored(hashes)).toEqual([sha(refreshToken)]);
+        expect(stored(hashes)).not.toContain(refreshToken);
+      });
+
+      it('gives two logins in the same second different tokens and hashes', async () => {
+        const { service, hashes } = setup();
+
+        const a = await service.login(dto);
+        const b = await service.login(dto);
+
+        expect(a.refreshToken).not.toBe(b.refreshToken);
+        expect(new Set(stored(hashes)).size).toBe(2);
+      });
+
+      it('reports when the refresh token expires, about 7 days out', async () => {
+        const { service } = setup();
+
+        const { refreshExpiresAt } = await service.login(dto);
+
+        const week = 7 * 24 * 60 * 60 * 1000;
+        expect(Math.abs(refreshExpiresAt - (Date.now() + week))).toBeLessThan(
+          5000,
+        );
+      });
+
+      it('keeps only the newest 5 sessions: a sixth login evicts the first', async () => {
+        const { service, hashes } = setup();
+
+        const first = await service.login(dto);
+        const others = [];
+        for (let i = 0; i < MAX_REFRESH_SESSIONS; i++) {
+          others.push(await service.login(dto));
+        }
+
+        expect(stored(hashes)).toHaveLength(MAX_REFRESH_SESSIONS);
+        await expect(service.refresh(first.refreshToken)).rejects.toThrow(
+          UnauthorizedException,
+        );
+        for (const session of others) {
+          await expect(
+            service.refresh(session.refreshToken),
+          ).resolves.toBeDefined();
+        }
+      });
+    });
+
+    describe('refresh', () => {
+      it('returns a new access token for a live refresh token, without rotating it', async () => {
+        const { service, jwt, hashes } = setup();
+        const { refreshToken, refreshExpiresAt } = await service.login(dto);
+        const before = [...stored(hashes)];
+
+        const result = await service.refresh(refreshToken);
+
+        expect(
+          jwt.verify(result.accessToken, { secret: ACCESS_SECRET }),
+        ).toMatchObject({ sub: 'u1', email: 'ada@x.test', role: 'user' });
+        // The cookie must not outlive the token it renews.
+        expect(
+          Math.abs(result.refreshExpiresAt - refreshExpiresAt),
+        ).toBeLessThan(2000);
+        expect(stored(hashes)).toEqual(before);
+        // Still usable: two tabs refreshing together both succeed.
+        await expect(service.refresh(refreshToken)).resolves.toBeDefined();
+      });
+
+      it('rejects a missing token', async () => {
+        const { service } = setup();
+
+        await expect(service.refresh(undefined)).rejects.toThrow(
+          UnauthorizedException,
+        );
+        await expect(service.refresh('')).rejects.toThrow(
+          UnauthorizedException,
+        );
+      });
+
+      it('rejects garbage and a tampered token', async () => {
+        const { service } = setup();
+        const { refreshToken } = await service.login(dto);
+        const [h, p, sig] = refreshToken.split('.');
+        const flipped = sig[10] === 'A' ? 'B' : 'A';
+        const tamperedSig = sig.slice(0, 10) + flipped + sig.slice(11);
+
+        for (const bad of ['not-a-jwt', `${h}.${p}.${tamperedSig}`]) {
+          await expect(service.refresh(bad)).rejects.toThrow(
+            UnauthorizedException,
+          );
+        }
+      });
+
+      it('rejects a valid-signature token whose hash was never stored', async () => {
+        const { service, jwt } = setup();
+
+        await expect(
+          service.refresh(signRefresh(jwt, { jti: 'never-issued' })),
+        ).rejects.toThrow(UnauthorizedException);
+      });
+
+      it('rejects an access token presented as a refresh token', async () => {
+        const { service } = setup();
+        const { accessToken } = await service.login(dto);
+
+        await expect(service.refresh(accessToken)).rejects.toThrow(
+          UnauthorizedException,
+        );
+      });
+
+      it("rejects a token signed with the refresh secret that is not type 'refresh'", async () => {
+        const { service, jwt, hashes } = setup();
+        const token = signRefresh(jwt, { type: 'access' });
+        hashes.set('u1', [sha(token)]); // even with a stored hash
+
+        await expect(service.refresh(token)).rejects.toThrow(
+          UnauthorizedException,
+        );
+      });
+
+      it('rejects an expired refresh token even though its hash is stored', async () => {
+        const { service, jwt, hashes } = setup();
+        const token = signRefresh(jwt, {}, { expiresIn: -10 });
+        hashes.set('u1', [sha(token)]);
+
+        await expect(service.refresh(token)).rejects.toThrow(
+          UnauthorizedException,
+        );
+      });
+
+      it('rejects when the user no longer exists', async () => {
+        const { service, jwt, hashes } = setup();
+        const token = signRefresh(jwt, { sub: 'deleted-user' });
+        hashes.set('deleted-user', [sha(token)]);
+
+        await expect(service.refresh(token)).rejects.toThrow(
+          UnauthorizedException,
+        );
+      });
+
+      it('gives every failure the same error message', async () => {
+        const { service, jwt } = setup();
+        const messages = new Set<string>();
+
+        for (const bad of [
+          undefined,
+          'garbage',
+          signRefresh(jwt, { jti: 'never-issued' }),
+          signRefresh(jwt, {}, { expiresIn: -10 }),
+        ]) {
+          const err = await caught(service.refresh(bad));
+          messages.add((err as Error).message);
+        }
+
+        expect(messages.size).toBe(1);
+      });
+    });
+
+    describe('logout', () => {
+      it('revokes only this device: the others keep working', async () => {
+        const { service, hashes } = setup();
+        const phone = await service.login(dto);
+        const laptop = await service.login(dto);
+
+        await service.logout(phone.refreshToken);
+
+        expect(stored(hashes)).toEqual([sha(laptop.refreshToken)]);
+        await expect(service.refresh(phone.refreshToken)).rejects.toThrow(
+          UnauthorizedException,
+        );
+        await expect(
+          service.refresh(laptop.refreshToken),
+        ).resolves.toBeDefined();
+      });
+
+      it('still revokes a token that has already expired', async () => {
+        const { service, jwt, hashes } = setup();
+        const token = signRefresh(jwt, {}, { expiresIn: -10 });
+        hashes.set('u1', [sha(token)]);
+
+        await service.logout(token);
+
+        expect(stored(hashes)).toEqual([]);
+      });
+
+      it.each([
+        ['no token', undefined],
+        ['an empty token', ''],
+        ['garbage', 'not-a-jwt'],
+      ])('succeeds and revokes nothing for %s', async (_label, token) => {
+        const { service, hashes } = setup();
+        const { refreshToken } = await service.login(dto);
+
+        await expect(service.logout(token)).resolves.toBeUndefined();
+
+        expect(stored(hashes)).toEqual([sha(refreshToken)]);
+      });
+
+      it('revokes nothing for an access token', async () => {
+        const { service, hashes } = setup();
+        const { accessToken, refreshToken } = await service.login(dto);
+
+        await service.logout(accessToken);
+
+        expect(stored(hashes)).toEqual([sha(refreshToken)]);
+      });
+    });
+
+    describe('updateCredentials', () => {
+      it('signs out every other session and keeps only the new one', async () => {
+        const { service, hashes } = setup();
+        const phone = await service.login(dto);
+        const laptop = await service.login(dto);
+
+        const changed = await service.updateCredentials('u1', {
+          currentPassword: PASSWORD,
+          newFullName: 'Ada K. Lovelace',
+        });
+
+        expect(stored(hashes)).toEqual([sha(changed.refreshToken)]);
+        await expect(service.refresh(phone.refreshToken)).rejects.toThrow(
+          UnauthorizedException,
+        );
+        await expect(service.refresh(laptop.refreshToken)).rejects.toThrow(
+          UnauthorizedException,
+        );
+        await expect(
+          service.refresh(changed.refreshToken),
+        ).resolves.toBeDefined();
+      });
     });
   });
 });
