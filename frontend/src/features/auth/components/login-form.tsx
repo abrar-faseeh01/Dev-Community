@@ -10,9 +10,13 @@ import {
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import type { ReactNode } from "react";
 import { useForm } from "react-hook-form";
 
-export function LoginForm() {
+// `notice` is a slot above the form for something the page knows and the form
+// does not (the login page uses it for the "session expired" message, which
+// reads the URL and so needs its own Suspense boundary).
+export function LoginForm({ notice }: { notice?: ReactNode }) {
   const router = useRouter();
 
   const {
@@ -59,6 +63,8 @@ export function LoginForm() {
           noValidate
           className="flex flex-col gap-6"
         >
+          {notice}
+
           {loginMutation.isError && (
             <p
               role="alert"

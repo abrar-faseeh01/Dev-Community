@@ -127,4 +127,32 @@ describe("LoginForm", () => {
 
     expect(screen.getByRole("alert")).toHaveTextContent("Login failed.");
   });
+
+  it("renders a notice passed in, above the fields and inside the form", () => {
+    render(<LoginForm notice={<p role="status">Heads up</p>} />);
+
+    const notice = screen.getByRole("status");
+    expect(notice).toHaveTextContent("Heads up");
+    expect(notice.closest("form")).not.toBeNull();
+    expect(
+      notice.compareDocumentPosition(field(/^email$/i)) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("renders no notice by default", () => {
+    render(<LoginForm />);
+
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("keeps a notice and the server's error alert apart", () => {
+    mockUseLogin.mockReturnValue(
+      fakeMutation({ isError: true, error: new Error("Invalid credentials") }),
+    );
+    render(<LoginForm notice={<p role="status">Heads up</p>} />);
+
+    expect(screen.getByRole("status")).toHaveTextContent("Heads up");
+    expect(screen.getByRole("alert")).toHaveTextContent("Invalid credentials");
+  });
 });
