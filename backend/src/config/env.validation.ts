@@ -1,3 +1,4 @@
+import { validateCronExpression } from 'cron';
 import { z } from 'zod';
 const blankToUndefined = (value: unknown) =>
   typeof value === 'string' && value.trim() === '' ? undefined : value;
@@ -92,6 +93,33 @@ const envSchema = z
     SUMMARIZER_TIMEOUT_MS: z.preprocess(
       blankToUndefined,
       z.coerce.number().int().min(1000).max(15000).default(10000),
+    ),
+    // Hard-delete of posts that were soft-deleted long enough ago (Day 19).
+    POST_PURGE_ENABLED: z.preprocess(
+      blankToUndefined,
+      z
+        .enum(['true', 'false'])
+        .default('true')
+        .transform((value) => value === 'true'),
+    ),
+
+    POST_PURGE_RETENTION_DAYS: z.preprocess(
+      blankToUndefined,
+      z.coerce.number().int().min(1).max(365).default(7),
+    ),
+
+    // Checked at startup, so a typo fails the boot instead of silently never
+    // running. 5 or 6 fields (a leading seconds field is allowed).
+    POST_PURGE_CRON: z.preprocess(
+      blankToUndefined,
+      z
+        .string()
+        .trim()
+        .default('0 3 * * *')
+        .refine(
+          (expression) => validateCronExpression(expression).valid,
+          'POST_PURGE_CRON is not a valid cron expression',
+        ),
     ),
   })
   // With one secret for both, an access token would verify as a refresh token

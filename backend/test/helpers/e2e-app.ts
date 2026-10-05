@@ -62,6 +62,8 @@ export async function createE2eApp(
   // depend on that ordering, so the mock is forced even if it ever breaks.
   process.env.SUMMARIZER_PROVIDER = 'mock';
   process.env.SUMMARIZER_API_KEY = '';
+  // Same ordering rule: the purge job must never run inside a test app.
+  process.env.POST_PURGE_ENABLED = 'false';
 
   const { Test } = await import('@nestjs/testing');
   await import('@nestjs/common');

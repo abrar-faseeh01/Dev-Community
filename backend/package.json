@@ -20,7 +20,8 @@
     "test:debug": "node --inspect-brk --experimental-vm-modules -r tsconfig-paths/register node_modules/jest/bin/jest.js --runInBand",
     "test:e2e": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config ./test/jest-e2e.json",
     "seed:admin": "ts-node -r tsconfig-paths/register scripts/seed-admin.ts",
-    "seed:ranking": "ts-node -r tsconfig-paths/register scripts/seed-ranking-data.ts"
+    "seed:ranking": "ts-node -r tsconfig-paths/register scripts/seed-ranking-data.ts",
+    "seed:purge": "ts-node -r tsconfig-paths/register scripts/seed-purge-data.ts"
   },
   "dependencies": {
     "@nestjs/common": "^12.0.1",
@@ -30,12 +31,14 @@
     "@nestjs/mongoose": "^12.0.0",
     "@nestjs/passport": "^12.0.0",
     "@nestjs/platform-express": "^12.0.1",
+    "@nestjs/schedule": "^12.0.2",
     "@nestjs/swagger": "^12.0.1",
     "@nestjs/throttler": "^6.5.0",
     "bcrypt": "^6.0.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
     "cookie-parser": "^1.4.7",
+    "cron": "4.4.0",
     "helmet": "^8.3.0",
     "mongoose": "^9.9.5",
     "ms": "^2.1.3",

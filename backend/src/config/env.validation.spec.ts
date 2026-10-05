@@ -184,6 +184,96 @@ describe('validateEnv', () => {
     });
   });
 
+  describe('validateEnv — post purge settings', () => {
+    let errorSpy: ReturnType<typeof jest.spyOn>;
+
+    beforeEach(() => {
+      errorSpy = jest
+        .spyOn(console, 'error')
+        .mockImplementation(() => undefined);
+    });
+
+    afterEach(() => {
+      errorSpy.mockRestore();
+    });
+
+    it('applies defaults when nothing is set', () => {
+      const env = validateEnv(base);
+      expect(env.POST_PURGE_ENABLED).toBe(true);
+      expect(env.POST_PURGE_RETENTION_DAYS).toBe(7);
+      expect(env.POST_PURGE_CRON).toBe('0 3 * * *');
+    });
+
+    it('treats blank values (as in an unfilled .env line) like unset', () => {
+      const env = validateEnv({
+        ...base,
+        POST_PURGE_ENABLED: '',
+        POST_PURGE_RETENTION_DAYS: '',
+        POST_PURGE_CRON: '  ',
+      });
+      expect(env.POST_PURGE_ENABLED).toBe(true);
+      expect(env.POST_PURGE_RETENTION_DAYS).toBe(7);
+      expect(env.POST_PURGE_CRON).toBe('0 3 * * *');
+    });
+
+    it('turns the enabled flag into a boolean', () => {
+      expect(
+        validateEnv({ ...base, POST_PURGE_ENABLED: 'false' })
+          .POST_PURGE_ENABLED,
+      ).toBe(false);
+      expect(
+        validateEnv({ ...base, POST_PURGE_ENABLED: 'true' }).POST_PURGE_ENABLED,
+      ).toBe(true);
+    });
+
+    it('rejects an enabled flag that is not true or false', () => {
+      expect(() => validateEnv({ ...base, POST_PURGE_ENABLED: 'yes' })).toThrow(
+        'Environment validation failed',
+      );
+    });
+
+    it('parses the retention days from a string', () => {
+      expect(
+        validateEnv({ ...base, POST_PURGE_RETENTION_DAYS: '14' })
+          .POST_PURGE_RETENTION_DAYS,
+      ).toBe(14);
+    });
+
+    it.each(['0', '-1', '1.5', '366', 'abc'])(
+      'rejects retention days %s',
+      (days) => {
+        expect(() =>
+          validateEnv({ ...base, POST_PURGE_RETENTION_DAYS: days }),
+        ).toThrow('Environment validation failed');
+      },
+    );
+
+    it.each(['0 3 * * *', '*/10 * * * * *'])(
+      'accepts the cron expression "%s"',
+      (expression) => {
+        expect(
+          validateEnv({ ...base, POST_PURGE_CRON: expression }).POST_PURGE_CRON,
+        ).toBe(expression);
+      },
+    );
+
+    it('trims the cron expression', () => {
+      expect(
+        validateEnv({ ...base, POST_PURGE_CRON: '  0 4 * * * ' })
+          .POST_PURGE_CRON,
+      ).toBe('0 4 * * *');
+    });
+
+    it.each(['nope', '61 * * * *', '* * *'])(
+      'rejects the cron expression "%s"',
+      (expression) => {
+        expect(() =>
+          validateEnv({ ...base, POST_PURGE_CRON: expression }),
+        ).toThrow('Environment validation failed');
+      },
+    );
+  });
+
   it('rejects an unknown NODE_ENV', () => {
     expect(() => validateEnv({ ...base, NODE_ENV: 'staging' })).toThrow();
   });
