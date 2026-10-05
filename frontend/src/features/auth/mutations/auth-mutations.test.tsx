@@ -1,4 +1,9 @@
 import {
+  isSignedOut,
+  markSignedIn,
+  markSignedOut,
+} from "@/lib/axios/session-state";
+import {
   getMe,
   login,
   logout,
@@ -68,12 +73,27 @@ function createWrapper() {
 
 const push = jest.fn();
 
+// A promise the test settles by hand, to look at the state while a request is
+// still pending.
+function deferred<T = void>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((res) => {
+    resolve = res;
+  });
+  return { promise, resolve };
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
   mockUseRouter.mockReturnValue({
     push,
   } as unknown as ReturnType<typeof useRouter>);
+  // The interceptor's signed-out flag is module state shared by every hook, so
+  // no test may leave it set for the next one.
+  markSignedIn();
 });
+
+afterEach(() => markSignedIn());
 
 describe("useLogin", () => {
   it("clears non-auth caches and stores the signed-in user", async () => {
@@ -110,6 +130,54 @@ describe("useLogin", () => {
     expect(resetSpy.mock.invocationCallOrder[0]).toBeLessThan(
       setSpy.mock.invocationCallOrder[authWriteIndex],
     );
+  });
+
+  it("clears the signed-out flag, so a new session gets normal expiry handling", async () => {
+    markSignedOut(); // as after a logout earlier in this tab
+    mockLogin.mockResolvedValue(USER);
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useLogin(), { wrapper: Wrapper });
+
+    act(() => {
+      result.current.mutate({ email: "ada@example.com", password: "pw" });
+    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(isSignedOut()).toBe(false);
+  });
+
+  it("clears the flag BEFORE the reset, so the refetches it starts are not suppressed", async () => {
+    markSignedOut();
+    mockLogin.mockResolvedValue(USER);
+    const { queryClient, Wrapper } = createWrapper();
+    let flagWhenResetStarted: boolean | undefined;
+    const realReset = queryClient.resetQueries.bind(queryClient);
+    jest.spyOn(queryClient, "resetQueries").mockImplementation((...args) => {
+      flagWhenResetStarted = isSignedOut();
+      return realReset(...args);
+    });
+    const { result } = renderHook(() => useLogin(), { wrapper: Wrapper });
+
+    act(() => {
+      result.current.mutate({ email: "ada@example.com", password: "pw" });
+    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(flagWhenResetStarted).toBe(false);
+  });
+
+  it("leaves the flag set when the login fails (nobody is signed in yet)", async () => {
+    markSignedOut();
+    mockLogin.mockRejectedValue(new Error("Invalid credentials"));
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useLogin(), { wrapper: Wrapper });
+
+    act(() => {
+      result.current.mutate({ email: "ada@example.com", password: "wrong" });
+    });
+    await waitFor(() => expect(result.current.isError).toBe(true));
+
+    expect(isSignedOut()).toBe(true);
   });
 });
 
@@ -158,6 +226,25 @@ describe("useSignup", () => {
     expect(queryClient.getQueryData(STALE_COMMENTS_KEY)).toBeUndefined();
     expect(queryClient.getQueryData(authKeys.me)).toEqual(USER);
   });
+
+  it("clears the signed-out flag once the account is signed in", async () => {
+    markSignedOut();
+    mockSignup.mockResolvedValue(undefined);
+    mockLogin.mockResolvedValue(USER);
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useSignup(), { wrapper: Wrapper });
+
+    act(() => {
+      result.current.mutate({
+        fullName: "Ada",
+        email: "ada@example.com",
+        password: "pw",
+      });
+    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(isSignedOut()).toBe(false);
+  });
 });
 
 describe("useLogout", () => {
@@ -189,6 +276,63 @@ describe("useLogout", () => {
     expect(queryClient.getQueryData(STALE_FEED_KEY)).toBeUndefined();
     expect(queryClient.getQueryData(authKeys.me)).toBeNull();
     expect(push).toHaveBeenCalledWith("/login");
+  });
+
+  describe("the interceptor's signed-out flag", () => {
+    it("is set before the logout request is sent, and still set while it is pending", async () => {
+      const pending = deferred();
+      let flagWhenSent: boolean | undefined;
+      mockLogout.mockImplementation(() => {
+        flagWhenSent = isSignedOut();
+        return pending.promise;
+      });
+      const { Wrapper } = createWrapper();
+      const { result } = renderHook(() => useLogout(), { wrapper: Wrapper });
+
+      act(() => {
+        result.current.mutate();
+      });
+      await waitFor(() => expect(mockLogout).toHaveBeenCalled());
+
+      expect(flagWhenSent).toBe(true); // set by onMutate, ahead of the request
+      expect(isSignedOut()).toBe(true);
+      expect(push).not.toHaveBeenCalled(); // still waiting on the server
+
+      pending.resolve();
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    });
+
+    it("stays set after a successful logout, including the local sign-out in onSettled", async () => {
+      mockLogout.mockResolvedValue(undefined);
+      const { queryClient, Wrapper } = createWrapper();
+      const { result } = renderHook(() => useLogout(), { wrapper: Wrapper });
+
+      act(() => {
+        result.current.mutate();
+      });
+      await waitFor(() => expect(push).toHaveBeenCalledWith("/login"));
+
+      expect(result.current.isSuccess).toBe(true);
+      expect(queryClient.getQueryData(authKeys.me)).toBeNull();
+      expect(isSignedOut()).toBe(true);
+    });
+
+    it("is cleared again when the logout request fails, and onSettled does not set it back", async () => {
+      mockLogout.mockRejectedValue(new Error("network down"));
+      const { queryClient, Wrapper } = createWrapper();
+      const { result } = renderHook(() => useLogout(), { wrapper: Wrapper });
+
+      act(() => {
+        result.current.mutate();
+      });
+      // push runs in onSettled, which is after onError: wait for it so the
+      // whole callback chain has finished before looking at the flag.
+      await waitFor(() => expect(push).toHaveBeenCalledWith("/login"));
+
+      expect(result.current.isError).toBe(true);
+      expect(queryClient.getQueryData(authKeys.me)).toBeNull(); // still signed out locally
+      expect(isSignedOut()).toBe(false);
+    });
   });
 });
 
