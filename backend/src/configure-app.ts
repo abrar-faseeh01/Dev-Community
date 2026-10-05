@@ -3,6 +3,7 @@ import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
+import { configureBodyParsing } from './common/middleware/body-parsing';
 
 // Everything the app needs on top of AppModule to behave the way production
 // does: security headers, the cookie parser the JWT strategy reads from, the
@@ -10,9 +11,12 @@ import { ResponseInterceptor } from './common/interceptors/response.interceptor'
 // main.ts and the e2e tests both call this, so a test exercises exactly what
 // runs in production instead of a copy that can drift out of sync. CORS and
 // Swagger stay in main.ts — they only matter for a real listening server.
+// main.ts must call enableCors() BEFORE this, so that errors raised by the
+// body parsers below (413, 415, 400) still carry CORS headers.
 export function configureApp(app: INestApplication): void {
   app.use(helmet());
   app.use(cookieParser());
+  configureBodyParsing(app);
 
   app.useGlobalPipes(
     new ValidationPipe({
