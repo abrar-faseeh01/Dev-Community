@@ -1,6 +1,13 @@
+// The `reason` query value on /login that says the visitor was sent there
+// because their session ended (not because they never signed in). The
+// axios interceptor appends it; the login page reads it to show a notice.
+export const LOGIN_REASON_PARAM = "reason";
+export const LOGIN_REASON_SESSION_EXPIRED = "session-expired";
+
 export const ROUTES = {
   HOME: "/",
   LOGIN: "/login",
+  LOGIN_SESSION_EXPIRED: `/login?${LOGIN_REASON_PARAM}=${LOGIN_REASON_SESSION_EXPIRED}`,
   SIGNUP: "/signup",
   SETTINGS: "/settings",
   POSTS: "/posts",
