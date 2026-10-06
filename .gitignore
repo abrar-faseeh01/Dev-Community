@@ -5,3 +5,7 @@ CLAUDE.md
 PROJECT_REPORT.md
 docs/
 design/
+# Compose secrets
+.env
+!.env.example
+.vscode/
