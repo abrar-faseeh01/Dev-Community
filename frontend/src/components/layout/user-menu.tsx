@@ -51,7 +51,7 @@ export function UserMenu({ user }: { user: AuthUser }) {
       <div
         id="account-menu"
         role="menu"
-        className={`absolute right-0 top-[calc(100%+0.5rem)] w-64 origin-top-right overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900 shadow-lg transition-all duration-150 ease-out ${
+        className={`absolute right-0 top-[calc(100%+0.5rem)] w-64 max-w-[calc(100vw-2rem)] origin-top-right overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900 shadow-lg transition-all duration-150 ease-out ${
           open ? "visible scale-100 opacity-100" : "invisible scale-95 opacity-0"
         }`}
       >

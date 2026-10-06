@@ -76,7 +76,7 @@ export function FeedSortMenu() {
         id="feed-sort-menu"
         role="menu"
         aria-label="Sort posts"
-        className={`absolute left-0 top-[calc(100%+0.5rem)] z-10 w-44 origin-top-left overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900 shadow-lg transition-all duration-150 ease-out ${
+        className={`absolute right-0 top-[calc(100%+0.5rem)] z-10 w-44 max-w-[calc(100vw-2rem)] origin-top-right overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900 shadow-lg transition-all duration-150 ease-out ${
           open ? "visible scale-100 opacity-100" : "invisible scale-95 opacity-0"
         }`}
       >

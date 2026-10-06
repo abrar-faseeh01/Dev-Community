@@ -24,7 +24,7 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-10 border-b border-neutral-800 bg-neutral-950/95 backdrop-blur">
-      <div className="mx-auto flex h-16 max-w-5xl items-center gap-4 px-4 sm:px-6">
+      <div className="mx-auto flex h-16 max-w-5xl items-center gap-2 px-4 sm:gap-4 sm:px-6">
         <Link
           href={ROUTES.HOME}
           className="flex shrink-0 items-center gap-2 text-base font-bold tracking-tight text-white"
@@ -63,7 +63,7 @@ export function Header() {
           {canCreate && (
             <Link
               href={ROUTES.POSTS_CREATE}
-              className="rounded-lg bg-emerald-400 px-4 py-2 font-semibold text-neutral-950 transition-colors hover:bg-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-400/40"
+              className="hidden rounded-lg bg-emerald-400 px-4 py-2 font-semibold text-neutral-950 transition-colors hover:bg-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-400/40 sm:block"
             >
               Create Post
             </Link>
