@@ -1,20 +1,96 @@
 # Developer Community Platform
 
-I'm building a Developer Community Platform where members can authenticate, maintain a developer profile, publish posts, comment (threaded, with replies), react (like/dislike), and (eventually) search and browse ranked content. This repo is the v1.0.0 release candidate, the platform through Day 20 of my 20-day build plan (Day 20 is documentation and the demo only; no code changed). To run it, follow Getting started (two terminals) or Running with Docker Compose (one command). Days 1-12 are summarized in this paragraph; Days 13-17 (ranked and latest feeds, feed filters, full-text search, an AI post summarizer, and focused automated testing), Day 18 (session and security hardening: refresh tokens, `Secure` cookies, request limits) and Day 19 (the post purge job, and the Docker Compose setup with its release-candidate review) are in the Progress log below. Days 1-12: project foundations, authentication with role-based access, a full developer profile API and form, a Posts API with ownership, pagination, and admin moderation, the posts UI (infinite-scroll feed, post page, create/edit form), a threaded comments API (create, reply, list as a tree, cascade delete, and edit), and the comments UI itself (recursive reply/edit/delete, permission-gated, with full keyboard focus management), and the reaction engine on the backend (like/dislike on posts and comments with toggle behaviour, a unique index, and concurrency-safe counters; the reaction buttons with optimistic updates and a "who reacted" overlay are the Day 12 frontend on top of it). After Day 8 I also restructured the frontend into a feature-first layout (see the Day 8 section under Progress).
+A full-stack platform where developers sign up, keep a profile, publish posts, discuss them in threaded comments, and react to content. The NestJS API stores data in MongoDB, and a Next.js frontend consumes it. Admins moderate content, and every admin override is audit-logged and notified to the affected member. This repository is the v1.0.0 release candidate.
+
+**Features**
+
+- Authentication with roles (`admin` and `user`), httpOnly session cookies and refresh tokens
+- Developer profiles: headline, bio, skills, experience and portfolio projects
+- Posts with ownership, cursor pagination, soft delete and admin moderation
+- Threaded comments with replies, edit, and cascade delete
+- Like and dislike reactions with optimistic updates and a "who reacted" list
+- Top, Latest and Most Discussed feeds, with URL-driven sorting and full-text search
+- An AI post summarizer (a deterministic mock by default, Gemini optional)
+- An admin panel with a user list, an audit trail and in-app notifications
+- Swagger API docs, automated tests, and Docker Compose
+
+**API docs:** Swagger UI at `http://localhost:3000/docs` once the backend is running.
+
+## Table of contents
+
+- [Quick start (Docker)](#quick-start-docker)
+- [Stack](#stack)
+- [Project structure](#project-structure)
+- [Getting started (without Docker)](#getting-started)
+- [Running with Docker Compose](#running-with-docker-compose)
+- [Testing](#testing)
+- [Environment variables](#environment-variables)
+- [Backend overview](#backend-overview)
+- [Authentication and roles](#authentication-and-roles)
+- [API reference](#api-reference)
+- [Admin capabilities](#admin-capabilities)
+- [Frontend guide](#frontend-guide)
+- [Demo](#demo)
+- [Next improvements](#next-improvements)
+- [Known limitations](#known-limitations)
+- [Progress log](#progress)
+
+## Quick start (Docker)
+
+Needs only Docker with Compose v2, and ports 3000, 3001 and 27017 free. Use Chrome, Edge or Firefox. Details, cleanup and troubleshooting are in [Running with Docker Compose](#running-with-docker-compose).
+
+1. Create the root `.env` with two different JWT secrets of at least 32 characters. In PowerShell, from the repo root:
+
+   ```powershell
+   $rng = [Security.Cryptography.RandomNumberGenerator]::Create()
+   function New-Secret { $b = New-Object byte[] 36; $rng.GetBytes($b); [Convert]::ToBase64String($b) }
+   Set-Content -Path .env -Encoding ascii -Value @("JWT_SECRET=$(New-Secret)", "JWT_REFRESH_SECRET=$(New-Secret)")
+   ```
+
+   In a POSIX shell: `printf 'JWT_SECRET=%s
+JWT_REFRESH_SECRET=%s
+' "$(openssl rand -base64 36)" "$(openssl rand -base64 36)" > .env`
+
+2. Build and start (the first build takes several minutes):
+
+   ```bash
+   docker compose up -d --build
+   docker compose ps
+   ```
+
+3. Create the first admin (signup only creates regular members). Pass the credentials from the shell for this one command; do not put them in `.env`:
+
+   ```powershell
+   $env:ADMIN_FULLNAME = "Admin"
+   $env:ADMIN_EMAIL = "admin@example.com"
+   $env:ADMIN_PASSWORD = "<a strong password>"
+   docker compose run --rm --build seed
+   Remove-Item Env:ADMIN_FULLNAME, Env:ADMIN_EMAIL, Env:ADMIN_PASSWORD
+   ```
+
+| What | URL |
+|---|---|
+| Frontend | `http://localhost:3001` |
+| Backend API | `http://localhost:3000` |
+| Swagger docs | `http://localhost:3000/docs` |
+| Health check | `http://localhost:3000/health` |
+
+Use `localhost`, not `127.0.0.1`. To run both apps without Docker instead, see [Getting started](#getting-started).
+
 
 ## Stack
 
-- **Backend:** NestJS 12, MongoDB via Mongoose 9 (Atlas, or the `mongo:8` container in Docker Compose), class-validator/class-transformer, Passport-JWT, bcrypt, Swagger.
-- **Frontend:** Next.js 16 (App Router), React 19, TanStack Query, axios, Tailwind CSS v4.
+- **Backend:** NestJS 12, MongoDB via Mongoose 9 (Atlas, or the `mongo:8` container in Docker Compose), class-validator/class-transformer, Passport-JWT, bcrypt, Swagger, Jest.
+- **Frontend:** Next.js 16 (App Router), React 19, TanStack Query, React Hook Form, Zod, axios, Tailwind CSS v4, Jest and React Testing Library.
+- **Deployment:** Docker and Docker Compose (MongoDB 8, the backend and the frontend).
 
 ## Project structure
 
 - `backend/` — NestJS API (`src/<feature>/` modules: `auth`, `users`, `profiles`, `posts`, `comments`, `reactions`, `summarizer`, `audit`, `notifications`, `health`; shared code in `src/common/`).
 - `frontend/` — Next.js app, all source under `frontend/src/`: `app/` (thin routes), `features/<name>/` (auth, posts, comments, reactions, profile, users, audit, notifications, health), `services/api/` (the only code that calls the backend), `lib/`, `components/`, `hooks/`, `providers/`, `constants/`. The layout and data flow are described under Day 8 in Progress.
 - `compose.yaml` and `.env.example` (repo root) — Docker Compose for MongoDB, the backend and the frontend, plus a one-off `seed` service for the first admin. See Running with Docker Compose.
-- `docs/` — per-day spec and plan files and the PRD are kept locally and are not in the public repo; only `docs/demo-script.md` is published.
 - `docs/demo-script.md` — the 15-minute demo script (workflows, one failure scenario, two technical decisions).
-- `AI_USAGE.md` — how I used AI tooling on this project, and what I personally reviewed and caught.
+- `AI_USAGE.md` — how AI tooling was used on this project, and what was reviewed and caught by hand.
 
 ## Getting started
 
@@ -428,7 +504,7 @@ Tests are Jest and React Testing Library, next to the file they cover (`post-car
 
 ## Demo
 
-`docs/demo-script.md` is the script for the 15-minute demo: the primary workflows, one failure scenario, and the frontend and backend decisions I explain.
+`docs/demo-script.md` is the script for the 15-minute demo: the primary workflows, one failure scenario, and one frontend and one backend technical decision.
 
 ## Next improvements
 
@@ -444,6 +520,18 @@ If I carried on, in this order:
 8. **Transactions** (a replica set) around the admin-override audit write and the reaction-plus-counter write.
 
 ## Known limitations
+
+**Launch blockers: none found** (Day 19 release-candidate review). The ones that matter most for a real deployment:
+
+- The Docker setup runs over `http://localhost` only. A real deployment needs HTTPS and a matching `FRONTEND_ORIGIN`; Safari rejects `Secure` cookies over plain HTTP.
+- The refresh token is not rotated and there is no "log out everywhere" button; a copied access token stays valid for its 15 minutes.
+- Rate limits are per IP and `trust proxy` is not set, so behind a reverse proxy every client would share one bucket.
+- No email verification or password reset, and notifications are polled every 45 seconds rather than pushed.
+- A database outage gives `GET /posts` a 500 instead of a 503, and there is no per-request logging.
+- Not tested: Safari, real phone browsers, the Gemini provider, and the 03:00 purge job firing in the container.
+
+<details>
+<summary>Full list of known limitations, including the Day 19 review and the frontend error and loading states</summary>
 
 - No "log out everywhere" button. Logging out revokes that device's refresh token, and a password or credentials change revokes every other device's, but an access token someone has copied stays valid until its 15 minutes run out. Deleting an account ends its sessions at once, since every request re-reads the account from the database.
 - No in-app way to promote a user to admin — the only path is the one-time `seed:admin` script (under Docker, the `seed` service: `docker compose run --rm --build seed`) or a direct database edit.
@@ -528,7 +616,14 @@ These come from reading the frontend code for the Day 19 review; none is a launc
 - **A logout that fails on the network still signs the user out of the UI** and goes to `/login`, but the server session and cookies are untouched, so a reload signs them back in. This is from the code, not reproduced.
 - **No global error boundary.** `app/error.tsx` catches errors inside the pages; an error thrown by the root layout (the header, for example) would show Next's default error page, because there is no `global-error.tsx`.
 
+</details>
+
 ## Progress
+
+The day-by-day record of the 20-day build, kept for reference.
+
+<details>
+<summary>Progress log, Days 1 to 20</summary>
 
 ### Day 1 — Project setup and request lifecycle
 
@@ -827,3 +922,6 @@ Added on top of the Day 12 reaction interface: a line above the like/dislike but
 - Documentation only; no code, API, schema or Swagger change.
 - **README:** added the Backend overview (modules and database models), the Frontend guide (routing, forms, TanStack Query patterns, testing and Docker), a Demo pointer and a Next improvements list. Setup, environment variables, authentication, the API reference, Swagger, testing and Docker were already here from earlier days. I checked the environment variables against `env.validation.ts` and left those sections as they were.
 - **Demo script:** `docs/demo-script.md`, a 15-minute run with one failure scenario and one frontend and one backend decision to explain.
+- **Release:** `v1.0.0` is tagged only after mentor approval; that step is manual.
+
+</details>
