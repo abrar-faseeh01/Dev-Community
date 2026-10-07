@@ -391,6 +391,16 @@ This day is infrastructure, so the risk was a setup that looks fine on my machin
 
 **What's checked and what isn't.** From a fresh clone of `beta`: all three services healthy; backend lint, 360 unit tests and build; backend e2e 315 of 315 against the Compose Mongo; frontend lint, 624 tests and `next build`; and a curl pass over the cookie attributes, CORS, refresh, logout, authorization, the whole post, comment and reaction flow, validation and the 429, plus persistence across `down` and `up`, a stopped Mongo and a stopped backend. The images and the logs contain no secret. Not tested: Safari, real phone browsers, the Gemini provider, and the 03:00 purge job firing in the container; the port-conflict error message is reasoned from `compose.yaml`, not provoked. The known limitations are in the README.
 
+### Day 20 — Documentation, demo script and reflection
+
+Documentation only: no code, API, schema or Swagger change. I asked Claude Code to read the README, `PROJECT_REPORT.md`, the PRD and the schemas first, and to tell me what was missing or stale before it wrote anything. It found three real gaps: the README had no backend modules and database models section and no frontend guide (routing, forms, TanStack Query patterns); `PROJECT_REPORT.md` stopped at Day 12 and still said the token lasted two hours, that there was no refresh flow and that the feed had no sort or search; and the PRD status snapshot still said Phases 2 to 5 had not started.
+
+**What it wrote:** the two new README sections, a Next improvements list, a Day 20 progress entry, section 13 of the report (Days 13 to 19) with the stale limitations corrected, the status and risks in the PRD, and `docs/demo-script.md`. Its first draft of the README entry said it had "checked setup, authentication, the API reference and Docker against the code". It had only checked the environment variables against `env.validation.ts`, so I had the sentence narrowed to that. It also first named files in the report's "new files" list (a cookie helper, `configure-app.ts` request limits) that do not exist under those names; it checked the tree and corrected them to `common/middleware/body-parsing.ts` and the refresh logic in `auth/`. The README said the ER diagram covered all collections; it covers users, posts, comments and reactions only, and the wording now says so.
+
+**What I checked myself:** the demo script has to be run end to end before the demo, and I have not done that yet. The failure scenario (stop the backend, watch the status card, start it again) is written from the Day 19 verification and the Day 2 status card, and the exact wording on screen is mine to confirm. I tag `v1.0.0` only after my mentor approves.
+
+**Process slip, for the record.** My rule is that it never runs git commands. While editing the README it ran a `git status --short` to see whether the file had changed, without being asked. It was read-only and showed nothing I did not expect, and it reported it.
+
 ## Where this leaves me
 
 Nothing here shipped because it "looked right" on the first pass. Every
