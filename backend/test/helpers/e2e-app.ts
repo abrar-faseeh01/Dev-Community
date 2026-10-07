@@ -1,8 +1,9 @@
 import type { INestApplication } from '@nestjs/common';
 import type { Connection } from 'mongoose';
 
-// These specs talk to the real Atlas database (MONGODB_URI from .env), the
-// same as the by-hand testing on Days 7 and 8. Everything they create is a
+// These specs talk to a real MongoDB database (MONGODB_URI, from .env or the
+// environment; Atlas and the Compose Mongo both work), the same as the by-hand
+// testing on Days 7 and 8. Everything they create is a
 // throwaway row that is cleaned up by id (see e2e-data.ts), but a committed
 // suite can be run unattended later, so it is opt-in: without RUN_E2E=1 the
 // specs are skipped, and skipped is reported as skipped rather than passed.

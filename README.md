@@ -1,28 +1,33 @@
 # Developer Community Platform
 
-I'm building a Developer Community Platform where members can authenticate, maintain a developer profile, publish posts, comment (threaded, with replies), react (like/dislike), and (eventually) search and browse ranked content. This repo covers the platform through Day 17 of my 20-day build plan. Days 1-12 are summarized in this paragraph; Days 13-17 (ranked and latest feeds, feed filters, full-text search, an AI post summarizer, and focused automated testing) are in the Progress log below. Days 1-12: project foundations, authentication with role-based access, a full developer profile API and form, a Posts API with ownership, pagination, and admin moderation, the posts UI (infinite-scroll feed, post page, create/edit form), a threaded comments API (create, reply, list as a tree, cascade delete, and edit), and the comments UI itself (recursive reply/edit/delete, permission-gated, with full keyboard focus management), and the reaction engine on the backend (like/dislike on posts and comments with toggle behaviour, a unique index, and concurrency-safe counters; the reaction buttons with optimistic updates and a "who reacted" overlay are the Day 12 frontend on top of it). After Day 8 I also restructured the frontend into a feature-first layout (see the Day 8 section under Progress).
+I'm building a Developer Community Platform where members can authenticate, maintain a developer profile, publish posts, comment (threaded, with replies), react (like/dislike), and (eventually) search and browse ranked content. This repo covers the platform through Day 19 of my 20-day build plan. Days 1-12 are summarized in this paragraph; Days 13-17 (ranked and latest feeds, feed filters, full-text search, an AI post summarizer, and focused automated testing), Day 18 (session and security hardening: refresh tokens, `Secure` cookies, request limits) and Day 19 (the post purge job, and the Docker Compose setup with its release-candidate review) are in the Progress log below. Days 1-12: project foundations, authentication with role-based access, a full developer profile API and form, a Posts API with ownership, pagination, and admin moderation, the posts UI (infinite-scroll feed, post page, create/edit form), a threaded comments API (create, reply, list as a tree, cascade delete, and edit), and the comments UI itself (recursive reply/edit/delete, permission-gated, with full keyboard focus management), and the reaction engine on the backend (like/dislike on posts and comments with toggle behaviour, a unique index, and concurrency-safe counters; the reaction buttons with optimistic updates and a "who reacted" overlay are the Day 12 frontend on top of it). After Day 8 I also restructured the frontend into a feature-first layout (see the Day 8 section under Progress).
 
 ## Stack
 
-- **Backend:** NestJS 12, MongoDB Atlas via Mongoose 9, class-validator/class-transformer, Passport-JWT, bcrypt, Swagger.
+- **Backend:** NestJS 12, MongoDB via Mongoose 9 (Atlas, or the `mongo:8` container in Docker Compose), class-validator/class-transformer, Passport-JWT, bcrypt, Swagger.
 - **Frontend:** Next.js 16 (App Router), React 19, TanStack Query, axios, Tailwind CSS v4.
 
 ## Project structure
 
 - `backend/` — NestJS API (`src/<feature>/` modules: `auth`, `users`, `profiles`, `posts`, `comments`, `reactions`, `summarizer`, `audit`, `notifications`, `health`; shared code in `src/common/`).
 - `frontend/` — Next.js app, all source under `frontend/src/`: `app/` (thin routes), `features/<name>/` (auth, posts, comments, reactions, profile, users, audit, notifications, health), `services/api/` (the only code that calls the backend), `lib/`, `components/`, `hooks/`, `providers/`, `constants/`. The layout and data flow are described under Day 8 in Progress.
+- `compose.yaml` and `.env.example` (repo root) — Docker Compose for MongoDB, the backend and the frontend, plus a one-off `seed` service for the first admin. See Running with Docker Compose.
 - `docs/` — per-day spec and plan files, and a product requirements doc (local reference, not part of the public repo).
 - `PROJECT_REPORT.md` — a detailed architecture and decisions write-up of the system as it stands today.
 - `AI_USAGE.md` — how I used AI tooling on this project, and what I personally reviewed and caught.
 
 ## Getting started
 
+**Requirements:** Node.js 24 with npm, and a MongoDB database (an Atlas cluster, or use Docker Compose below, which brings its own). The Docker images run `node:24-slim` and I develop on Node 24.21.0. The version is pinned only in the two Dockerfiles: the repo has no `engines` field and no `.nvmrc`, so a local install is not checked.
+
 ### 1. Clone and install
 
 ```bash
-git clone git@github.com:abrar-faseeh01/Week-1_6Sense.git
-cd Week-1_6Sense
+git clone https://github.com/abrar-faseeh01/Dev-Community.git
+cd Dev-Community
 ```
+
+The repository is public, so the HTTPS URL needs no token to clone.
 
 ### 2. Backend
 
@@ -37,11 +42,12 @@ Create `backend/.env` (see `backend/.env.example`):
 MONGODB_URI=your_mongodb_connection_string
 PORT=3000
 JWT_SECRET=a_random_string_at_least_32_characters_long
-JWT_EXPIRES_IN=2h
+JWT_REFRESH_SECRET=a_different_random_string_at_least_32_characters_long
+JWT_EXPIRES_IN=15m
 FRONTEND_ORIGIN=http://localhost:3001
 ```
 
-`MONGODB_URI` and `JWT_SECRET` are required — the app fails fast at startup if either is missing, or if `JWT_SECRET` is under 32 characters (`backend/src/config/env.validation.ts`).
+`MONGODB_URI`, `JWT_SECRET` and `JWT_REFRESH_SECRET` are required — the app fails fast at startup if any is missing, if either secret is under 32 characters, or if the two secrets are equal (`backend/src/config/env.validation.ts`). Everything else has a default: `PORT` 3000, `JWT_EXPIRES_IN` (the access token) 15m, `JWT_REFRESH_EXPIRES_IN` 7d, `COOKIE_REFRESH_PATH` `/auth`, `COOKIE_SECURE` follows `NODE_ENV`, and `FRONTEND_ORIGIN` `http://localhost:3001` (it must be set when `NODE_ENV=production`).
 
 ```bash
 npm run start:dev
@@ -88,19 +94,138 @@ npm run dev
 
 The frontend runs on `http://localhost:3001`.
 
+## Running with Docker Compose
+
+`compose.yaml` at the repo root runs MongoDB, the backend and the frontend together, so nothing needs installing except Docker. It does not read `backend/.env` or `frontend/.env.local`: the backend's settings are in `compose.yaml` itself, and the two JWT secrets come from a `.env` file next to it. A one-off `seed` service (profile `tools`) creates the first admin.
+
+**Prerequisites:** Docker with Compose v2 (`docker compose`), internet access for the first build (base images from Docker Hub, and the frontend build downloads the Geist font from Google Fonts), and ports 3000, 3001 and 27017 free. Use Chrome, Edge or Firefox (see the limitations at the end of this section).
+
+### 1. Create the root `.env`
+
+The backend needs two secrets of at least 32 characters, and they must differ. In PowerShell, from the repo root, this writes them to `.env` without printing them:
+
+```powershell
+$rng = [Security.Cryptography.RandomNumberGenerator]::Create()
+function New-Secret { $b = New-Object byte[] 36; $rng.GetBytes($b); [Convert]::ToBase64String($b) }
+Set-Content -Path .env -Encoding ascii -Value @("JWT_SECRET=$(New-Secret)", "JWT_REFRESH_SECRET=$(New-Secret)")
+```
+
+In a POSIX shell: `printf 'JWT_SECRET=%s\nJWT_REFRESH_SECRET=%s\n' "$(openssl rand -base64 36)" "$(openssl rand -base64 36)" > .env`. `.env.example` shows the two keys; `.env` is git-ignored. Without them, `docker compose` refuses to start with "Set JWT_SECRET in the root .env".
+
+### 2. Build and start
+
+```bash
+docker compose up -d --build
+docker compose ps
+```
+
+The first build takes several minutes. When it is done, `docker compose ps` shows `mongo`, `backend` and `frontend` as `Up … (healthy)`; a start with the images already built takes about 15 to 30 seconds. The order is enforced: the backend waits for a healthy Mongo and the frontend waits for a healthy backend.
+
+| What | URL |
+|---|---|
+| Frontend | `http://localhost:3001` |
+| Backend API | `http://localhost:3000` |
+| Swagger docs | `http://localhost:3000/docs` |
+| Health check | `http://localhost:3000/health` |
+
+Use `localhost`, not `127.0.0.1`: the backend allows exactly the origin `http://localhost:3001`.
+
+### 3. Create the first admin
+
+Signup always creates a regular member, so the first admin comes from the `seed` service. Pass the credentials from the shell for this one command; do not put them in `.env`.
+
+```powershell
+$env:ADMIN_FULLNAME = "Admin"
+$env:ADMIN_EMAIL = "admin@example.com"
+$env:ADMIN_PASSWORD = "<a strong password>"
+docker compose run --rm --build seed
+Remove-Item Env:ADMIN_FULLNAME, Env:ADMIN_EMAIL, Env:ADMIN_PASSWORD
+```
+
+In a POSIX shell, put the three variables in front of the `docker compose run --rm --build seed` line instead. It prints `Admin created: <email>`. Running it again prints `Admin already exists … Nothing to do` and changes nothing. The script is `backend/scripts/seed-admin.ts`; it reads only `MONGODB_URI` (set by `compose.yaml`) and these three variables.
+
+### Stopping, resetting and cleaning up
+
+- `docker compose stop` stops the containers; `docker compose down` removes them. Both keep the database, because it lives in the named volume `devcommunity_mongo-data`. The services have no restart policy, so after a reboot run `docker compose up -d` again.
+- `docker compose down -v` also deletes that volume: every user, post and comment, and the seeded admin, are gone. Use it only to start from an empty database.
+- After a change to the code, run `docker compose up -d --build`. `NEXT_PUBLIC_API_URL` is a build argument of the frontend image (the browser reads it from the bundle), so changing it needs a rebuild of the frontend, not just a restart.
+- `down` does not remove everything. The Mongo image declares an anonymous volume for `/data/configdb`, and each time the Mongo container is recreated another one is left behind. `docker volume ls` lists them. `docker volume prune` removes unused anonymous volumes only (Docker 23 and later; it never touches `devcommunity_mongo-data` unless you add `-a`). `docker image prune` removes dangling images. The seed image is tagged, so `docker image prune` leaves it: remove it with `docker image rm devcommunity-seed` when you no longer need it.
+
+### Running the backend e2e specs against the Compose Mongo
+
+The e2e specs (`backend/test/*.e2e-spec.ts`) need a real database and are skipped unless `RUN_E2E=1`. With the stack up, run them from `backend/` against a separate database name so they cannot touch your data, and run them on their own (a run alongside other work on the same Mongo can exceed the 60-second hook timeout). With no `backend/.env`, the JWT secrets come from the process environment. In PowerShell:
+
+```powershell
+cd backend
+npm ci
+Get-Content ..\.env | ForEach-Object { if ($_ -match '^(JWT_SECRET|JWT_REFRESH_SECRET)=(.+)$') { Set-Item "env:$($Matches[1])" $Matches[2] } }
+$env:RUN_E2E = "1"
+$env:NODE_ENV = "test"
+$env:FRONTEND_ORIGIN = "http://localhost:3001"
+$env:MONGODB_URI = "mongodb://127.0.0.1:27017/devcommunity_e2e"
+npm run test:e2e
+```
+
+The specs clean up after themselves. To drop the database afterwards: `docker compose exec mongo mongosh --quiet --eval "db.getSiblingDB('devcommunity_e2e').dropDatabase()"`. Port 27017 is published on `127.0.0.1` only, for exactly this.
+
+### Ports, the project name and running two copies
+
+The project name (`devcommunity`) and the host ports 3000 (backend), 3001 (frontend) and 27017 (Mongo) are fixed in `compose.yaml`. Two checkouts therefore cannot run at the same time: they would share one project, one network and one database volume. The dev servers (`npm run start:dev`, `npm run dev`) use the same ports and must be stopped first, and a second copy needs a different `name:` as well as different ports.
+
+If a port is already taken, Docker refuses to start that container with a "ports are not available … bind" error, and the services that depend on it are not started. Nothing reads the ports from the environment, so you change `compose.yaml` itself. Change only the left-hand (host) side of a mapping, such as `"3002:3001"`:
+
+- A different frontend port also needs `FRONTEND_ORIGIN` to be the new browser URL (for example `http://localhost:3002`), because the backend allows exactly that one origin.
+- A different backend port also needs the `NEXT_PUBLIC_API_URL` build argument of the frontend to be the new browser URL (for example `http://localhost:3005`), and then `docker compose up -d --build`.
+- A different Mongo port only matters for tools on your machine, such as the e2e `MONGODB_URI` above.
+
+### Limits of the Compose setup
+
+- It works over `http://localhost` only. In production mode the backend forces `Secure` cookies and refuses `COOKIE_SECURE=false`. Chrome, Edge and Firefox accept `Secure` cookies from `http://localhost`; Safari rejects them over plain HTTP, so sign-in does not stick there. A real deployment needs HTTPS and a `FRONTEND_ORIGIN` that matches it.
+- `http://127.0.0.1:3001` does not work: the backend answers every origin with the `http://localhost:3001` origin, so the browser rejects it.
+- The summarizer runs on the built-in mock, because no Gemini key is passed through. Add `SUMMARIZER_PROVIDER` and `SUMMARIZER_API_KEY` to the backend's `environment:` in `compose.yaml` to use Gemini.
+- The rest of the list is under Known limitations, in the Day 19 subsection.
+
+## Testing
+
+Run each command from the app's own folder, after `npm ci` (or `npm install`). Nothing in this table needs Docker.
+
+| | Backend (`backend/`) | Frontend (`frontend/`) |
+|---|---|---|
+| Lint | `npm run lint` (oxlint on `src/` and `test/`) | `npm run lint` (eslint) |
+| Unit and component tests | `npm test` (Jest) | `npm test` (Jest and React Testing Library) |
+| Production build | `npm run build` (`nest build`) | `npm run build` (`next build`) |
+| End-to-end tests | `npm run test:e2e`, with `RUN_E2E=1` | none |
+
+At Day 19 that was 360 backend unit tests in 19 suites, 315 backend e2e tests in 17 suites, and 624 frontend tests in 60 suites, with lint and both builds clean.
+
+- **The unit tests need no database and no `.env`.** The backend's Jest runs with `--experimental-vm-modules` (the script sets it), so Node prints an "ExperimentalWarning: VM Modules" line; that is expected.
+- **The frontend build needs internet** (it downloads the Geist font from Google Fonts) and `NEXT_PUBLIC_API_URL` set, for example from `frontend/.env.local`. Without it the build still passes, but the bundle sends every request to the wrong origin.
+- **The e2e specs need a real MongoDB** and are skipped unless `RUN_E2E=1`; a skipped run says so and is not a pass. Outside Docker you need `MONGODB_URI` pointing at a database you can write to (an Atlas cluster, or the Compose Mongo as described under Running with Docker Compose), plus `JWT_SECRET` and `JWT_REFRESH_SECRET`, from `backend/.env` or from the shell (shell variables win over `backend/.env`). Use a database name of its own, such as `devcommunity_e2e`. The specs create throwaway users and delete everything they made; they never call Gemini (the mock summarizer is forced) and the purge job is off. In PowerShell:
+
+  ```powershell
+  cd backend
+  $env:RUN_E2E = "1"
+  $env:MONGODB_URI = "mongodb://127.0.0.1:27017/devcommunity_e2e"
+  npm run test:e2e
+  ```
+
+  In a POSIX shell, put `RUN_E2E=1 MONGODB_URI=… ` in front of `npm run test:e2e`.
+- **Run the e2e suite on its own.** It runs one file at a time (`maxWorkers: 1`) with a 60-second timeout per hook and test, and a run alongside other work against the same database can exceed that.
+
 ## Environment variables
 
 Real `.env` files are gitignored in both apps. Use the committed example files as the source of truth:
 
-- `backend/.env.example` — `MONGODB_URI`, `PORT`, `JWT_SECRET`, `JWT_EXPIRES_IN`, `FRONTEND_ORIGIN`, plus four optional summarizer settings: `SUMMARIZER_PROVIDER` (`mock` or `gemini`), `SUMMARIZER_API_KEY`, `SUMMARIZER_MODEL` (default `gemini-3.5-flash-lite`) and `SUMMARIZER_TIMEOUT_MS` (default 10000, allowed 1000-15000). With no key the app uses the built-in mock summarizer, so nothing needs configuring to run it. Three more optional settings control the post purge job (Day 19): `POST_PURGE_ENABLED` (default `true`), `POST_PURGE_RETENTION_DAYS` (whole days, 1-365, default 7) and `POST_PURGE_CRON` (a cron expression with 5 or 6 fields, default `0 3 * * *`, so every day at 03:00 server time). An invalid value, including a cron expression that doesn't parse, stops the app at startup.
+- `backend/.env.example` — `MONGODB_URI`, `PORT`, `NODE_ENV`, `JWT_SECRET`, `JWT_EXPIRES_IN`, `JWT_REFRESH_SECRET`, `JWT_REFRESH_EXPIRES_IN`, `COOKIE_SECURE`, `COOKIE_REFRESH_PATH`, `FRONTEND_ORIGIN`, the first-admin variables `ADMIN_FULLNAME`, `ADMIN_EMAIL` and `ADMIN_PASSWORD`, plus four optional summarizer settings: `SUMMARIZER_PROVIDER` (`mock` or `gemini`), `SUMMARIZER_API_KEY`, `SUMMARIZER_MODEL` (default `gemini-3.5-flash-lite`) and `SUMMARIZER_TIMEOUT_MS` (default 10000, allowed 1000-15000). With no key the app uses the built-in mock summarizer, so nothing needs configuring to run it. Three more optional settings control the post purge job (Day 19): `POST_PURGE_ENABLED` (default `true`), `POST_PURGE_RETENTION_DAYS` (whole days, 1-365, default 7) and `POST_PURGE_CRON` (a cron expression with 5 or 6 fields, default `0 3 * * *`, so every day at 03:00 server time). An invalid value, including a cron expression that doesn't parse, stops the app at startup.
 - `frontend/.env.example` — `NEXT_PUBLIC_API_URL`.
+- `.env.example` (repo root) — `JWT_SECRET` and `JWT_REFRESH_SECRET` for Docker Compose, which does not read the two files above. The first-admin variables `ADMIN_FULLNAME`, `ADMIN_EMAIL` and `ADMIN_PASSWORD` are read only by the seed script (`backend/.env.example` documents them).
 
 ## Authentication and roles
 
-- A JWT (`{sub, email, role}`) is issued on login and stored in an **httpOnly cookie** (`access_token`) — never in a client-readable form, and never sent as an `Authorization` header. The frontend's axios client sets `withCredentials: true`, so the browser attaches the cookie on every request.
+- A short-lived JWT (`{sub, email, role}`, 15 minutes by default) is issued on login and stored in an **httpOnly cookie** (`access_token`) — never in a client-readable form, and never sent as an `Authorization` header. A second httpOnly cookie, `refresh_token` (a separate JWT with its own secret, 7 days by default, sent only to the auth routes through `COOKIE_REFRESH_PATH`, default `/auth`), lets the frontend get a new access token from `POST /auth/refresh` when the first one expires, without asking the user to sign in again. Only a hash of each refresh token is stored, per device (up to 5 devices; a sixth login signs out the oldest), and logging out revokes that device's token. Both cookies are `SameSite=Lax`, and `Secure` follows `NODE_ENV` (on in production, where `COOKIE_SECURE=false` is rejected). The frontend's axios client sets `withCredentials: true`, so the browser attaches the cookies on every request.
 - Roles are `admin | user`. Every signup is hard-coded to `role: "user"` server-side — there's no field a client can send to self-promote.
-- Every route requires a valid session by default; only routes explicitly marked `@Public()` (signup, login, logout, health) skip that check.
-- `PATCH /auth/me` (change your own password, full name, or — admin-only — email) always re-verifies your current password before applying any change, and re-issues a fresh cookie on success.
+- Every route requires a valid session by default; only routes explicitly marked `@Public()` (signup, login, refresh, logout, health, and the public reads of posts, comments and reactions) skip that check.
+- `PATCH /auth/me` (change your own password, full name, or — admin-only — email) always re-verifies your current password before applying any change, and re-issues both session cookies on success. Every other device's refresh token is revoked, so those devices are signed out once their access token expires.
 
 ## API reference
 
@@ -118,8 +243,9 @@ Every response follows one shape: `{success: true, data}` on success, or `{succe
 | Method & path | Access | Notes |
 |---|---|---|
 | `POST /auth/signup` | Public | Throttled |
-| `POST /auth/login` | Public | Sets the session cookie; throttled |
-| `POST /auth/logout` | Public | Clears the cookie; always succeeds |
+| `POST /auth/login` | Public | Sets the `access_token` and `refresh_token` cookies; throttled (5 a minute per IP) |
+| `POST /auth/refresh` | Public (needs the `refresh_token` cookie) | Sets a new `access_token` cookie; the refresh token is not rotated. A missing, invalid, expired or revoked token is a `401` and clears both cookies; throttled (20 a minute per IP) |
+| `POST /auth/logout` | Public | Clears both cookies and revokes this device's refresh token; always succeeds |
 | `GET /auth/me` | Authenticated | Current user, read fresh from the database |
 | `PATCH /auth/me` | Authenticated | Change password / full name / (admin-only) email; requires `currentPassword` |
 
@@ -146,9 +272,10 @@ An admin acting on someone else's profile through any of the write routes above 
 |---|---|---|
 | `POST /posts` | Regular members only | Author is always the caller, never client-supplied. An admin gets `403` — admins moderate but don't author |
 | `GET /posts` | Public | Cursor-paginated feed; `?limit=` (1-50, default 10), `?cursor=`, optional `?authorId=` (one author's posts, used by "Posts made by you"), and `?sort=latest\|top\|discussed` (default `latest`) |
+| `GET /posts/search` | Public | Full-text search of titles and bodies: `?q=` (required, 1-100 characters) and `?limit=` (1-20); returns `{items, hasMore}`; throttled (40 a minute per IP) |
 | `GET /posts/:id` | Public | A soft-deleted post 404s the same as a nonexistent one |
 | `PATCH /posts/:id` | Owner or admin | Partial update — at least one of `title`/`body` required |
-| `DELETE /posts/:id` | Owner or admin | Soft delete (`deletedAt`) — excluded from every read path afterward, never hard-deleted |
+| `DELETE /posts/:id` | Owner or admin | Soft delete (`deletedAt`) — excluded from every read path afterward, and hard-deleted by the purge job once it has been deleted for 7 days (Day 19) |
 | `POST /posts/:id/summarize` | Any signed-in user, admins included | Returns `{summary, tags, truncated, source}` (`source` is `mock` or `gemini`). `422` for a body under 200 characters, `400`/`404` for a bad or missing/soft-deleted post, `429` over 10 a minute per IP, `502`/`503`/`504` when the summarizer returns something unusable, is unavailable, or times out. Nothing is stored |
 
 The list response shape is `{items, nextCursor}` — pass the previous response's `nextCursor` as `?cursor=` to get the next page; `nextCursor: null` means there are no more posts. Every write on `PATCH`/`DELETE` uses optimistic concurrency: a genuine conflicting concurrent edit returns `409`, never a silent overwrite. An admin editing or deleting someone else's post is audit-logged (identifying the specific post, not just the author) and the author is notified; a self-edit or self-delete produces neither.
@@ -215,8 +342,8 @@ Every admin-override action creates one audit-log entry (who, what changed, befo
 
 ## Known limitations
 
-- No session revocation / "log out everywhere" — a JWT stays valid until it expires. The one exception: deleting an account immediately kills its sessions, since every request re-reads the account from the database.
-- No in-app way to promote a user to admin — the only path is the one-time `seed:admin` script or a direct database edit.
+- No "log out everywhere" button. Logging out revokes that device's refresh token, and a password or credentials change revokes every other device's, but an access token someone has copied stays valid until its 15 minutes run out. Deleting an account ends its sessions at once, since every request re-reads the account from the database.
+- No in-app way to promote a user to admin — the only path is the one-time `seed:admin` script (under Docker, the `seed` service: `docker compose run --rm --build seed`) or a direct database edit.
 - No pagination on the admin user list, the audit log, or the notification list.
 - No email verification on signup and no password-reset flow.
 - Notifications are polled (every 45 seconds while the app is open and the tab is visible), not pushed in real time.
@@ -229,14 +356,14 @@ Every admin-override action creates one audit-log entry (who, what changed, befo
 - `frontend/src/middleware.ts` still uses Next.js 16's deprecated `middleware` name (the current name is `proxy`); it works, and the rename is deliberately left as its own change.
 - Soft-deleted posts are hard-deleted by a scheduled job once they have been deleted for 7 days (Day 19; see its entry under Progress). There is no restore path, so the 7 days is only a safety net for someone with database access. The job's limitations are listed with that entry.
 - Admin-override actions (profile edits, post edits/deletes) aren't wrapped in a database transaction — if the audit-log/notification write fails after the underlying change already saved, the change persists with no audit trail. Not yet hit in practice; the guard that does fire (optimistic concurrency on a genuine conflicting edit) correctly returns `409`, not `500`.
-- No structured server-side logging for unexpected (non-`HttpException`) errors — the global exception filter returns a generic 500 to the client without logging the real error anywhere, which would make a genuine production bug hard to diagnose from logs alone.
+- Server errors are logged thinly. For any response with a status of 500 or above, the global exception filter writes one line, `METHOD path -> status ErrorName`, plus the error's `code` when it has one. It deliberately leaves out the message, the stack, the query string and the body, because a driver's message can hold user data (a duplicate-key error quotes the email), and the client gets a generic message for an unexpected error. A genuine production bug therefore usually has to be reproduced, since the log names the error type but not its cause. There is no per-request logging.
 - `GET /posts/:postId/comments` returns the whole tree with no pagination, so the response is unbounded on a very active post.
 - Editing a comment keeps no history — only the current body is stored, and the "edited" signal is just `createdAt` differing from `updatedAt`.
 - A reply created at the exact instant a concurrent delete cascades past it can end up live under a deleted parent: invisible in the tree but still counted, so `commentCount` can read one higher than what's shown. The count itself isn't wrong; fixing this fully needs multi-document transactions, which this backend doesn't have configured.
 - Two deletes of the same comment subtree that truly overlap can each return a partial `deletedCount`, though the total decrement to `commentCount` is always exact (measured by forcing six simultaneous deletes together 25 times).
 - When a post's own author removes someone else's comment, there's no audit entry and the comment's author isn't told — only an admin's removal is logged.
 - No notification yet when someone comments or replies on a post.
-- No rate limiting on comment routes yet (planned for the security-hardening day).
+- The comment routes have no route-specific rate limit. Only the global default applies: 100 requests a minute per IP, counted separately for each route.
 - Deleting a user account doesn't yet remove or reassign their comments — they still show up, with the author shown as "Deleted user".
 - Reactions from a deleted account stay in the database and keep counting toward the counters; nothing removes them. Reactions on a soft-deleted post and on its comments stay for the 7 days before the purge job removes them with the post; reactions on a comment that was soft-deleted on its own, under a post that is still live, are never removed.
 - The reaction row and its counter are two separate writes with no transaction, so a server crash between them can leave a counter one off. A counter whose update fails while the server is running is repaired by a recount from the reaction rows; a crash is not.
@@ -260,16 +387,50 @@ Every admin-override action creates one audit-log entry (who, what changed, befo
 - On Gemini's free tier, Google may use submitted content to improve its products. Only a post's title and body are sent, never the author or the caller, but those are still sent.
 - Leaving the page while a summary is being generated discards the result on the client, but the server call still completes and still counts against the quota.
 - The frontend splits the summary into bullets by sentence ends, so an abbreviation such as "e.g. " ends up as two bullets. The API sends the summary as one plain string, and I kept that contract rather than change the backend for the layout.
-- The 5-a-minute limit on signup and login is not covered by any automated test. The e2e app replaces the throttler's storage with one that never counts, so a `429` cannot be provoked there; I only checked it by hand. Day 18 revisits the limits.
-- The e2e login test checks the cookie's `HttpOnly`, `SameSite=Lax` and `Max-Age` flags but not `Secure`, because the controller sets `secure: false` for local http. Production needs `secure: true` (Day 18).
+- At Day 17 the 5-a-minute limit on signup and login was not covered by any automated test: the shared e2e app replaces the throttler's storage with one that never counts, so a `429` could not be provoked there, and I had only checked it by hand. Day 18 added `test/rate-limits.e2e-spec.ts`, which runs its own app with the real throttler and covers the `429` on login, signup, refresh, credential changes, search and summarize.
+- At Day 17 the e2e login test checked the cookie's `HttpOnly`, `SameSite=Lax` and `Max-Age` flags but not `Secure`, because the controller then set `secure: false` for local http. Since Day 18 `Secure` follows `NODE_ENV` (on in production, and `COOKIE_SECURE=false` is rejected there), and `test/cookies-secure.e2e-spec.ts` covers it on login, refresh, credential changes and logout.
 - A summarize request that times out and being offline look the same to the frontend (both arrive with no HTTP status), so one message covers both. A summarizer that is slow, as opposed to the server being unreachable, comes back as the server's own `504` and gets its own message.
+
+### Docker release candidate (Day 19)
+
+**Launch blockers: none found** (final check from a fresh clone of `beta`, 2026-10-06; written up 2026-10-07). Everything below is a known limitation, with its impact and a workaround.
+
+- **HTTP on localhost only.** Compose runs the backend in production mode, which forces `Secure` cookies. Chrome, Edge and Firefox accept them from `http://localhost`; Safari rejects them over plain HTTP, so sign-in does not stick there. `http://127.0.0.1:3001` is blocked by CORS: the backend answers every origin with the `http://localhost:3001` origin, so a browser on any other origin rejects the response. Workaround: use `http://localhost:3001` in Chrome, Edge or Firefox. A real deployment needs HTTPS and a matching `FRONTEND_ORIGIN`.
+- **The summarizer is the mock in Compose.** No Gemini key is passed through, so summaries are the extractive mock ones (`source: mock`). Workaround: add `SUMMARIZER_PROVIDER` and `SUMMARIZER_API_KEY` to the backend's `environment:` in `compose.yaml`.
+- **No per-request logging.** Neither service logs a line per request; the backend logs startup and server errors, the frontend its start. Impact: harder to see what happened when debugging. No workaround yet.
+- **`POST /auth/refresh` re-issues only the access cookie.** The refresh token is not rotated, which matches the Swagger text. Impact: a stolen refresh token stays usable for its 7 days unless the user logs out.
+- **Signup does not sign the user in, and a duplicate signup says so.** A second signup with the same email returns `409 Email already in use`, which reveals that an email is registered; login gives the same `401` for an unknown email and a wrong password. The frontend signs the new user in with a login call right after signup. Workaround: none needed for this project's scope.
+- **Logout does not revoke the access token.** It revokes the refresh token and clears both cookies, but an access token someone copied earlier stays valid until its 15-minute JWT expires.
+- **A database outage gives `GET /posts` a 500.** It logs a raw `MongoServerSelectionError` instead of returning 503, while `GET /health` correctly returns 503. The backend reconnects on its own about 13 seconds after Mongo returns, with no restart.
+- **Docker flags the backend unhealthy only about a minute after Mongo goes away** (5 failed checks, 15 seconds apart). `/health` itself turns 503 within seconds.
+- **Ports 3000 and 3001 are published on all interfaces.** Mongo is bound to `127.0.0.1` only. Anything on the same network can reach the app. Workaround: put `127.0.0.1:` in front of those two mappings in `compose.yaml`.
+- **Rate limits are per IP.** Login is 5 a minute (a 429 with `Retry-After: 60`), so clients behind one host or NAT share a bucket.
+- **Fixed project name and ports.** `devcommunity` and 3000, 3001 and 27017 cannot be changed without editing `compose.yaml` (see Running with Docker Compose). Two checkouts cannot run together.
+- **Leftovers accumulate.** `docker compose down` does not remove the anonymous `/data/configdb` volumes, the tagged seed image, or a stale `:build` image tag from a manual build. Workaround: the cleanup commands in Running with Docker Compose.
+- **Backend e2e can time out under load.** Run alongside other work that hits the same Mongo, the first spec can exceed its 60-second hook timeout. It did not reproduce on a cold clone (315 of 315 passed in 87 seconds), so run it alone.
+- **`npm audit` reports 29 backend and 27 frontend vulnerabilities** (one critical on each side). I have not investigated them.
+- **`next build` prints the `middleware` to `proxy` deprecation warning.** The rename is deliberately left for a change of its own.
+- **Responsive.** Below the `sm` breakpoint the Create Post button is hidden from the header (it is in the avatar menu). At 320px the search box is about 58px wide and the signed-out header is tight. The Admin Users and Audit log tables scroll sideways inside their container, so on a phone the last column (Edit and Delete, View details) needs a sideways scroll.
+- **Not tested:** Safari, real phone browsers, the Gemini provider, and the 03:00 purge job firing in the container.
+
+### Frontend error and loading states (release-candidate review)
+
+These come from reading the frontend code for the Day 19 review; none is a launch blocker. They have not been reproduced in a browser unless it says so.
+
+- **Not every load error has a Retry button.** The feed, the post page, the edit page, "Posts made by you", search results, the comments and the reactor lists do. The profile view, the two profile edit pages, Admin Users, the Audit log and the notification list show the error and nothing else. Workaround: reload the page.
+- **"Request failed" when the server cannot be reached.** The API client's fallback message, used when there is no response at all, is shown as-is by the login, signup and settings forms, the profile pages, Admin Users, the Audit log, the notification list and the System Status card. The feed, the post page, the comments, reactions and the summarizer map it to "Couldn't reach the server…" instead. Workaround: none; the wording is the only problem.
+- **Other server messages are shown unchanged too.** A `429` from login, signup or a credential change reads `ThrottlerException: Too Many Requests` in the form's error banner (that is the throttler's default message, and the API returns it for the `429`; only the summarizer maps its own `429`).
+- **A failed `GET /auth/me` of any kind makes a signed-in user look signed out.** The call treats every failure (a `429`, a 5xx or no response) as "nobody is signed in", and the answer is cached until the page is reloaded, so protected pages send the user to `/login` even though the session is still valid. Workaround: reload once the server is back.
+- **Signup is two calls, signup and then login.** If the second fails (for example with a `429` on login), the account exists but the page shows an error, and signing up again with the same email returns `409`. Workaround: sign in with the new account.
+- **A logout that fails on the network still signs the user out of the UI** and goes to `/login`, but the server session and cookies are untouched, so a reload signs them back in. This is from the code, not reproduced.
+- **No global error boundary.** `app/error.tsx` catches errors inside the pages; an error thrown by the root layout (the header, for example) would show Next's default error page, because there is no `global-error.tsx`.
 
 ## Progress
 
 ### Day 1 — Project setup and request lifecycle
 
 - Set up the NestJS backend with Zod-validated environment configuration.
-- Connected MongoDB Atlas through Mongoose.
+- Connected MongoDB through Mongoose (I used Atlas for development; Day 19 adds a local `mongo:8` container for Docker Compose).
 - Added the `health` module and `GET /health`.
 - Set up Next.js with the App Router and connected the frontend to the health check.
 - Added `.env.example` for both apps.
@@ -311,7 +472,7 @@ Every admin-override action creates one audit-log entry (who, what changed, befo
 - Added the `Post` schema (`authorId`, `title`, `body`, `likeCount`/`dislikeCount`/`commentCount` as denormalized placeholders for Day 9/11, `deletedAt`) with optimistic concurrency, and built `PostsModule`: create, cursor-paginated list, detail, update, and soft delete.
 - Pagination is cursor-based on `_id` alone (revised from an initial `{createdAt, _id}` design after `.explain()` showed the original shape couldn't get tight index bounds); the feed index is `{deletedAt: 1, _id: -1}`, confirmed via `.explain()` to produce a tight range scan rather than a full collection scan.
 - `PATCH`/`DELETE /posts/:id` reuse the existing owner-or-admin authorization pattern, extended so an admin editing or deleting someone else's post is audit-logged (the audit entry identifies the specific post, not just the author) and the author is notified — the same `recordAdminOverride` helper now used by profiles, users, and posts.
-- Verified against a real MongoDB Atlas database throughout: forced genuine optimistic-concurrency conflicts via concurrent requests (confirmed `409`, never `500`), traced actual queries to confirm the list endpoint doesn't do N+1 author lookups (one batched query regardless of page size), and confirmed list/detail responses never expose `passwordHash` or `email` on the author.
+- Verified against a real MongoDB database (Atlas at the time) throughout: forced genuine optimistic-concurrency conflicts via concurrent requests (confirmed `409`, never `500`), traced actual queries to confirm the list endpoint doesn't do N+1 author lookups (one batched query regardless of page size), and confirmed list/detail responses never expose `passwordHash` or `email` on the author.
 - Added full Swagger/OpenAPI documentation across every existing module (auth, users, profiles, posts, audit, notifications) — not just health, which was all that existed before — including a cookie-based auth scheme matching this app's actual httpOnly-cookie transport.
 
 ### Day 8 — Feed and reusable post interface
@@ -357,7 +518,7 @@ frontend/src/
 **Decisions worth knowing.**
 
 - The current user lives in the TanStack Query cache (`useAuth()` returns `{user, loading}`); login, signup, logout, and settings update it directly. There is no separate auth context provider.
-- The axios interceptor turns every failure into an `ApiError` (message, per-field errors, HTTP status) and redirects to `/login` on a `401`, except for requests that set `skipAuthRedirect` (`/auth/me`, `/auth/login`, `/auth/signup`, where a `401` is expected). The exemption is a flag on the request rather than a URL list inside the interceptor.
+- The axios interceptor turns every failure into an `ApiError` (message, per-field errors, HTTP status) and redirects to `/login` on a `401`, except for requests that set `skipAuthRedirect` (`/auth/me`, `/auth/login`, `/auth/signup`, where a `401` is expected). The exemption is a flag on the request rather than a URL list inside the interceptor. (That is the Day 8 behaviour. Since Day 18 a `401` on a protected call first starts one shared `POST /auth/refresh` and repeats the request once; only a refresh that fails sends the visitor to `/login?reason=session-expired`. Login, signup and the refresh call itself are never retried.)
 - Forms use React Hook Form with Zod schemas kept in `features/<name>/schemas/`, and form types come from the schema. The settings form moved from plain state to this pattern, so its errors now appear inline instead of as browser pop-ups.
 - Every route is referenced through `constants/routes.ts` instead of typed as a string.
 - An ESLint rule fails the lint if a page or component imports `axios` or anything under `services/`, so the data flow above can't quietly erode.
@@ -466,7 +627,7 @@ Added on top of the Day 12 reaction interface: a line above the like/dislike but
 - A `Summarizer` interface has two implementations, chosen from env at startup and logged once: a deterministic extractive mock, used whenever no key is set (or `SUMMARIZER_PROVIDER=mock`), and a thin Gemini client using native `fetch` and `AbortSignal.timeout`, so the timeout also cancels the upstream request. The mock always returns at least one tag (`general` when no keyword matches), because zero valid tags counts as malformed. I checked the Gemini request and response shape against Google's current Interactions API docs before relying on it. The default model is `gemini-3.5-flash-lite`; changing only `SUMMARIZER_MODEL` switches it.
 - Whatever a provider returns is validated by one Zod schema before it reaches the client: a summary of 1-600 characters and tags that are checked one by one. A bad tag is dropped, duplicates collapse case-insensitively, and the list is cut to 5; the response only fails if the summary is unusable or no valid tag remains.
 - Errors use the existing envelope with generic messages (upstream text goes to the log only): `504` timeout, `502` malformed output, `503` unavailable or upstream rate limit, `422` body under 200 characters. A body over 8000 characters is truncated and flagged rather than rejected. Unexpected provider errors are now logged by the service before they become a bare `500`.
-- Only the post's title and body are loaded (`select('title body')`) and sent: the author, the caller and every other field never reach the summarizer. `@Throttle` is 10 requests a minute per IP, on a judgment call; Day 18 revisits it.
+- Only the post's title and body are loaded (`select('title body')`) and sent: the author, the caller and every other field never reach the summarizer. `@Throttle` is 10 requests a minute per IP, on a judgment call; reviewed on Day 18 and kept at 10 per minute.
 - Tests: unit tests for the output schema, the mock (including its determinism and the no-keyword fallback), the Gemini client against a stubbed `fetch` (success, timeout, malformed, 5xx/429, request contents), the service (length rules, payload, error mapping) and provider selection; 10 e2e cases against the real database, with the mock forced even if a key is in `.env`. Full backend unit suite: 246 tests, 14 suites, plus `tsc --noEmit`. Automated tests never call the real Gemini API; I checked that once by hand with a real key, along with the `429` throttle and the route's Swagger entry. No frontend changes in this entry.
 
 ### Day 16 (frontend) — Post summarizer UI
@@ -507,7 +668,24 @@ Added on top of the Day 12 reaction interface: a line above the like/dislike but
 | Reactions, ranking | toggle, unique index, concurrency; ranking function and feed (earlier days) | pass |
 | Frontend schemas | login, signup, update-credentials, profile and portfolio rules | pass |
 | Frontend forms | field errors, disabled while pending, server error, redirect; integration through the real hook | pass |
-| Rate limiting | 429 on signup and login | not covered (see Known limitations) |
+| Rate limiting | 429 on signup and login | not covered at Day 17; Day 18 added `rate-limits.e2e-spec.ts` |
+
+### Day 18 — Security and session hardening
+
+- **Sessions:** login now issues a 15-minute access token (the `access_token` cookie) and a 7-day refresh token (the `refresh_token` cookie), signed with its own `JWT_REFRESH_SECRET`. `POST /auth/refresh` renews the access token. Only a SHA-256 hash of each refresh token is stored, up to 5 per user (a sixth login evicts the oldest); logout revokes only that device's token and always succeeds; a credential change (`PATCH /auth/me`) signs out every other device. The refresh token is not rotated, so two tabs refreshing together cannot invalidate each other, and there is no reuse detection.
+- **Cookies:** one options helper sets and clears both cookies, because a browser only drops a cookie when the clear names the same path. The refresh cookie is scoped to `COOKIE_REFRESH_PATH` (default `/auth`), so it is sent only to the auth routes. The access cookie lives as long as the refresh token has left, so the Next middleware (which only checks that the cookie exists) does not send a user with an expired access token to `/login` before the refresh can run. `SameSite=Lax` is fixed, and `Secure` follows `NODE_ENV`.
+- **Environment:** new or changed settings are `JWT_EXPIRES_IN` (now 15m by default), `JWT_REFRESH_SECRET` (32 or more characters, different from `JWT_SECRET`), `JWT_REFRESH_EXPIRES_IN` (7d), `NODE_ENV`, `COOKIE_SECURE` (on by default in production, refused as off there) and `COOKIE_REFRESH_PATH`. `FRONTEND_ORIGIN` must now be an exact origin and is required in production. An existing `backend/.env` needs `JWT_REFRESH_SECRET`, or the app no longer starts.
+- **Request bodies:** JSON only, 100 kb. A non-JSON body is a `415`, an oversized one a `413`, and malformed JSON a `400` with a fixed "Malformed JSON body" message, because Node's own parse error quoted part of the body, including password text. CORS is registered before body parsing, so these rejections still carry CORS headers. The exception filter answers any other non-`HttpException` 4xx error with a generic message and logs a 5xx as name, code, method and path only.
+- **Rate limits:** `POST /auth/refresh` is new at 20 a minute per IP. Signup and login stay at 5, `PATCH /auth/me` at 10, search at 40 and summarize at 10; the search and summarize limits were reviewed and kept. Every other route falls under the global default of 100 a minute per IP. `test/rate-limits.e2e-spec.ts` keeps the real throttler and checks the `429`, its failure envelope and `Retry-After` on login, signup, refresh, credential changes, search and summarize.
+- **Frontend:** on a `401` the axios interceptor starts one shared `POST /auth/refresh`, then retries the original request exactly once. Concurrent failures cost one refresh, and a late `401` from an older request is only retried. A refresh that returns `401` ends the session with a single redirect to `/login?reason=session-expired`; a `429`, a 5xx or a network error on the refresh does not log the user out. Login, signup and the refresh call itself never trigger a refresh. The login page shows a status notice only for that exact reason and never renders text from the URL.
+- **After Day 18, a logout fix:** a normal logout was reported as an expired session. Logout resets the query cache, which refetches the queries that are mounted; the notification bell polls a protected route and was still mounted, so once the cookies were cleared it got a `401`, the refresh got a `401` too, and the interceptor redirected to `/login?reason=session-expired`. `useLogout` now marks the session as signed out before it sends the request (and clears the mark if the request fails), login and signup clear it before the cache reset, and while it is set the interceptor does not refresh, retry or redirect. The mark is read in three places, including after a refresh succeeds and inside the redirect, so a refresh that was already running at sign-out cannot send the visitor to `/login`. The post purge job added after Day 18 is under Day 19 below.
+- **Tests:** backend `test/refresh.e2e-spec.ts`, `test/cookies-secure.e2e-spec.ts`, `test/request-limits.e2e-spec.ts` and `test/rate-limits.e2e-spec.ts`, plus more cases in `auth.service.spec.ts`, `env.validation.spec.ts` and the exception filter spec. The e2e app helper gained a `realThrottler` option, and the OpenAPI snapshot changed on purpose (the refresh route, the cookies, the 413 and 415 rules and the search `429`). Frontend: `lib/axios/interceptors.test.ts` (including 8 cases for the signed-out mark and a sign-out while a refresh is in flight, in both outcomes), the session-expired notice, the middleware, and 7 hook tests plus an integration test that reproduces the logout bug with a mounted bell.
+- **Known limitations:**
+  - A user can have 5 sessions at once; the sixth login signs the oldest device out, and that device's next refresh fails.
+  - There is no refresh-token rotation and no reuse detection: a stolen refresh token works until it expires (7 days), is logged out, or is evicted.
+  - Throttling is per IP, and `trust proxy` is not set, so behind a reverse proxy every client would share one bucket.
+  - A signed-out visitor costs one failing `GET /auth/me` and one failing `POST /auth/refresh` on each page load.
+  - `useCurrentUser` treats every failure of `GET /auth/me` as "signed out", so a `429`, a 5xx or a network error during a page load shows a signed-in user as signed out until the page is reloaded.
 
 ### Day 19 — Post purge job (scheduled hard delete)
 
@@ -532,3 +710,11 @@ Added on top of the Day 12 reaction interface: a line above the like/dislike but
   - If a reaction or comment delete fails part-way, the posts are still there and the next run retries the whole batch.
   - The purge writes no audit entry or notification; it only logs the counts. Audit logs are for admin overrides, and they are never purged. A `delete_post` audit entry keeps the post's id and title as plain values in `previousState`, so after a purge that id no longer points at anything.
   - There is no restore, so the 7 days is only a safety net for someone with database access.
+
+### Day 19 — Docker Compose and release-candidate review
+
+- **What it adds:** `compose.yaml` runs MongoDB 8, the backend and the frontend, plus a one-off `seed` service (profile `tools`) that creates the first admin. A multi-stage `backend/Dockerfile` and `frontend/Dockerfile` (Next.js `output: "standalone"`) build the images on `node:24-slim`; both run as the non-root `node` user. The backend waits for a healthy Mongo and the frontend waits for a healthy backend; each has a health check that uses `node -e fetch(...)`, since the slim image has no curl. Setup is in the README section Running with Docker Compose. No API, schema or Swagger change.
+- **Configuration:** the backend's settings are in `compose.yaml`; the two JWT secrets come from a root `.env` and `docker compose` fails fast if either is missing. `NEXT_PUBLIC_API_URL` is a build argument (`http://localhost:3000`, the browser's address for the API, not the service name), and the frontend Dockerfile fails the build if it is empty.
+- **Responsive fix:** at 375px the signed-in header, the feed's sort menu and the account menu overflowed the screen. Create Post is now hidden below `sm` (it is also in the avatar menu), and both dropdowns are anchored to their button's right edge with a width cap. Measured in a real 375px viewport before and after: page width now equals the viewport at 375, 360, 320, 768 and 1280, with both menus closed and open.
+- **Verified from a fresh clone of `beta`:** all three services healthy; backend lint, 360 unit tests and build; backend e2e 315 of 315 (17 suites) against the Compose Mongo; frontend lint, 624 tests (60 suites) and `next build`. By curl: cookie attributes, CORS, login, refresh and logout, authorization, the post, comment and reaction flow, validation (including a 413), and the 429 with `Retry-After`. Persistence across `down` and `up`, Mongo stopped and restarted (the backend recovers on its own in about 13 seconds), backend stopped (the frontend keeps serving), and `restart` of everything. The images contain no `.env` file and no secret, and the logs contain no secret, token, password or email.
+- **Known limitations:** listed under Known limitations, in the Day 19 subsection. Launch blockers: none found.
