@@ -1,6 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import { createE2eApp, describeE2e } from './helpers/e2e-app';
+import { createE2eApp, describeE2e, mailFakesOf } from './helpers/e2e-app';
 import { E2eData } from './helpers/e2e-data';
 
 // Real-database checks for the auth path. Every other e2e spec mints a signed
@@ -99,6 +99,19 @@ describeE2e('auth', () => {
       expect(row?.role).toBe('user');
       expect(row?.passwordHash).not.toBe(PASSWORD);
       expect(row?.passwordHash.startsWith('$2b$')).toBe(true);
+    });
+
+    // The queue is the fake from createE2eApp(): nothing reaches Redis or SMTP.
+    // Other signups in this file add their own jobs, so only this user's count.
+    it('queues exactly one welcome email carrying only the user id', () => {
+      const userId: string = signupRes.body.data.id;
+      const jobs = mailFakesOf(app).queue.jobs.filter(
+        (job) => (job.data as { userId?: string }).userId === userId,
+      );
+
+      expect(jobs).toHaveLength(1);
+      expect(jobs[0].name).toBe('welcome-email');
+      expect(jobs[0].data).toEqual({ userId });
     });
 
     it('rejects a second signup with the same email (409)', async () => {

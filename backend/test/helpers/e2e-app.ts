@@ -33,6 +33,45 @@ const neverThrottle = {
   }),
 };
 
+// Stands in for the "mail" BullMQ queue: records what signup adds and never
+// touches Redis. Bull Board wraps the same object (its adapter accepts any
+// queue whose metaValues.version starts with "bullmq", and at startup reads
+// only the name and opts).
+export class FakeMailQueue {
+  readonly name = 'mail';
+  readonly opts = {};
+  readonly metaValues = { version: 'bullmq-e2e-fake' };
+  readonly jobs: { name: string; data: unknown; opts: unknown }[] = [];
+
+  async add(name: string, data: unknown, opts?: unknown) {
+    this.jobs.push({ name, data, opts });
+    return { id: `fake-${this.jobs.length}`, name, data };
+  }
+
+  async close() {}
+}
+
+// Stands in for MailService, so nothing in a test app can send real mail.
+export class FakeMailService {
+  readonly sent: { to: string; fullName: string }[] = [];
+
+  async sendWelcome(to: string, fullName: string) {
+    this.sent.push({ to, fullName });
+  }
+}
+
+const mailFakes = new WeakMap<
+  INestApplication,
+  { queue: FakeMailQueue; mail: FakeMailService }
+>();
+
+// The fakes an app from createE2eApp() was built with.
+export function mailFakesOf(app: INestApplication) {
+  const fakes = mailFakes.get(app);
+  if (!fakes) throw new Error('app was not built by createE2eApp()');
+  return fakes;
+}
+
 export type E2eAppOptions = {
   // Keep the real rate limits. Off by default, because every other spec fires
   // far more than 5 logins a minute. Only the rate-limit spec turns it on, and
@@ -65,9 +104,16 @@ export async function createE2eApp(
   process.env.SUMMARIZER_API_KEY = '';
   // Same ordering rule: the purge job must never run inside a test app.
   process.env.POST_PURGE_ENABLED = 'false';
+  // Same ordering rule: signup must take the queue path (recorded by the fake
+  // queue below), even if MAIL_MODE=sync is left in the shell.
+  process.env.MAIL_MODE = 'queue';
 
   const { Test } = await import('@nestjs/testing');
   await import('@nestjs/common');
+  // Same reason as @nestjs/throttler above: @bull-board/nestjs (CommonJS,
+  // pulled in by MailModule) require()s the ESM-only @nestjs/bull-shared, so
+  // it must be loaded here first, which importing @nestjs/bullmq does.
+  const { getQueueToken } = await import('@nestjs/bullmq');
   const { ThrottlerStorage } = await import('@nestjs/throttler');
   // Explicit .js extensions: TypeScript requires them on a dynamic import()
   // in this module mode. jest-e2e.json maps them back to the .ts files.
@@ -77,6 +123,17 @@ export async function createE2eApp(
     await import('../../src/summarizer/summarizer.interface.js');
   const { MockSummarizer } =
     await import('../../src/summarizer/mock-summarizer.js');
+  const { MAIL_QUEUE } = await import('../../src/mail/mail.constants.js');
+  const { MailProcessor } = await import('../../src/mail/mail.processor.js');
+  const { MailService } = await import('../../src/mail/mail.service.js');
+
+  // A test app must never use the developer's Redis or send real mail: the
+  // queue is replaced by a recorder, and MailService by one that sends
+  // nothing. MailProcessor is replaced by a plain object: the BullMQ explorer
+  // only starts a worker for a provider whose class carries @Processor, and
+  // the class of {} is Object, so no worker (and no Redis connection) exists.
+  const fakeQueue = new FakeMailQueue();
+  const fakeMail = new FakeMailService();
 
   let builder = Test.createTestingModule({ imports: [AppModule] });
   if (!options.realThrottler) {
@@ -87,9 +144,16 @@ export async function createE2eApp(
   const moduleRef = await builder
     .overrideProvider(SUMMARIZER)
     .useValue(new MockSummarizer())
+    .overrideProvider(getQueueToken(MAIL_QUEUE))
+    .useValue(fakeQueue)
+    .overrideProvider(MailService)
+    .useValue(fakeMail)
+    .overrideProvider(MailProcessor)
+    .useValue({})
     .compile();
 
   const app = moduleRef.createNestApplication();
+  mailFakes.set(app, { queue: fakeQueue, mail: fakeMail });
   configureApp(app);
   await app.init();
 
