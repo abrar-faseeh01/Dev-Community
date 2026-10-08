@@ -123,6 +123,13 @@ const envSchema = z
       blankToUndefined,
       z.string().trim().default('DevCommunity <no-reply@devcommunity.local>'),
     ),
+    // queue: signup adds a job and returns (normal). sync: signup sends the
+    // email itself and waits, which only exists to measure the "before" case.
+    MAIL_MODE: z.preprocess(
+      blankToUndefined,
+      z.enum(['queue', 'sync']).default('queue'),
+    ),
+
     // Experiment switches (queue demo): make the mail step slow or flaky on
     // purpose. Refused in production below.
     MAIL_FAILURE_RATE: z.preprocess(
@@ -193,6 +200,14 @@ const envSchema = z
       message:
         'MAIL_FAILURE_RATE and MAIL_DELAY_MS are test switches and must be 0 when NODE_ENV=production',
       path: ['MAIL_FAILURE_RATE'],
+    },
+  )
+  .refine(
+    (env) => !(env.NODE_ENV === 'production' && env.MAIL_MODE === 'sync'),
+    {
+      message:
+        'MAIL_MODE=sync is a measurement switch and is not allowed when NODE_ENV=production',
+      path: ['MAIL_MODE'],
     },
   )
 

@@ -8,8 +8,10 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import type { Queue } from 'bullmq';
 import mongoose from 'mongoose';
 import { createHash } from 'node:crypto';
+import { MailService } from '../mail/mail.service';
 import { MAX_REFRESH_SESSIONS, UsersService } from '../users/users.service';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
@@ -63,11 +65,25 @@ async function caught(promise: Promise<unknown>): Promise<unknown> {
 // The two settings AuthService reads from ConfigService.
 const ACCESS_SECRET = 'a'.repeat(40);
 const REFRESH_SECRET = 'r'.repeat(40);
-function configStub(): ConfigService {
+function configStub(mailMode?: 'queue' | 'sync'): ConfigService {
   return {
     getOrThrow: () => REFRESH_SECRET,
-    get: (_key: string, fallback: unknown) => fallback,
+    get: (key: string, fallback: unknown) =>
+      key === 'MAIL_MODE' && mailMode ? mailMode : fallback,
   } as unknown as ConfigService;
+}
+
+// The welcome-email collaborators. Signup is the only method that uses them,
+// so the other tests just receive these unused stand-ins.
+function mailStubs() {
+  const add = jest.fn<AsyncFn>().mockResolvedValue(undefined);
+  const sendWelcome = jest.fn<AsyncFn>().mockResolvedValue(undefined);
+  return {
+    add,
+    sendWelcome,
+    mailQueue: { add } as unknown as Queue,
+    mailService: { sendWelcome } as unknown as MailService,
+  };
 }
 
 describe('AuthService', () => {
@@ -90,6 +106,7 @@ describe('AuthService', () => {
   const jwtService = { sign } as unknown as JwtService;
 
   let service: AuthService;
+  let mail: ReturnType<typeof mailStubs>;
 
   beforeEach(() => {
     findByEmail.mockReset();
@@ -100,7 +117,14 @@ describe('AuthService', () => {
     replaceRefreshHashes.mockReset();
     sign.mockReset();
     sign.mockReturnValue('signed-token');
-    service = new AuthService(usersService, jwtService, configStub());
+    mail = mailStubs();
+    service = new AuthService(
+      usersService,
+      jwtService,
+      configStub(),
+      mail.mailQueue,
+      mail.mailService,
+    );
   });
 
   /*     SIGNUP     */
@@ -120,6 +144,8 @@ describe('AuthService', () => {
       expect(err).toBeInstanceOf(ConflictException);
       expect((err as Error).message).toBe('Email already in use');
       expect(create).not.toHaveBeenCalled();
+
+      expect(mail.add).not.toHaveBeenCalled();
     });
 
     it('stores a bcrypt hash of the password, never the plaintext', async () => {
@@ -168,6 +194,78 @@ describe('AuthService', () => {
       create.mockResolvedValue(created);
 
       await expect(service.signup(dto)).resolves.toBe(created);
+    });
+    describe('welcome email', () => {
+      beforeEach(() => {
+        findByEmail.mockResolvedValue(null);
+        create.mockResolvedValue(makeUser());
+      });
+
+      it('adds one welcome job carrying only the user id', async () => {
+        await service.signup(dto);
+
+        expect(mail.add).toHaveBeenCalledTimes(1);
+        const [name, data, opts] = mail.add.mock.calls[0] as [
+          string,
+          Record<string, unknown>,
+          Record<string, unknown>,
+        ];
+        expect(name).toBe('welcome-email');
+        expect(data).toEqual({ userId: 'u1' });
+        expect(opts).toMatchObject({ jobId: 'welcome-u1', attempts: 5 });
+        expect(mail.sendWelcome).not.toHaveBeenCalled();
+      });
+
+      it('still creates the account when the queue is unreachable', async () => {
+        mail.add.mockRejectedValue(new Error('connect ECONNREFUSED'));
+
+        await expect(service.signup(dto)).resolves.toMatchObject({
+          _id: 'u1',
+        });
+        expect(create).toHaveBeenCalledTimes(1);
+      });
+
+      it('still creates the account when the queue never answers', async () => {
+        // A dead Redis does not reject, it just never replies.
+        mail.add.mockReturnValue(new Promise(() => {}));
+
+        await expect(service.signup(dto)).resolves.toMatchObject({
+          _id: 'u1',
+        });
+      }, 10_000);
+
+      it('in sync mode sends the email itself and adds no job', async () => {
+        const syncService = new AuthService(
+          usersService,
+          jwtService,
+          configStub('sync'),
+          mail.mailQueue,
+          mail.mailService,
+        );
+
+        await syncService.signup(dto);
+
+        expect(mail.sendWelcome).toHaveBeenCalledWith(
+          'ada@x.test',
+          'Ada Lovelace',
+        );
+        expect(mail.add).not.toHaveBeenCalled();
+      });
+
+      it('in sync mode a mail failure makes signup fail', async () => {
+        mail.sendWelcome.mockRejectedValue(new Error('Simulated SMTP failure'));
+        const syncService = new AuthService(
+          usersService,
+          jwtService,
+          configStub('sync'),
+          mail.mailQueue,
+          mail.mailService,
+        );
+
+        const err = await caught(syncService.signup(dto));
+
+        expect((err as Error).message).toBe('Simulated SMTP failure');
+      });
     });
   });
 
@@ -511,7 +609,13 @@ describe('AuthService', () => {
         hashes,
         user,
         jwt,
-        service: new AuthService(users, jwt, configStub()),
+        service: new AuthService(
+          users,
+          jwt,
+          configStub(),
+          mailStubs().mailQueue,
+          mailStubs().mailService,
+        ),
       };
     }
 

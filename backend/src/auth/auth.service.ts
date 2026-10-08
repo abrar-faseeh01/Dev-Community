@@ -1,23 +1,36 @@
+import { InjectQueue } from '@nestjs/bullmq';
 import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import { Queue } from 'bullmq';
 import mongoose from 'mongoose';
 import type { StringValue } from 'ms';
 import ms from 'ms';
 import { createHash, randomUUID } from 'node:crypto';
+import {
+  MAIL_QUEUE,
+  WELCOME_JOB,
+  welcomeJobOptions,
+} from '../mail/mail.constants';
+import { MailService } from '../mail/mail.service';
 import { UsersService } from '../users/users.service';
 import { LoginDto } from './dto/login.dto';
 import { SignupDto } from './dto/signup.dto';
 import { UpdateCredentialsDto } from './dto/update-credentials.dto';
 
 const SALT_ROUNDS = 12;
+// With Redis unreachable, queue.add() does not fail: it waits for the
+// connection to come back, which would freeze every signup. Past this long the
+// welcome email is given up on and signup carries on.
+export const ENQUEUE_TIMEOUT_MS = 2000;
 
 type RefreshPayload = { sub?: string; type?: string; exp?: number };
 
@@ -30,16 +43,21 @@ function hashToken(token: string): string {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
   private readonly refreshSecret: string;
   private readonly refreshExpiresIn: string;
+  private readonly mailMode: 'queue' | 'sync';
 
   constructor(
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
     config: ConfigService,
+    @InjectQueue(MAIL_QUEUE) private readonly mailQueue: Queue,
+    private readonly mailService: MailService,
   ) {
     this.refreshSecret = config.getOrThrow<string>('JWT_REFRESH_SECRET');
     this.refreshExpiresIn = config.get<string>('JWT_REFRESH_EXPIRES_IN', '7d');
+    this.mailMode = config.get<'queue' | 'sync'>('MAIL_MODE', 'queue');
   }
 
   private signAccessToken(user: { _id: unknown; email: string; role: string }) {
@@ -86,8 +104,51 @@ export class AuthService {
       email: dto.email,
       passwordHash,
     });
+    await this.sendWelcomeEmail(user);
 
     return user; // passwordHash stripped automatically via schema's toJSON
+  }
+
+  // The account already exists at this point, so what happens to the welcome
+  // email must not decide whether signup succeeds.
+  private async sendWelcomeEmail(user: {
+    _id: unknown;
+    email: string;
+    fullName: string;
+  }): Promise<void> {
+    if (this.mailMode === 'sync') {
+      // Measurement only (MAIL_MODE=sync): signup waits for the SMTP call and
+      // fails when it fails. This is the "before" case the queue replaces.
+      await this.mailService.sendWelcome(user.email, user.fullName);
+      return;
+    }
+
+    const userId = String(user._id);
+    let timer: NodeJS.Timeout | undefined;
+    try {
+      await Promise.race([
+        this.mailQueue.add(WELCOME_JOB, { userId }, welcomeJobOptions(userId)),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(
+            () =>
+              reject(
+                new Error(`queue did not answer in ${ENQUEUE_TIMEOUT_MS} ms`),
+              ),
+            ENQUEUE_TIMEOUT_MS,
+          );
+        }),
+      ]);
+    } catch (error) {
+      // Redis unreachable: the user still gets their account, only the welcome
+      // email is lost. The user's address is not logged, only their id.
+      this.logger.error(
+        `Could not queue the welcome email for user ${userId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   async login(dto: LoginDto) {
