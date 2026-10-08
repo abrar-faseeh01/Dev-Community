@@ -123,6 +123,13 @@ const envSchema = z
       blankToUndefined,
       z.string().trim().default('DevCommunity <no-reply@devcommunity.local>'),
     ),
+    // Turns every rate limit off, for load tests only (scripts/seed-signups.ts
+    // fires 100 signups, the limit is 5 a minute). Refused in production.
+    THROTTLE_DISABLED: z.preprocess(
+      blankToUndefined,
+      booleanString.default(false),
+    ),
+
     // The Bull Board queue dashboard at /admin/queues (admins only). Left unset
     // it is on everywhere except production, where it has to be asked for.
     BULL_BOARD_ENABLED: z.preprocess(
@@ -197,17 +204,18 @@ const envSchema = z
     },
   )
   .refine(
-    (env) =>
-      !(
-        env.NODE_ENV === 'production' &&
-        (env.MAIL_FAILURE_RATE > 0 || env.MAIL_DELAY_MS > 0)
-      ),
+    (env) => !(env.NODE_ENV === 'production' && env.MAIL_FAILURE_RATE > 0),
     {
       message:
-        'MAIL_FAILURE_RATE and MAIL_DELAY_MS are test switches and must be 0 when NODE_ENV=production',
+        'MAIL_FAILURE_RATE is a test switch and must be 0 when NODE_ENV=production',
       path: ['MAIL_FAILURE_RATE'],
     },
   )
+  .refine((env) => !(env.NODE_ENV === 'production' && env.MAIL_DELAY_MS > 0), {
+    message:
+      'MAIL_DELAY_MS is a test switch and must be 0 when NODE_ENV=production',
+    path: ['MAIL_DELAY_MS'],
+  })
   .refine(
     (env) => !(env.NODE_ENV === 'production' && env.MAIL_MODE === 'sync'),
     {
@@ -216,7 +224,11 @@ const envSchema = z
       path: ['MAIL_MODE'],
     },
   )
-
+  .refine((env) => !(env.NODE_ENV === 'production' && env.THROTTLE_DISABLED), {
+    message:
+      'THROTTLE_DISABLED=true turns off every rate limit and is not allowed when NODE_ENV=production',
+    path: ['THROTTLE_DISABLED'],
+  })
   .transform((env) => ({
     ...env,
     COOKIE_SECURE: env.COOKIE_SECURE ?? env.NODE_ENV === 'production',

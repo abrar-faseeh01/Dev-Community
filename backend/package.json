@@ -23,7 +23,8 @@
     "seed:ranking": "ts-node -r tsconfig-paths/register scripts/seed-ranking-data.ts",
     "seed:purge": "ts-node -r tsconfig-paths/register scripts/seed-purge-data.ts",
     "mail:test": "ts-node -r tsconfig-paths/register scripts/send-test-mail.ts",
-    "mail:enqueue": "ts-node -r tsconfig-paths/register scripts/enqueue-test-job.ts"
+    "mail:enqueue": "ts-node -r tsconfig-paths/register scripts/enqueue-test-job.ts",
+    "seed:signups": "ts-node -r tsconfig-paths/register scripts/seed-signups.ts"
   },
   "dependencies": {
     "@bull-board/api": "^9.10.4",

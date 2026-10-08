@@ -27,13 +27,20 @@ import { JwtStrategy } from './strategies/jwt.strategy';
       }),
     }),
 
-    ThrottlerModule.forRoot([
-      // Global default: a sanity ceiling against runaway bugs/scripts, not
-      // a real constraint on normal authenticated use — the genuinely
-      // brute-force-sensitive routes (login/signup/credential changes) get
-      // their own much tighter @Throttle() override in auth.controller.ts.
-      { ttl: 60000, limit: 100 }, // 100 requests per minute per IP
-    ]),
+    ThrottlerModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        // Global default: a sanity ceiling against runaway bugs/scripts, not
+        // a real constraint on normal authenticated use — the genuinely
+        // brute-force-sensitive routes (login/signup/credential changes) get
+        // their own much tighter @Throttle() override in auth.controller.ts.
+        throttlers: [{ ttl: 60000, limit: 100 }], // 100 requests per minute per IP
+        // Load-test switch (THROTTLE_DISABLED). Off unless asked for, and the
+        // env schema refuses it in production.
+        skipIf: () => config.getOrThrow<boolean>('THROTTLE_DISABLED'),
+      }),
+    }),
   ],
 
   controllers: [AuthController],

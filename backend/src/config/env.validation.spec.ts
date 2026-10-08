@@ -277,4 +277,63 @@ describe('validateEnv', () => {
   it('rejects an unknown NODE_ENV', () => {
     expect(() => validateEnv({ ...base, NODE_ENV: 'staging' })).toThrow();
   });
+  describe('queue demo settings', () => {
+    it('defaults to the safe values', () => {
+      const env = validateEnv(base);
+
+      expect(env.MAIL_MODE).toBe('queue');
+      expect(env.MAIL_FAILURE_RATE).toBe(0);
+      expect(env.MAIL_DELAY_MS).toBe(0);
+      expect(env.MAIL_CONCURRENCY).toBe(5);
+      expect(env.THROTTLE_DISABLED).toBe(false);
+      expect(env.REDIS_HOST).toBe('localhost');
+      expect(env.REDIS_PORT).toBe(6379);
+    });
+
+    it('allows the test switches outside production', () => {
+      const env = validateEnv({
+        ...base,
+        MAIL_MODE: 'sync',
+        MAIL_FAILURE_RATE: '0.3',
+        MAIL_DELAY_MS: '500',
+        THROTTLE_DISABLED: 'true',
+      });
+
+      expect(env.MAIL_MODE).toBe('sync');
+      expect(env.MAIL_FAILURE_RATE).toBe(0.3);
+      expect(env.MAIL_DELAY_MS).toBe(500);
+      expect(env.THROTTLE_DISABLED).toBe(true);
+    });
+
+    it.each([
+      ['MAIL_MODE', 'sync'],
+      ['MAIL_FAILURE_RATE', '0.3'],
+      ['MAIL_DELAY_MS', '500'],
+      ['THROTTLE_DISABLED', 'true'],
+    ])('refuses %s=%s in production', (name, value) => {
+      expect(() => validateEnv({ ...prod, [name]: value })).toThrow(
+        'Environment validation failed',
+      );
+      expect(failedFields()).toEqual([name]);
+    });
+
+    it.each([
+      ['MAIL_FAILURE_RATE', '1.5'],
+      ['MAIL_CONCURRENCY', '0'],
+      ['MAIL_MODE', 'maybe'],
+    ])('rejects %s=%s', (name, value) => {
+      expect(() => validateEnv({ ...base, [name]: value })).toThrow();
+    });
+
+    it('turns the queue dashboard on outside production and off in it', () => {
+      expect(validateEnv(base).BULL_BOARD_ENABLED).toBe(true);
+      expect(validateEnv(prod).BULL_BOARD_ENABLED).toBe(false);
+    });
+
+    it('lets production switch the dashboard on explicitly', () => {
+      expect(
+        validateEnv({ ...prod, BULL_BOARD_ENABLED: 'true' }).BULL_BOARD_ENABLED,
+      ).toBe(true);
+    });
+  });
 });
