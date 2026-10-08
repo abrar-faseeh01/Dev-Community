@@ -1,6 +1,3 @@
-// this file is the worker that runs in a separate process from the main NestJS app.
-// It is started by the "mail:worker" script in package.json, which sets up the environment and then runs this file.
-// The worker connects to Redis and listens for jobs on the "mail" queue, which are added by the main app when a user signs up.
 import { OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -14,6 +11,8 @@ import { MailService } from './mail.service';
 // The worker: takes jobs off the "mail" queue one by one (up to
 // MAIL_CONCURRENCY at a time) and runs process() for each. If process()
 // throws, BullMQ retries the job using the attempts/backoff it was added with.
+// It is a provider of MailModule, so it runs inside the API process: there is
+// no separate worker process to start.
 @Processor(MAIL_QUEUE)
 export class MailProcessor
   extends WorkerHost
@@ -78,10 +77,19 @@ export class MailProcessor
     this.logger.log(`Job ${job.id} completed (attempt ${job.attemptsMade})`);
   }
 
+  // An earlier attempt failing is routine (BullMQ retries it), so it is a
+  // warning. The final attempt failing means the email is never sent and
+  // nothing retries it later, so it is an error, naming the user by id.
   @OnWorkerEvent('failed')
-  onFailed(job: Job | undefined, error: Error): void {
-    this.logger.warn(
-      `Job ${job?.id} failed (attempt ${job?.attemptsMade}/${job?.opts.attempts}): ${error.message}`,
-    );
+  onFailed(job: Job<WelcomeJobData> | undefined, error: Error): void {
+    const attempts = job?.opts.attempts ?? 1;
+    const attempt = `attempt ${job?.attemptsMade}/${attempts}`;
+    if (job && job.attemptsMade >= attempts) {
+      this.logger.error(
+        `Job ${job.id} failed its final ${attempt}, giving up: user ${job.data?.userId} gets no welcome email: ${error.message}`,
+      );
+      return;
+    }
+    this.logger.warn(`Job ${job?.id} failed (${attempt}): ${error.message}`);
   }
 }
