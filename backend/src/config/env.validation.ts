@@ -94,6 +94,21 @@ const envSchema = z
       blankToUndefined,
       z.coerce.number().int().min(1000).max(15000).default(10000),
     ),
+    // Redis holds the job queues (welcome emails and later jobs).
+    REDIS_HOST: z.preprocess(
+      blankToUndefined,
+      z.string().trim().default('localhost'),
+    ),
+    REDIS_PORT: z.preprocess(
+      blankToUndefined,
+      z.coerce.number().int().min(1).max(65535).default(6379),
+    ),
+    // How many emails the worker sends at the same time.
+    MAIL_CONCURRENCY: z.preprocess(
+      blankToUndefined,
+      z.coerce.number().int().min(1).max(50).default(5),
+    ),
+
     // Outgoing mail. Locally this points at Mailpit (a fake SMTP server);
     // nothing here ever reaches a real inbox.
     SMTP_HOST: z.preprocess(

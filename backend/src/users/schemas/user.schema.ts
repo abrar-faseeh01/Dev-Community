@@ -109,6 +109,12 @@ export class User extends Document {
 
   @Prop({ type: [PortfolioProjectSchema], default: [] })
   portfolioProjects: Types.DocumentArray<PortfolioProject>;
+
+  // Set by the mail worker once the welcome email has gone out. It is the
+  // idempotency marker: a retried or duplicated job sees it and sends nothing.
+  // null (or absent, for users that existed before this field) means not sent.
+  @Prop({ type: Date, default: null })
+  welcomeEmailSentAt?: Date | null;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
@@ -119,6 +125,7 @@ UserSchema.set('toJSON', {
   transform: (_doc, ret: Record<string, any>) => {
     delete ret.passwordHash;
     delete ret.refreshTokenHashes;
+    delete ret.welcomeEmailSentAt;
     delete ret.__v;
     return ret;
   },
