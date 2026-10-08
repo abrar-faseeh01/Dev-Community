@@ -36,12 +36,26 @@ services:
     depends_on:
       mongo:
         condition: service_healthy
+      redis:
+        condition: service_healthy
+      # Mailpit only receives mail; a send that fails before it is up is
+      # retried by the queue, so starting is enough.
+      mailpit:
+        condition: service_started
     ports:
       - "3000:3000"
     environment:
       NODE_ENV: production
       PORT: "3000"
       MONGODB_URI: mongodb://mongo:27017/devcommunity
+      # Service names on the Compose network, and the container's own ports:
+      # 1025 is Mailpit's SMTP port inside the network (1026 is only the host
+      # mapping). NODE_ENV=production also turns the /admin/queues dashboard
+      # off (BULL_BOARD_ENABLED defaults to false there).
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      SMTP_HOST: mailpit
+      SMTP_PORT: "1025"
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in the root .env}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?Set JWT_REFRESH_SECRET in the root .env}
       FRONTEND_ORIGIN: http://localhost:3001
