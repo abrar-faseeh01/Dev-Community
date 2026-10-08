@@ -94,6 +94,31 @@ const envSchema = z
       blankToUndefined,
       z.coerce.number().int().min(1000).max(15000).default(10000),
     ),
+    // Outgoing mail. Locally this points at Mailpit (a fake SMTP server);
+    // nothing here ever reaches a real inbox.
+    SMTP_HOST: z.preprocess(
+      blankToUndefined,
+      z.string().trim().default('localhost'),
+    ),
+    SMTP_PORT: z.preprocess(
+      blankToUndefined,
+      z.coerce.number().int().min(1).max(65535).default(1025),
+    ),
+    MAIL_FROM: z.preprocess(
+      blankToUndefined,
+      z.string().trim().default('DevCommunity <no-reply@devcommunity.local>'),
+    ),
+    // Experiment switches (queue demo): make the mail step slow or flaky on
+    // purpose. Refused in production below.
+    MAIL_FAILURE_RATE: z.preprocess(
+      blankToUndefined,
+      z.coerce.number().min(0).max(1).default(0),
+    ),
+    MAIL_DELAY_MS: z.preprocess(
+      blankToUndefined,
+      z.coerce.number().int().min(0).max(10000).default(0),
+    ),
+
     // Hard-delete of posts that were soft-deleted long enough ago (Day 19).
     POST_PURGE_ENABLED: z.preprocess(
       blankToUndefined,
@@ -143,6 +168,19 @@ const envSchema = z
       path: ['FRONTEND_ORIGIN'],
     },
   )
+  .refine(
+    (env) =>
+      !(
+        env.NODE_ENV === 'production' &&
+        (env.MAIL_FAILURE_RATE > 0 || env.MAIL_DELAY_MS > 0)
+      ),
+    {
+      message:
+        'MAIL_FAILURE_RATE and MAIL_DELAY_MS are test switches and must be 0 when NODE_ENV=production',
+      path: ['MAIL_FAILURE_RATE'],
+    },
+  )
+
   .transform((env) => ({
     ...env,
     COOKIE_SECURE: env.COOKIE_SECURE ?? env.NODE_ENV === 'production',
