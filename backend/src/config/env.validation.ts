@@ -123,6 +123,12 @@ const envSchema = z
       blankToUndefined,
       z.string().trim().default('DevCommunity <no-reply@devcommunity.local>'),
     ),
+    // The Bull Board queue dashboard at /admin/queues (admins only). Left unset
+    // it is on everywhere except production, where it has to be asked for.
+    BULL_BOARD_ENABLED: z.preprocess(
+      blankToUndefined,
+      booleanString.optional(),
+    ),
     // queue: signup adds a job and returns (normal). sync: signup sends the
     // email itself and waits, which only exists to measure the "before" case.
     MAIL_MODE: z.preprocess(
@@ -215,6 +221,7 @@ const envSchema = z
     ...env,
     COOKIE_SECURE: env.COOKIE_SECURE ?? env.NODE_ENV === 'production',
     FRONTEND_ORIGIN: env.FRONTEND_ORIGIN ?? DEFAULT_FRONTEND_ORIGIN,
+    BULL_BOARD_ENABLED: env.BULL_BOARD_ENABLED ?? env.NODE_ENV !== 'production',
   }));
 
 export function validateEnv(config: Record<string, unknown>) {

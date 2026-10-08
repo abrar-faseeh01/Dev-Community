@@ -14,6 +14,7 @@ import { MailModule } from './mail/mail.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { PostsModule } from './posts/posts.module';
 import { ProfilesModule } from './profiles/profiles.module';
+import { QueueBoardModule } from './queue-board/queue-board.module';
 import { ReactionsModule } from './reactions/reactions.module';
 import { SummarizerModule } from './summarizer/summarizer.module';
 import { UsersModule } from './users/users.module';
@@ -54,6 +55,7 @@ import { UsersModule } from './users/users.module';
     ReactionsModule,
     SummarizerModule,
     MailModule,
+    QueueBoardModule,
     ScheduleModule.forRoot(),
   ],
   controllers: [AppController],
