@@ -1,9 +1,13 @@
+import { Queue } from 'bullmq';
 import 'dotenv/config';
 import mongoose from 'mongoose';
+import { MAIL_QUEUE } from '../src/mail/mail.constants';
 
 // Fires a burst of signups at the running API and reports how long they took,
 // then (if Mailpit is reachable) how long the welcome emails took to arrive
-// and whether any user got more than one.
+// and whether any user got more than one. If Redis is reachable it also reads
+// the mail queue: it stops waiting once no job is pending, and lists the jobs
+// of this run that failed for good.
 //
 //   npm run seed:signups                       100 signups, 10 at a time
 //   npm run seed:signups -- --total=50 --concurrency=5
@@ -88,6 +92,47 @@ async function mailpitRecipients(): Promise<string[]> {
     start += page.length;
   }
   return recipients;
+}
+
+// ---- Mail queue (Redis) ---------------------------------------------------
+
+// Rejects after `ms` instead of waiting forever: with Redis down, BullMQ calls
+// do not fail, they wait for the connection to come back.
+function within<T>(promise: Promise<T>, ms: number): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`no answer in ${ms} ms`)), ms);
+    }),
+  ]).finally(() => clearTimeout(timer));
+}
+
+async function openMailQueue(): Promise<Queue | undefined> {
+  const queue = new Queue(MAIL_QUEUE, {
+    connection: {
+      host: process.env.REDIS_HOST || 'localhost',
+      port: Number(process.env.REDIS_PORT || 6379),
+    },
+  });
+  try {
+    await within(queue.waitUntilReady(), 3000);
+    return queue;
+  } catch (err) {
+    console.log(
+      `(Redis not reachable: skipping the queue checks. ${(err as Error).message})\n`,
+    );
+    void queue.close().catch(() => undefined);
+    return undefined;
+  }
+}
+
+async function pendingJobs(queue: Queue): Promise<number> {
+  const counts = await within(
+    queue.getJobCounts('waiting', 'delayed', 'active', 'prioritized'),
+    3000,
+  );
+  return Object.values(counts).reduce((sum, n) => sum + n, 0);
 }
 
 // ---- Signups --------------------------------------------------------------
@@ -177,20 +222,48 @@ async function main() {
 
   if (!inboxAvailable || created.length === 0) return;
 
+  const queue = await openMailQueue();
+  try {
+    await reportEmails(created, startedAt, queue);
+    if (queue) await reportQueue(queue, startedAt);
+  } finally {
+    await queue?.close();
+  }
+}
+
+async function reportEmails(
+  created: Outcome[],
+  startedAt: number,
+  queue: Queue | undefined,
+) {
   // Wait for the worker to finish: every created user should get one email.
+  // With the queue readable, also stop once no job is left pending: whatever
+  // has not arrived by then never will (its job failed for good).
   console.log(
     `\nWaiting up to ${WAIT_SECONDS}s for ${created.length} emails...`,
   );
   let delivered = 0;
   let allArrivedMs: number | undefined;
+  let gaveUpMs: number | undefined; // stopped early: nothing left pending
   while (Date.now() - startedAt < WAIT_SECONDS * 1000) {
     delivered = await mailpitTotal();
     if (delivered >= created.length) {
       allArrivedMs = Date.now() - startedAt;
       break;
     }
+    if (queue && (await pendingJobs(queue)) === 0) {
+      // A finished job's email may still be on its way into Mailpit.
+      await sleep(1000);
+      if ((await mailpitTotal()) >= created.length) {
+        allArrivedMs = Date.now() - startedAt;
+      } else {
+        gaveUpMs = Date.now() - startedAt;
+      }
+      break;
+    }
     await sleep(250);
   }
+  const seconds = (ms: number) => Number((ms / 1000).toFixed(1));
 
   const recipients = await mailpitRecipients();
   const perUser = new Map<string, number>();
@@ -207,10 +280,42 @@ async function main() {
     'users with a duplicate': duplicates,
     'users with no email': missing,
     'all arrived after (s)':
-      allArrivedMs === undefined
-        ? 'not within the wait'
-        : Number((allArrivedMs / 1000).toFixed(1)),
+      allArrivedMs !== undefined
+        ? seconds(allArrivedMs)
+        : gaveUpMs !== undefined
+          ? `no: nothing pending after ${seconds(gaveUpMs)}s`
+          : 'not within the wait',
   });
+}
+
+// This run's jobs that failed for good, and whatever is still pending. A job
+// belongs to this run if it was added after the burst started.
+async function reportQueue(queue: Queue, startedAt: number) {
+  const [counts, failedJobs] = await within(
+    Promise.all([
+      queue.getJobCounts('waiting', 'delayed', 'active', 'prioritized'),
+      queue.getJobs(['failed'], 0, -1),
+    ]),
+    5000,
+  );
+  const failed = failedJobs.filter((job) => job.timestamp >= startedAt);
+
+  console.log('\nQUEUE (mail)');
+  console.table({
+    'failed for good (this run)': failed.length,
+    'still waiting': counts.waiting + counts.prioritized,
+    'still delayed (retry pending)': counts.delayed,
+    'still active': counts.active,
+  });
+  if (failed.length > 0) {
+    console.table(
+      failed.map((job) => ({
+        job: job.id,
+        attempts: `${job.attemptsMade}/${job.opts.attempts ?? 1}`,
+        reason: job.failedReason,
+      })),
+    );
+  }
 }
 
 main()
