@@ -14,6 +14,21 @@ services:
       timeout: 5s
       retries: 5
       start_period: 20s
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mailpit:
+    image: axllent/mailpit
+    ports:
+      - "127.0.0.1:1026:1025" # host 1026 -> container 1025 (SMTP)
+      - "127.0.0.1:8025:8025" # web inbox
 
   backend:
     build:
