@@ -49,11 +49,19 @@ FRONTEND_ORIGIN=http://localhost:3001
 
 `MONGODB_URI`, `JWT_SECRET` and `JWT_REFRESH_SECRET` are required — the app fails fast at startup if any is missing, if either secret is under 32 characters, or if the two secrets are equal (`backend/src/config/env.validation.ts`). Everything else has a default: `PORT` 3000, `JWT_EXPIRES_IN` (the access token) 15m, `JWT_REFRESH_EXPIRES_IN` 7d, `COOKIE_REFRESH_PATH` `/auth`, `COOKIE_SECURE` follows `NODE_ENV`, and `FRONTEND_ORIGIN` `http://localhost:3001` (it must be set when `NODE_ENV=production`).
 
+Signup sends a welcome email through a background queue, which needs Redis, and locally the email goes to Mailpit, a fake SMTP server with a web inbox. Start both from the repo root (they need no `.env`):
+
+```bash
+docker compose up -d redis mailpit
+```
+
+`backend/.env.example` already points at them (`REDIS_HOST=localhost`, `SMTP_HOST=localhost`, `SMTP_PORT=1026`). The emails show up at `http://localhost:8025`. Without Redis the backend still starts and signup still works, but each signup waits 2 seconds for the queue and its welcome email is lost (see Known limitations).
+
 ```bash
 npm run start:dev
 ```
 
-The backend runs on `http://localhost:3000`. API docs are at `http://localhost:3000/docs` (Swagger).
+The backend runs on `http://localhost:3000`. API docs are at `http://localhost:3000/docs` (Swagger). The queue dashboard (Bull Board) is at `http://localhost:3000/admin/queues`, for a signed-in admin only.
 
 #### Bootstrapping the first admin
 
@@ -96,9 +104,9 @@ The frontend runs on `http://localhost:3001`.
 
 ## Running with Docker Compose
 
-`compose.yaml` at the repo root runs MongoDB, the backend and the frontend together, so nothing needs installing except Docker. It does not read `backend/.env` or `frontend/.env.local`: the backend's settings are in `compose.yaml` itself, and the two JWT secrets come from a `.env` file next to it. A one-off `seed` service (profile `tools`) creates the first admin.
+`compose.yaml` at the repo root runs MongoDB, Redis (the job queue), Mailpit (a fake SMTP server with a web inbox), the backend and the frontend together, so nothing needs installing except Docker. It does not read `backend/.env` or `frontend/.env.local`: the backend's settings are in `compose.yaml` itself, and the two JWT secrets come from a `.env` file next to it. A one-off `seed` service (profile `tools`) creates the first admin.
 
-**Prerequisites:** Docker with Compose v2 (`docker compose`), internet access for the first build (base images from Docker Hub, and the frontend build downloads the Geist font from Google Fonts), and ports 3000, 3001 and 27017 free. Use Chrome, Edge or Firefox (see the limitations at the end of this section).
+**Prerequisites:** Docker with Compose v2 (`docker compose`), internet access for the first build (base images from Docker Hub, and the frontend build downloads the Geist font from Google Fonts), and ports 3000, 3001, 27017, 6379, 1026 and 8025 free. Use Chrome, Edge or Firefox (see the limitations at the end of this section).
 
 ### 1. Create the root `.env`
 
@@ -119,7 +127,7 @@ docker compose up -d --build
 docker compose ps
 ```
 
-The first build takes several minutes. When it is done, `docker compose ps` shows `mongo`, `backend` and `frontend` as `Up … (healthy)`; a start with the images already built takes about 15 to 30 seconds. The order is enforced: the backend waits for a healthy Mongo and the frontend waits for a healthy backend.
+The first build takes several minutes. When it is done, `docker compose ps` shows `mongo`, `redis`, `mailpit`, `backend` and `frontend` as `Up … (healthy)`; a start with the images already built takes about 15 to 30 seconds. The order is enforced: the backend waits for a healthy Mongo and Redis and a started Mailpit, and the frontend waits for a healthy backend.
 
 | What | URL |
 |---|---|
@@ -127,6 +135,9 @@ The first build takes several minutes. When it is done, `docker compose ps` show
 | Backend API | `http://localhost:3000` |
 | Swagger docs | `http://localhost:3000/docs` |
 | Health check | `http://localhost:3000/health` |
+| Welcome emails (Mailpit inbox) | `http://localhost:8025` |
+
+Inside the Compose network the backend reaches Redis at `redis:6379` and Mailpit at `mailpit:1025` (the container's own SMTP port; 1026 is only the mapping on the host). The backend runs with `NODE_ENV=production`, so the queue dashboard at `/admin/queues` is off and answers 404; add `BULL_BOARD_ENABLED: "true"` to the backend's `environment:` to turn it on (admins only).
 
 Use `localhost`, not `127.0.0.1`: the backend allows exactly the origin `http://localhost:3001`.
 
@@ -170,7 +181,7 @@ The specs clean up after themselves. To drop the database afterwards: `docker co
 
 ### Ports, the project name and running two copies
 
-The project name (`devcommunity`) and the host ports 3000 (backend), 3001 (frontend) and 27017 (Mongo) are fixed in `compose.yaml`. Two checkouts therefore cannot run at the same time: they would share one project, one network and one database volume. The dev servers (`npm run start:dev`, `npm run dev`) use the same ports and must be stopped first, and a second copy needs a different `name:` as well as different ports.
+The project name (`devcommunity`) and the host ports 3000 (backend), 3001 (frontend), 27017 (Mongo), 6379 (Redis), 1026 (Mailpit SMTP) and 8025 (Mailpit inbox) are fixed in `compose.yaml`. Mongo, Redis and Mailpit are published on `127.0.0.1` only. Mailpit's SMTP port is 1026 on the host because Windows blocked 1025 on my machine. Two checkouts therefore cannot run at the same time: they would share one project, one network and one database volume. The dev servers (`npm run start:dev`, `npm run dev`) use the same ports and must be stopped first, and a second copy needs a different `name:` as well as different ports.
 
 If a port is already taken, Docker refuses to start that container with a "ports are not available … bind" error, and the services that depend on it are not started. Nothing reads the ports from the environment, so you change `compose.yaml` itself. Change only the left-hand (host) side of a mapping, such as `"3002:3001"`:
 
@@ -198,6 +209,7 @@ Run each command from the app's own folder, after `npm ci` (or `npm install`). N
 
 At Day 19 that was 360 backend unit tests in 19 suites, 315 backend e2e tests in 17 suites, and 624 frontend tests in 60 suites, with lint and both builds clean.
 
+- **Neither suite needs Redis or Mailpit.** The unit tests stub the queue and the mail service. The e2e app (`test/helpers/e2e-app.ts`) replaces the mail queue with an in-memory recorder, `MailService` with a fake that sends nothing, and the queue worker with an empty object, so a test run never connects to Redis (checked with Redis stopped and a listener on port 6379: no connection) and never sends mail. Signup's e2e test reads the recorder to check that exactly one welcome job, carrying only the user id, was added.
 - **The unit tests need no database and no `.env`.** The backend's Jest runs with `--experimental-vm-modules` (the script sets it), so Node prints an "ExperimentalWarning: VM Modules" line; that is expected.
 - **The frontend build needs internet** (it downloads the Geist font from Google Fonts) and `NEXT_PUBLIC_API_URL` set, for example from `frontend/.env.local`. Without it the build still passes, but the bundle sends every request to the wrong origin.
 - **The e2e specs need a real MongoDB** and are skipped unless `RUN_E2E=1`; a skipped run says so and is not a pass. Outside Docker you need `MONGODB_URI` pointing at a database you can write to (an Atlas cluster, or the Compose Mongo as described under Running with Docker Compose), plus `JWT_SECRET` and `JWT_REFRESH_SECRET`, from `backend/.env` or from the shell (shell variables win over `backend/.env`). Use a database name of its own, such as `devcommunity_e2e`. The specs create throwaway users and delete everything they made; they never call Gemini (the mock summarizer is forced) and the purge job is off. In PowerShell:
@@ -216,7 +228,7 @@ At Day 19 that was 360 backend unit tests in 19 suites, 315 backend e2e tests in
 
 Real `.env` files are gitignored in both apps. Use the committed example files as the source of truth:
 
-- `backend/.env.example` — `MONGODB_URI`, `PORT`, `NODE_ENV`, `JWT_SECRET`, `JWT_EXPIRES_IN`, `JWT_REFRESH_SECRET`, `JWT_REFRESH_EXPIRES_IN`, `COOKIE_SECURE`, `COOKIE_REFRESH_PATH`, `FRONTEND_ORIGIN`, the first-admin variables `ADMIN_FULLNAME`, `ADMIN_EMAIL` and `ADMIN_PASSWORD`, plus four optional summarizer settings: `SUMMARIZER_PROVIDER` (`mock` or `gemini`), `SUMMARIZER_API_KEY`, `SUMMARIZER_MODEL` (default `gemini-3.5-flash-lite`) and `SUMMARIZER_TIMEOUT_MS` (default 10000, allowed 1000-15000). With no key the app uses the built-in mock summarizer, so nothing needs configuring to run it. Three more optional settings control the post purge job (Day 19): `POST_PURGE_ENABLED` (default `true`), `POST_PURGE_RETENTION_DAYS` (whole days, 1-365, default 7) and `POST_PURGE_CRON` (a cron expression with 5 or 6 fields, default `0 3 * * *`, so every day at 03:00 server time). An invalid value, including a cron expression that doesn't parse, stops the app at startup.
+- `backend/.env.example` — `MONGODB_URI`, `PORT`, `NODE_ENV`, `JWT_SECRET`, `JWT_EXPIRES_IN`, `JWT_REFRESH_SECRET`, `JWT_REFRESH_EXPIRES_IN`, `COOKIE_SECURE`, `COOKIE_REFRESH_PATH`, `FRONTEND_ORIGIN`, the first-admin variables `ADMIN_FULLNAME`, `ADMIN_EMAIL` and `ADMIN_PASSWORD`, plus four optional summarizer settings: `SUMMARIZER_PROVIDER` (`mock` or `gemini`), `SUMMARIZER_API_KEY`, `SUMMARIZER_MODEL` (default `gemini-3.5-flash-lite`) and `SUMMARIZER_TIMEOUT_MS` (default 10000, allowed 1000-15000). With no key the app uses the built-in mock summarizer, so nothing needs configuring to run it. Three more optional settings control the post purge job (Day 19): `POST_PURGE_ENABLED` (default `true`), `POST_PURGE_RETENTION_DAYS` (whole days, 1-365, default 7) and `POST_PURGE_CRON` (a cron expression with 5 or 6 fields, default `0 3 * * *`, so every day at 03:00 server time). An invalid value, including a cron expression that doesn't parse, stops the app at startup. The welcome-email queue adds (all optional): `REDIS_HOST` (default `localhost`) and `REDIS_PORT` (6379); `SMTP_HOST` (default `localhost`), `SMTP_PORT` (default 1025; set 1026 for the Compose Mailpit from the host) and `MAIL_FROM`; `MAIL_CONCURRENCY` (emails sent at once, 1-50, default 5); `BULL_BOARD_ENABLED` (the `/admin/queues` dashboard; default on, except in production where it is off unless `true`). Four more are test switches for measuring the queue, and the app refuses to start in production with any of them on: `MAIL_MODE` (`queue`, the default, or `sync`, where signup sends the email itself and waits), `MAIL_DELAY_MS` (a delay before each send, 0-10000), `MAIL_FAILURE_RATE` (the share of sends that fail on purpose, 0-1) and `THROTTLE_DISABLED` (turns every rate limit off, for load tests).
 - `frontend/.env.example` — `NEXT_PUBLIC_API_URL`.
 - `.env.example` (repo root) — `JWT_SECRET` and `JWT_REFRESH_SECRET` for Docker Compose, which does not read the two files above. The first-admin variables `ADMIN_FULLNAME`, `ADMIN_EMAIL` and `ADMIN_PASSWORD` are read only by the seed script (`backend/.env.example` documents them).
 
@@ -390,6 +402,15 @@ Every admin-override action creates one audit-log entry (who, what changed, befo
 - At Day 17 the 5-a-minute limit on signup and login was not covered by any automated test: the shared e2e app replaces the throttler's storage with one that never counts, so a `429` could not be provoked there, and I had only checked it by hand. Day 18 added `test/rate-limits.e2e-spec.ts`, which runs its own app with the real throttler and covers the `429` on login, signup, refresh, credential changes, search and summarize.
 - At Day 17 the e2e login test checked the cookie's `HttpOnly`, `SameSite=Lax` and `Max-Age` flags but not `Secure`, because the controller then set `secure: false` for local http. Since Day 18 `Secure` follows `NODE_ENV` (on in production, and `COOKIE_SECURE=false` is rejected there), and `test/cookies-secure.e2e-spec.ts` covers it on login, refresh, credential changes and logout.
 - A summarize request that times out and being offline look the same to the frontend (both arrive with no HTTP status), so one message covers both. A summarizer that is slow, as opposed to the server being unreachable, comes back as the server's own `504` and gets its own message.
+
+### Welcome email queue
+
+- **A crash between sending an email and recording it can send it twice.** The worker sends, then sets `welcomeEmailSentAt`. If the process dies after the SMTP server accepted the email but before that write, the job is retried after the restart and the user gets a second email. Every other retry, and a duplicate job, is skipped by that marker (tested: a second job for a user who already had the email sent nothing).
+- **A job that fails all 5 attempts is dropped.** Nothing retries it later. The worker logs it at error level with the user id (not the address), and it stays in the queue's failed list for 24 hours, where an admin can retry it from Bull Board. With a 30% simulated failure rate this happened to 0 or 1 job per 100, close to the expected 0.3⁵ ≈ 0.24% per job.
+- **With Redis down, signup still succeeds but the email is lost.** Adding a job does not fail when Redis is unreachable, it waits, so signup gives up on the queue after 2 seconds, logs the user id, and returns 201. No email is sent for that user later.
+- **The worker runs inside the API process.** There is no separate worker to scale or restart on its own, and the sends share the API's event loop and thread pool.
+- **Unexplained multi-second signup stalls, seen only in queue mode.** In some queue-mode load runs a few signups took 5 to 10 seconds while the median stayed normal (two runs at 30 signups 2 at a time, and one of the two 100-signup runs at worker concurrency 5). I never saw it in sync mode, and I did not find the cause.
+- **After a crash, the jobs that were in flight wait about 60 seconds.** Their lock has to expire and the stalled-job check (every 30 seconds) has to pass before the restarted worker picks them up. Nothing is lost; it is only late (tested: 40 of 40 users got exactly one email).
 
 ### Docker release candidate (Day 19)
 
@@ -718,3 +739,15 @@ Added on top of the Day 12 reaction interface: a line above the like/dislike but
 - **Responsive fix:** at 375px the signed-in header, the feed's sort menu and the account menu overflowed the screen. Create Post is now hidden below `sm` (it is also in the avatar menu), and both dropdowns are anchored to their button's right edge with a width cap. Measured in a real 375px viewport before and after: page width now equals the viewport at 375, 360, 320, 768 and 1280, with both menus closed and open.
 - **Verified from a fresh clone of `beta`:** all three services healthy; backend lint, 360 unit tests and build; backend e2e 315 of 315 (17 suites) against the Compose Mongo; frontend lint, 624 tests (60 suites) and `next build`. By curl: cookie attributes, CORS, login, refresh and logout, authorization, the post, comment and reaction flow, validation (including a 413), and the 429 with `Retry-After`. Persistence across `down` and `up`, Mongo stopped and restarted (the backend recovers on its own in about 13 seconds), backend stopped (the frontend keeps serving), and `restart` of everything. The images contain no `.env` file and no secret, and the logs contain no secret, token, password or email.
 - **Known limitations:** listed under Known limitations, in the Day 19 subsection. Launch blockers: none found.
+
+### Welcome email queue (background jobs with BullMQ)
+
+- **What it adds:** signup now sends a welcome email, through a background job instead of inside the request. I built it to learn message queues and background workers. Signup adds a `welcome-email` job (carrying only the user id) to a BullMQ queue in Redis and returns; a worker sends the email over SMTP (nodemailer) and records `welcomeEmailSentAt` on the user. No endpoint or response changed, so the OpenAPI snapshot is unchanged; the user schema gained `welcomeEmailSentAt`, which `toJSON` strips.
+- **Where it lives:** `backend/src/mail/` (`mail.constants.ts` with the job options, `mail.service.ts`, `mail.processor.ts` for the worker, `mail.module.ts`), the enqueue step in `AuthService.signup()`, and the Bull Board dashboard in `backend/src/queue-board/` at `/admin/queues`, guarded by the access-token cookie and the admin role read from the database (404 when `BULL_BOARD_ENABLED` is off).
+- **Reliability choices:** each job has a fixed id (`welcome-<userId>`), so the same user is never queued twice; 5 attempts with exponential backoff (2, 4, 8, 16 seconds); the worker skips a user whose `welcomeEmailSentAt` is already set and marks it with an atomic update; a malformed or deleted user finishes the job quietly instead of retrying. A job's last failed attempt is logged at error level with the user id. Signup gives up on the queue after 2 seconds when Redis is unreachable and still returns 201.
+- **Measured** (local Mongo in Docker, the API built and run with `node dist/main.js`, a 500 ms simulated mail delay, a 10-signup warm-up before each run): at 30 signups 2 at a time, signup's median was 388-582 ms with the queue against 828-918 ms sending inline. At 100 signups 10 at a time the medians overlap (bcrypt dominates), but with 30% of sends failing, inline sending failed 31-33 signups out of 100 while the queue failed none and delivered 99-100 emails. The full tables are in the PR description.
+- **Crash and duplicate tests:** killing the API mid-way through 40 emails left 2 jobs in flight; after a restart they were recovered as stalled about 60 seconds later and every one of the 40 users got exactly one email. A second job for a user who already had the email sent nothing and logged "already sent, skipping".
+- **Tests:** `mail.processor.spec.ts` and `mail.service.spec.ts` (14 cases) and the signup cases in `auth.service.spec.ts`; the e2e app now uses a fake queue and mail service (see Testing). Fixed along the way: since Bull Board was added, the e2e suite could not start at all (a CommonJS/ESM load cycle in Jest); `e2e-app.ts` now loads `@nestjs/bullmq` first. Results: backend unit 400 tests in 22 suites, e2e 316 in 17 suites (against a local Mongo, with Redis stopped), `tsc` and oxlint clean.
+- **Compose:** the backend container now gets `REDIS_HOST=redis`, `SMTP_HOST=mailpit` and `SMTP_PORT=1025`, and waits for a healthy Redis. Checked with the containerised backend: one signup's email reached Mailpit in about half a second, and `/admin/queues` answered 404.
+- **Load-test tooling:** `npm run seed:signups` fires a burst of signups, waits for the emails in Mailpit, and reports per-user duplicates and misses, plus the queue's failed and pending jobs; `--cleanup` deletes only the `load-…@example.com` users it made. `npm run mail:test` and `npm run mail:enqueue` send one email or one job by hand.
+- **Known limitations:** listed under Known limitations, in the Welcome email queue subsection.
