@@ -128,28 +128,32 @@ export class AuthService {
 
     const userId = String(user._id);
     let timer: NodeJS.Timeout | undefined;
+    const cutoff = new Error(`no answer in ${ENQUEUE_TIMEOUT_MS} ms`);
     try {
       await Promise.race([
         this.mailQueue.add(WELCOME_JOB, { userId }, welcomeJobOptions(userId)),
         new Promise<never>((_, reject) => {
-          timer = setTimeout(
-            () =>
-              reject(
-                new Error(`queue did not answer in ${ENQUEUE_TIMEOUT_MS} ms`),
-              ),
-            ENQUEUE_TIMEOUT_MS,
-          );
+          timer = setTimeout(() => reject(cutoff), ENQUEUE_TIMEOUT_MS);
         }),
       ]);
     } catch (error) {
-      // Redis unreachable: the user still gets their account; the welcome
-      // email is late at best (see ENQUEUE_TIMEOUT_MS). The user's address is
+      // The user still gets their account either way. The user's address is
       // not logged, only their id.
-      this.logger.error(
-        `Could not queue the welcome email for user ${userId}: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
+      if (error === cutoff) {
+        // Redis did not answer in time, but the add is still pending in the
+        // Redis client: if Redis returns while this process runs, the job is
+        // added then and the email goes out late.
+        this.logger.error(
+          `The welcome email job for user ${userId} was not added within ${ENQUEUE_TIMEOUT_MS} ms; it will be added, and the email sent late, if Redis returns while the API is still running`,
+        );
+      } else {
+        // The add itself failed, so nothing is pending.
+        this.logger.error(
+          `The welcome email job for user ${userId} could not be added, so no welcome email will be sent: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
     } finally {
       clearTimeout(timer);
     }

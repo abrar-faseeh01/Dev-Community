@@ -3,6 +3,7 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -216,22 +217,45 @@ describe('AuthService', () => {
         expect(mail.sendWelcome).not.toHaveBeenCalled();
       });
 
-      it('still creates the account when the queue is unreachable', async () => {
+      it('still creates the account when the add is rejected, and logs that no email will be sent', async () => {
+        const errorSpy = jest
+          .spyOn(Logger.prototype, 'error')
+          .mockImplementation(() => {});
         mail.add.mockRejectedValue(new Error('connect ECONNREFUSED'));
 
         await expect(service.signup(dto)).resolves.toMatchObject({
           _id: 'u1',
         });
         expect(create).toHaveBeenCalledTimes(1);
+
+        expect(errorSpy).toHaveBeenCalledTimes(1);
+        const message = String(errorSpy.mock.calls[0][0]);
+        expect(message).toContain('user u1');
+        expect(message).toContain('no welcome email will be sent');
+        expect(message).toContain('connect ECONNREFUSED');
+        expect(message).not.toContain('ada@x.test');
+        errorSpy.mockRestore();
       });
 
-      it('still creates the account when the queue never answers', async () => {
+      it('still creates the account when the queue never answers, and logs that the email will be late', async () => {
+        const errorSpy = jest
+          .spyOn(Logger.prototype, 'error')
+          .mockImplementation(() => {});
         // A dead Redis does not reject, it just never replies.
         mail.add.mockReturnValue(new Promise(() => {}));
 
         await expect(service.signup(dto)).resolves.toMatchObject({
           _id: 'u1',
         });
+
+        expect(errorSpy).toHaveBeenCalledTimes(1);
+        const message = String(errorSpy.mock.calls[0][0]);
+        expect(message).toContain('user u1');
+        expect(message).toContain('not added within 2000 ms');
+        expect(message).toContain('sent late');
+        expect(message).toContain('if Redis returns');
+        expect(message).not.toContain('ada@x.test');
+        errorSpy.mockRestore();
       }, 10_000);
 
       it('in sync mode sends the email itself and adds no job', async () => {
