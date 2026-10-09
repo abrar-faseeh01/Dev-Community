@@ -64,9 +64,7 @@ describe('MailProcessor', () => {
     });
     processor = new MailProcessor(userModel, mail, config);
     logSpy = jest.spyOn(Logger.prototype, 'log').mockImplementation(() => {});
-    warnSpy = jest
-      .spyOn(Logger.prototype, 'warn')
-      .mockImplementation(() => {});
+    warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => {});
     errorSpy = jest
       .spyOn(Logger.prototype, 'error')
       .mockImplementation(() => {});
