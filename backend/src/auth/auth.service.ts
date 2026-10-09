@@ -28,8 +28,11 @@ import { UpdateCredentialsDto } from './dto/update-credentials.dto';
 
 const SALT_ROUNDS = 12;
 // With Redis unreachable, queue.add() does not fail: it waits for the
-// connection to come back, which would freeze every signup. Past this long the
-// welcome email is given up on and signup carries on.
+// connection to come back, which would freeze every signup. Past this long
+// signup stops waiting and carries on. The add itself stays pending in the
+// Redis client: if Redis returns while this process is still running, the job
+// is added then and the email goes out late; if the process stops first, it
+// is lost.
 export const ENQUEUE_TIMEOUT_MS = 2000;
 
 type RefreshPayload = { sub?: string; type?: string; exp?: number };
@@ -139,8 +142,9 @@ export class AuthService {
         }),
       ]);
     } catch (error) {
-      // Redis unreachable: the user still gets their account, only the welcome
-      // email is lost. The user's address is not logged, only their id.
+      // Redis unreachable: the user still gets their account; the welcome
+      // email is late at best (see ENQUEUE_TIMEOUT_MS). The user's address is
+      // not logged, only their id.
       this.logger.error(
         `Could not queue the welcome email for user ${userId}: ${
           error instanceof Error ? error.message : String(error)

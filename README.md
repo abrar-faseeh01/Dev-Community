@@ -55,7 +55,7 @@ Signup sends a welcome email through a background queue, which needs Redis, and 
 docker compose up -d redis mailpit
 ```
 
-`backend/.env.example` already points at them (`REDIS_HOST=localhost`, `SMTP_HOST=localhost`, `SMTP_PORT=1026`). The emails show up at `http://localhost:8025`. Without Redis the backend still starts and signup still works, but each signup waits 2 seconds for the queue and its welcome email is lost (see Known limitations).
+`backend/.env.example` already points at them (`REDIS_HOST=localhost`, `SMTP_HOST=localhost`, `SMTP_PORT=1026`). The emails show up at `http://localhost:8025`. Without Redis the backend still starts and signup still works, but each signup waits 2 seconds for the queue and its welcome email is at best late (see Known limitations).
 
 ```bash
 npm run start:dev
@@ -407,7 +407,7 @@ Every admin-override action creates one audit-log entry (who, what changed, befo
 
 - **A crash between sending an email and recording it can send it twice.** The worker sends, then sets `welcomeEmailSentAt`. If the process dies after the SMTP server accepted the email but before that write, the job is retried after the restart and the user gets a second email. Every other retry, and a duplicate job, is skipped by that marker (tested: a second job for a user who already had the email sent nothing).
 - **A job that fails all 5 attempts is dropped.** Nothing retries it later. The worker logs it at error level with the user id (not the address), and it stays in the queue's failed list for 24 hours, where an admin can retry it from Bull Board. With a 30% simulated failure rate this happened to 0 or 1 job per 100, close to the expected 0.3⁵ ≈ 0.24% per job.
-- **With Redis down, signup still succeeds but the email is lost.** Adding a job does not fail when Redis is unreachable, it waits, so signup gives up on the queue after 2 seconds, logs the user id, and returns 201. No email is sent for that user later.
+- **With Redis down, signup still succeeds but the email is late or lost.** Adding a job does not fail when Redis is unreachable, it waits, so signup stops waiting after 2 seconds, logs the user id ("Could not queue the welcome email"), and returns 201. The add stays pending inside the Redis client: when Redis came back with the API still running, the job was added and the email arrived (tested). If the API restarts before Redis returns, that pending add is gone and the user never gets the email (not tested). The log line therefore does not mean the email is definitely lost. While Redis stays down, every signup leaves one such pending add in memory.
 - **The worker runs inside the API process.** There is no separate worker to scale or restart on its own, and the sends share the API's event loop and thread pool.
 - **Unexplained multi-second signup stalls, seen only in queue mode.** In some queue-mode load runs a few signups took 5 to 10 seconds while the median stayed normal (two runs at 30 signups 2 at a time, and one of the two 100-signup runs at worker concurrency 5). I never saw it in sync mode, and I did not find the cause.
 - **After a crash, the jobs that were in flight wait about 60 seconds.** Their lock has to expire and the stalled-job check (every 30 seconds) has to pass before the restarted worker picks them up. Nothing is lost; it is only late (tested: 40 of 40 users got exactly one email).
