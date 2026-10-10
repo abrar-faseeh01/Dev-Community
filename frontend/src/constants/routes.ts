@@ -13,6 +13,7 @@ export const ROUTES = {
   POSTS: "/posts",
   POSTS_CREATE: "/posts/create",
   POSTS_MINE: "/posts/mine",
+  CHANGELOG: "/changelog",
   PROFILE_EDIT: "/profile/edit",
   ADMIN_USERS: "/admin/users",
   ADMIN_AUDIT_LOG: "/admin/audit-log",

@@ -65,6 +65,9 @@ export async function createE2eApp(
   process.env.SUMMARIZER_API_KEY = '';
   // Same ordering rule: the purge job must never run inside a test app.
   process.env.POST_PURGE_ENABLED = 'false';
+  // Same for the changelog: a test must never reach GitHub, even when .env
+  // holds real GitHub App credentials.
+  process.env.CHANGELOG_PROVIDER = 'mock';
 
   const { Test } = await import('@nestjs/testing');
   await import('@nestjs/common');

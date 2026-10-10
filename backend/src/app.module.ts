@@ -6,6 +6,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
+import { ChangelogModule } from './changelog/changelog.module';
 import { CommentsModule } from './comments/comments.module';
 import { validateEnv } from './config/env.validation';
 import { HealthModule } from './health/health.module';
@@ -41,6 +42,7 @@ import { UsersModule } from './users/users.module';
     CommentsModule,
     ReactionsModule,
     SummarizerModule,
+    ChangelogModule,
     ScheduleModule.forRoot(),
   ],
   controllers: [AppController],

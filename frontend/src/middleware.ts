@@ -1,7 +1,7 @@
 import { ROUTES } from "@/constants/routes";
 import { NextRequest, NextResponse } from "next/server";
 
-const PROTECTED_PATHS = ["/dashboard", "/settings", "/profile", "/admin"]; // add more protected routes here as you build them
+const PROTECTED_PATHS = ["/dashboard", "/settings", "/profile", "/admin", "/changelog"]; // add more protected routes here as you build them
 
 // Posts are readable without an account (the API's GET /posts and
 // GET /posts/:id are public), so only the pages that write are protected:
@@ -39,5 +39,6 @@ export const config = {
     "/profile/:path*",
     "/posts/:path*",
     "/admin/:path*",
+    "/changelog/:path*",
   ],
 };

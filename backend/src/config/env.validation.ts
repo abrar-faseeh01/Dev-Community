@@ -94,6 +94,22 @@ const envSchema = z
       blankToUndefined,
       z.coerce.number().int().min(1000).max(15000).default(10000),
     ),
+    // Changelog: GitHub App credentials. All optional; any one missing means
+    // the mock provider. The private key is one line with \n for newlines.
+    CHANGELOG_PROVIDER: z.preprocess(
+      blankToUndefined,
+      z.enum(['mock', 'github']).optional(),
+    ),
+    GITHUB_APP_ID: z.preprocess(blankToUndefined, z.string().trim().optional()),
+    GITHUB_APP_INSTALLATION_ID: z.preprocess(
+      blankToUndefined,
+      z.string().trim().optional(),
+    ),
+    GITHUB_APP_PRIVATE_KEY: z.preprocess(
+      blankToUndefined,
+      z.string().optional(),
+    ),
+
     // Hard-delete of posts that were soft-deleted long enough ago (Day 19).
     POST_PURGE_ENABLED: z.preprocess(
       blankToUndefined,

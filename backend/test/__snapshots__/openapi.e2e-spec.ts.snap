@@ -218,6 +218,115 @@ exports[`OpenAPI document matches the committed snapshot 1`] = `
         ],
         "type": "object",
       },
+      "ChangelogEntryDto": {
+        "properties": {
+          "_id": {
+            "example": "64f1c2e5a1b2c3d4e5f6a7f0",
+            "type": "string",
+          },
+          "authorLogin": {
+            "example": "octocat",
+            "type": "string",
+          },
+          "baseBranch": {
+            "example": "main",
+            "type": "string",
+          },
+          "body": {
+            "description": "The PR description as Markdown (at most 10000 characters, empty if none). Untrusted text written on GitHub: render it as Markdown without raw HTML.",
+            "example": "## What changed
+
+- Adds the changelog page",
+            "type": "string",
+          },
+          "htmlUrl": {
+            "example": "https://github.com/octocat/hello-world/pull/42",
+            "type": "string",
+          },
+          "mergedAt": {
+            "example": "2026-10-08T12:00:00.000Z",
+            "format": "date-time",
+            "type": "string",
+          },
+          "owner": {
+            "example": "octocat",
+            "type": "string",
+          },
+          "prNumber": {
+            "example": 42,
+            "type": "number",
+          },
+          "repo": {
+            "example": "hello-world",
+            "type": "string",
+          },
+          "syncedAt": {
+            "example": "2026-10-09T08:00:00.000Z",
+            "format": "date-time",
+            "type": "string",
+          },
+          "title": {
+            "example": "Add changelog page",
+            "type": "string",
+          },
+        },
+        "required": [
+          "_id",
+          "owner",
+          "repo",
+          "prNumber",
+          "title",
+          "authorLogin",
+          "mergedAt",
+          "htmlUrl",
+          "baseBranch",
+          "body",
+          "syncedAt",
+        ],
+        "type": "object",
+      },
+      "ChangelogListResponseDto": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/ChangelogEntryDto",
+            },
+            "type": "array",
+          },
+          "success": {
+            "example": true,
+            "type": "boolean",
+          },
+        },
+        "required": [
+          "success",
+          "data",
+        ],
+        "type": "object",
+      },
+      "ChangelogSyncResponseDto": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ChangelogEntryDto",
+              },
+            ],
+            "description": "null when the repository has no PR merged into main.",
+            "nullable": true,
+            "type": "object",
+          },
+          "success": {
+            "example": true,
+            "type": "boolean",
+          },
+        },
+        "required": [
+          "success",
+          "data",
+        ],
+        "type": "object",
+      },
       "CommentDto": {
         "properties": {
           "author": {
@@ -1268,6 +1377,19 @@ exports[`OpenAPI document matches the committed snapshot 1`] = `
         ],
         "type": "object",
       },
+      "SyncChangelogDto": {
+        "properties": {
+          "repo": {
+            "description": "\`owner/repo\`.",
+            "example": "octocat/hello-world",
+            "type": "string",
+          },
+        },
+        "required": [
+          "repo",
+        ],
+        "type": "object",
+      },
       "ToggleReactionDto": {
         "properties": {
           "type": {
@@ -1929,6 +2051,162 @@ exports[`OpenAPI document matches the committed snapshot 1`] = `
         "summary": "Create an account",
         "tags": [
           "auth",
+        ],
+      },
+    },
+    "/changelog": {
+      "get": {
+        "description": "Newest merged first, at most 50. Reads only the database and never calls GitHub, so it works while GitHub is down.",
+        "operationId": "ChangelogController_findAll",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangelogListResponseDto",
+                },
+              },
+            },
+            "description": "",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Missing, invalid, or expired session cookie.",
+          },
+        },
+        "security": [
+          {
+            "access_token": [],
+          },
+        ],
+        "summary": "List stored changelog entries",
+        "tags": [
+          "changelog",
+        ],
+      },
+    },
+    "/changelog/sync": {
+      "post": {
+        "description": "Fetches the most recently merged PR into \`main\` for one repository and upserts it (syncing the same PR twice leaves one entry). On any failure nothing is written and existing entries are untouched. Failure bodies use the standard envelope; the message is fixed text per failure and never contains a token, key or GitHub response. Without GitHub App credentials the server uses a fixed mock PR.",
+        "operationId": "ChangelogController_sync",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyncChangelogDto",
+              },
+            },
+          },
+          "required": true,
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangelogSyncResponseDto",
+                },
+              },
+            },
+            "description": "",
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "\`repo\` is not in \`owner/repo\` form.",
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Missing, invalid, or expired session cookie.",
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Caller is not an admin.",
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "Repository not found, or the App is not installed on it (\`REPO_NOT_FOUND\`).",
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "More than 5 sync requests in a minute from one IP.",
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "The server's GitHub App was refused (\`GITHUB_AUTH_FAILED\`, \`GITHUB_FORBIDDEN\`). Not the caller's session.",
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "GitHub is unreachable (\`GITHUB_UNAVAILABLE\`) or its rate limit is reached (\`GITHUB_RATE_LIMITED\`).",
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto",
+                },
+              },
+            },
+            "description": "GitHub took too long (\`GITHUB_TIMEOUT\`).",
+          },
+        },
+        "security": [
+          {
+            "access_token": [],
+          },
+        ],
+        "summary": "Sync the last PR merged into main (admin only)",
+        "tags": [
+          "changelog",
         ],
       },
     },

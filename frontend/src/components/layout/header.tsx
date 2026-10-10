@@ -60,6 +60,22 @@ export function Header() {
             Feed
           </Link>
 
+          {/* The changelog API needs a session, so the link is for signed-in
+              users only. Hidden on phones, where the header is already full. */}
+          {!loading && user && (
+            <Link
+              href={ROUTES.CHANGELOG}
+              aria-current={pathname === ROUTES.CHANGELOG ? "page" : undefined}
+              className={`hidden rounded-lg px-3 py-2 font-medium transition-colors hover:bg-neutral-900 sm:block ${
+                pathname === ROUTES.CHANGELOG
+                  ? "text-white"
+                  : "text-neutral-400 hover:text-white"
+              }`}
+            >
+              Changelog
+            </Link>
+          )}
+
           {canCreate && (
             <Link
               href={ROUTES.POSTS_CREATE}
