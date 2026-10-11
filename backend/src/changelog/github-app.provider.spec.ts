@@ -59,12 +59,14 @@ describe('GithubAppProvider', () => {
           ]),
         );
 
-      await expect(provider().getLastMergedPr('o', 'r')).resolves.toMatchObject({
-        prNumber: 2,
-        authorLogin: 'octocat',
-        baseBranch: 'main',
-        mergedAt: new Date('2026-10-05T00:00:00Z'),
-      });
+      await expect(provider().getLastMergedPr('o', 'r')).resolves.toMatchObject(
+        {
+          prNumber: 2,
+          authorLogin: 'octocat',
+          baseBranch: 'main',
+          mergedAt: new Date('2026-10-05T00:00:00Z'),
+        },
+      );
     });
 
     it('keeps the PR description, turns a null one into "" and caps a huge one', async () => {
@@ -108,9 +110,9 @@ describe('GithubAppProvider', () => {
         `Bearer ${SECRET_TOKEN}`,
       );
       // App JWT: three base64url parts.
-      expect(
-        (first.headers as Record<string, string>).Authorization,
-      ).toMatch(/^Bearer [\w-]+\.[\w-]+\.[\w-]+$/);
+      expect((first.headers as Record<string, string>).Authorization).toMatch(
+        /^Bearer [\w-]+\.[\w-]+\.[\w-]+$/,
+      );
     });
   });
 

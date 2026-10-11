@@ -21,7 +21,9 @@ const PR: MergedPr = {
 function setup() {
   const getLastMergedPr = jest.fn<ChangelogProvider['getLastMergedPr']>();
   const provider: ChangelogProvider = { source: 'github', getLastMergedPr };
-  const exec = jest.fn<() => Promise<unknown>>().mockResolvedValue({ _id: 'x' });
+  const exec = jest
+    .fn<() => Promise<unknown>>()
+    .mockResolvedValue({ _id: 'x' });
   const findOneAndUpdate = jest.fn().mockReturnValue({ exec });
   const model = { findOneAndUpdate } as unknown as Model<ChangelogEntry>;
   return {
@@ -68,7 +70,9 @@ describe('ChangelogService.sync', () => {
       const { service, getLastMergedPr, findOneAndUpdate } = setup();
       getLastMergedPr.mockRejectedValue(new ChangelogSyncError(code));
 
-      const error = await service.sync('octocat/hello').catch((e: unknown) => e);
+      const error = await service
+        .sync('octocat/hello')
+        .catch((e: unknown) => e);
 
       expect(error).toBeInstanceOf(ChangelogSyncError);
       expect((error as ChangelogSyncError).getResponse()).toEqual({
