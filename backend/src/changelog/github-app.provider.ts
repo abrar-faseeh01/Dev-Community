@@ -180,6 +180,7 @@ function toMergedPr(raw: RawPr): MergedPr | null {
     htmlUrl: raw.html_url,
     baseBranch: raw.base.ref,
     // GitHub sends null for an empty description.
-    body: typeof raw.body === 'string' ? raw.body.slice(0, MAX_BODY_LENGTH) : '',
+    body:
+      typeof raw.body === 'string' ? raw.body.slice(0, MAX_BODY_LENGTH) : '',
   };
 }
