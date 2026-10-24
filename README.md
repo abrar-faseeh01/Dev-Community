@@ -1,6 +1,23 @@
+
 # Developer Community Platform
 
-I'm building a Developer Community Platform where members can authenticate, maintain a developer profile, publish posts, comment (threaded, with replies), react (like/dislike), and (eventually) search and browse ranked content. This repo covers the platform through Day 19 of my 20-day build plan. Days 1-12 are summarized in this paragraph; Days 13-17 (ranked and latest feeds, feed filters, full-text search, an AI post summarizer, and focused automated testing), Day 18 (session and security hardening: refresh tokens, `Secure` cookies, request limits) and Day 19 (the post purge job, and the Docker Compose setup with its release-candidate review) are in the Progress log below. Days 1-12: project foundations, authentication with role-based access, a full developer profile API and form, a Posts API with ownership, pagination, and admin moderation, the posts UI (infinite-scroll feed, post page, create/edit form), a threaded comments API (create, reply, list as a tree, cascade delete, and edit), and the comments UI itself (recursive reply/edit/delete, permission-gated, with full keyboard focus management), and the reaction engine on the backend (like/dislike on posts and comments with toggle behaviour, a unique index, and concurrency-safe counters; the reaction buttons with optimistic updates and a "who reacted" overlay are the Day 12 frontend on top of it). After Day 8 I also restructured the frontend into a feature-first layout (see the Day 8 section under Progress).
+A full-stack social platform where developers can create profiles, share posts, participate in threaded discussions, and engage with the community.
+
+### Key Features
+
+- **Authentication & Authorization** — JWT-based authentication with HTTP-only cookies and role-based access control.
+- **Developer Profiles** — Manage skills, experience, bio, and portfolio projects.
+- **Posts & Feeds** — Create and manage posts, browse paginated feeds, and explore ranked content.
+- **Threaded Comments** — Reply to comments with nested discussions and permission-based editing and deletion.
+- **Reactions** — Like and dislike posts and comments with concurrency-safe counters.
+- **Search & AI Summarization** — Search posts by text and generate post summaries.
+- **Admin Moderation** — Manage users, moderate content, and review audit logs.
+- **Notifications** — Receive in-app notifications for relevant administrative actions.
+- **Automated Testing** — Backend unit and E2E tests, plus frontend component tests.
+- **Docker Support** — Run the application and MongoDB using Docker Compose.
+
+This project follows a 20-day development plan. See the [Progress](#progress) section for implementation milestones and engineering decisions.
+
 
 ## Stack
 
@@ -178,12 +195,15 @@ If a port is already taken, Docker refuses to start that container with a "ports
 - A different backend port also needs the `NEXT_PUBLIC_API_URL` build argument of the frontend to be the new browser URL (for example `http://localhost:3005`), and then `docker compose up -d --build`.
 - A different Mongo port only matters for tools on your machine, such as the e2e `MONGODB_URI` above.
 
-### Limits of the Compose setup
 
-- It works over `http://localhost` only. In production mode the backend forces `Secure` cookies and refuses `COOKIE_SECURE=false`. Chrome, Edge and Firefox accept `Secure` cookies from `http://localhost`; Safari rejects them over plain HTTP, so sign-in does not stick there. A real deployment needs HTTPS and a `FRONTEND_ORIGIN` that matches it.
-- `http://127.0.0.1:3001` does not work: the backend answers every origin with the `http://localhost:3001` origin, so the browser rejects it.
-- The summarizer runs on the built-in mock, because no Gemini key is passed through. Add `SUMMARIZER_PROVIDER` and `SUMMARIZER_API_KEY` to the backend's `environment:` in `compose.yaml` to use Gemini.
-- The rest of the list is under Known limitations, in the Day 19 subsection.
+### Limits of the Compose Setup
+
+- **Local browser compatibility:** Use `http://localhost:3001` in Chrome, Edge, or Firefox. Safari sign-in over plain HTTP is not supported by the current setup. A real deployment requires HTTPS and a matching `FRONTEND_ORIGIN`.
+- **Summarizer:** The Compose setup uses the built-in mock summarizer unless an external provider is configured. See [Environment variables](#environment-variables).
+- **Network binding:** The frontend and backend ports are published on all interfaces by default. For local-only access, bind their host ports to `127.0.0.1` in `compose.yaml`.
+
+See [Docker Release Candidate](#docker-release-candidate-day-19) for the review scope and remaining deployment considerations.
+
 
 ## Testing
 
@@ -343,21 +363,19 @@ Every admin-override action creates one audit-log entry (who, what changed, befo
 
 
 
-### Docker Release Candidate (Day 19)
 
-**Release candidate tested; no launch blockers identified in the review.** Verified from a fresh clone of the `beta` branch on October 6, 2026, and documented October 7, 2026.
+## Docker Release Candidate
 
-- **Docker Compose:** The application starts with the backend, frontend, and MongoDB services.
-- **Authentication and cookies:** Local development uses `http://localhost:3001` in Chrome, Edge, or Firefox. Safari compatibility over plain HTTP has not been verified successfully. Production deployment requires HTTPS and a matching `FRONTEND_ORIGIN`.
-- **Summarizer:** Docker Compose uses the mock summarizer by default. Configure `SUMMARIZER_PROVIDER` and `SUMMARIZER_API_KEY` to use an external AI provider.
-- **Authentication token lifecycle:** Access tokens remain valid until expiration after logout. Refresh tokens are not rotated during refresh.
-- **Database resilience:** `/health` returns `503` when MongoDB is unavailable. The backend reconnects automatically when the database becomes available again.
-- **Network exposure:** The frontend and backend ports are published on all network interfaces by default. For local-only access, bind ports `3000` and `3001` to `127.0.0.1`.
-- **Automated tests:** All 315 backend E2E tests passed in 87 seconds during a fresh-clone run. Running tests alongside other workloads using the same MongoDB instance may cause timeouts.
-- **Responsive UI:** Some header elements are constrained on narrow screens, and the Admin Users and Audit Log tables require horizontal scrolling on mobile.
-- **Security review:** `npm audit` reported dependency vulnerabilities, including critical-severity findings in both the backend and frontend. These findings require investigation before production deployment.
+The Docker Compose setup was tested from a fresh clone of the `beta` branch on October 6, 2026.
 
-**Testing scope:** Safari, real mobile browsers, the external Gemini provider, and execution of the scheduled 03:00 purge job inside the container were not verified during this review.
+- **Docker Compose:** Backend, frontend, and MongoDB started successfully, with health checks passing.
+- **Automated tests:** All 360 backend unit tests, 315 backend E2E tests, and 624 frontend tests passed during the review. Lint checks and production builds also passed.
+- **Authentication and networking:** Login, refresh, logout, cookie attributes, CORS, authorization, and rate limiting were checked.
+- **Database resilience:** The backend recovered automatically after MongoDB restarted, without requiring a backend restart.
+- **Known limitations:** Local HTTP browser compatibility, mock summarization by default, access-token validity after logout, and mobile layout constraints remain.
+- **Production readiness:** Dependency audit findings, including critical-severity vulnerabilities, require investigation before production deployment.
+
+**Not verified:** Safari, real mobile browsers, the external Gemini provider in the Compose environment, and the scheduled purge job firing inside the container.
 
 
 ## Progress
@@ -652,4 +670,6 @@ Added on top of the Day 12 reaction interface: a line above the like/dislike but
 - **Configuration:** the backend's settings are in `compose.yaml`; the two JWT secrets come from a root `.env` and `docker compose` fails fast if either is missing. `NEXT_PUBLIC_API_URL` is a build argument (`http://localhost:3000`, the browser's address for the API, not the service name), and the frontend Dockerfile fails the build if it is empty.
 - **Responsive fix:** at 375px the signed-in header, the feed's sort menu and the account menu overflowed the screen. Create Post is now hidden below `sm` (it is also in the avatar menu), and both dropdowns are anchored to their button's right edge with a width cap. Measured in a real 375px viewport before and after: page width now equals the viewport at 375, 360, 320, 768 and 1280, with both menus closed and open.
 - **Verified from a fresh clone of `beta`:** all three services healthy; backend lint, 360 unit tests and build; backend e2e 315 of 315 (17 suites) against the Compose Mongo; frontend lint, 624 tests (60 suites) and `next build`. By curl: cookie attributes, CORS, login, refresh and logout, authorization, the post, comment and reaction flow, validation (including a 413), and the 429 with `Retry-After`. Persistence across `down` and `up`, Mongo stopped and restarted (the backend recovers on its own in about 13 seconds), backend stopped (the frontend keeps serving), and `restart` of everything. The images contain no `.env` file and no secret, and the logs contain no secret, token, password or email.
-- **Known limitations:** listed under Known limitations, in the Day 19 subsection. Launch blockers: none found.
+
+- **Review outcome:** No launch blockers were identified during this review. See [Docker Release Candidate](#docker-release-candidate-day-19) for the review summary and remaining limitations.
+
