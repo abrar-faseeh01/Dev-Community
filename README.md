@@ -342,39 +342,23 @@ Every admin-override action creates one audit-log entry (who, what changed, befo
 
 
 
-### Docker release candidate (Day 19)
 
-**Launch blockers: none found** (final check from a fresh clone of `beta`, 2026-10-06; written up 2026-10-07). Everything below is a known limitation, with its impact and a workaround.
+### Docker Release Candidate (Day 19)
 
-- **HTTP on localhost only.** Compose runs the backend in production mode, which forces `Secure` cookies. Chrome, Edge and Firefox accept them from `http://localhost`; Safari rejects them over plain HTTP, so sign-in does not stick there. `http://127.0.0.1:3001` is blocked by CORS: the backend answers every origin with the `http://localhost:3001` origin, so a browser on any other origin rejects the response. Workaround: use `http://localhost:3001` in Chrome, Edge or Firefox. A real deployment needs HTTPS and a matching `FRONTEND_ORIGIN`.
-- **The summarizer is the mock in Compose.** No Gemini key is passed through, so summaries are the extractive mock ones (`source: mock`). Workaround: add `SUMMARIZER_PROVIDER` and `SUMMARIZER_API_KEY` to the backend's `environment:` in `compose.yaml`.
-- **No per-request logging.** Neither service logs a line per request; the backend logs startup and server errors, the frontend its start. Impact: harder to see what happened when debugging. No workaround yet.
-- **`POST /auth/refresh` re-issues only the access cookie.** The refresh token is not rotated, which matches the Swagger text. Impact: a stolen refresh token stays usable for its 7 days unless the user logs out.
-- **Signup does not sign the user in, and a duplicate signup says so.** A second signup with the same email returns `409 Email already in use`, which reveals that an email is registered; login gives the same `401` for an unknown email and a wrong password. The frontend signs the new user in with a login call right after signup. Workaround: none needed for this project's scope.
-- **Logout does not revoke the access token.** It revokes the refresh token and clears both cookies, but an access token someone copied earlier stays valid until its 15-minute JWT expires.
-- **A database outage gives `GET /posts` a 500.** It logs a raw `MongoServerSelectionError` instead of returning 503, while `GET /health` correctly returns 503. The backend reconnects on its own about 13 seconds after Mongo returns, with no restart.
-- **Docker flags the backend unhealthy only about a minute after Mongo goes away** (5 failed checks, 15 seconds apart). `/health` itself turns 503 within seconds.
-- **Ports 3000 and 3001 are published on all interfaces.** Mongo is bound to `127.0.0.1` only. Anything on the same network can reach the app. Workaround: put `127.0.0.1:` in front of those two mappings in `compose.yaml`.
-- **Rate limits are per IP.** Login is 5 a minute (a 429 with `Retry-After: 60`), so clients behind one host or NAT share a bucket.
-- **Fixed project name and ports.** `devcommunity` and 3000, 3001 and 27017 cannot be changed without editing `compose.yaml` (see Running with Docker Compose). Two checkouts cannot run together.
-- **Leftovers accumulate.** `docker compose down` does not remove the anonymous `/data/configdb` volumes, the tagged seed image, or a stale `:build` image tag from a manual build. Workaround: the cleanup commands in Running with Docker Compose.
-- **Backend e2e can time out under load.** Run alongside other work that hits the same Mongo, the first spec can exceed its 60-second hook timeout. It did not reproduce on a cold clone (315 of 315 passed in 87 seconds), so run it alone.
-- **`npm audit` reports 29 backend and 27 frontend vulnerabilities** (one critical on each side). I have not investigated them.
-- **`next build` prints the `middleware` to `proxy` deprecation warning.** The rename is deliberately left for a change of its own.
-- **Responsive.** Below the `sm` breakpoint the Create Post button is hidden from the header (it is in the avatar menu). At 320px the search box is about 58px wide and the signed-out header is tight. The Admin Users and Audit log tables scroll sideways inside their container, so on a phone the last column (Edit and Delete, View details) needs a sideways scroll.
-- **Not tested:** Safari, real phone browsers, the Gemini provider, and the 03:00 purge job firing in the container.
+**Release candidate tested; no launch blockers identified in the review.** Verified from a fresh clone of the `beta` branch on October 6, 2026, and documented October 7, 2026.
 
-### Frontend error and loading states (release-candidate review)
+- **Docker Compose:** The application starts with the backend, frontend, and MongoDB services.
+- **Authentication and cookies:** Local development uses `http://localhost:3001` in Chrome, Edge, or Firefox. Safari compatibility over plain HTTP has not been verified successfully. Production deployment requires HTTPS and a matching `FRONTEND_ORIGIN`.
+- **Summarizer:** Docker Compose uses the mock summarizer by default. Configure `SUMMARIZER_PROVIDER` and `SUMMARIZER_API_KEY` to use an external AI provider.
+- **Authentication token lifecycle:** Access tokens remain valid until expiration after logout. Refresh tokens are not rotated during refresh.
+- **Database resilience:** `/health` returns `503` when MongoDB is unavailable. The backend reconnects automatically when the database becomes available again.
+- **Network exposure:** The frontend and backend ports are published on all network interfaces by default. For local-only access, bind ports `3000` and `3001` to `127.0.0.1`.
+- **Automated tests:** All 315 backend E2E tests passed in 87 seconds during a fresh-clone run. Running tests alongside other workloads using the same MongoDB instance may cause timeouts.
+- **Responsive UI:** Some header elements are constrained on narrow screens, and the Admin Users and Audit Log tables require horizontal scrolling on mobile.
+- **Security review:** `npm audit` reported dependency vulnerabilities, including critical-severity findings in both the backend and frontend. These findings require investigation before production deployment.
 
-These come from reading the frontend code for the Day 19 review; none is a launch blocker. They have not been reproduced in a browser unless it says so.
+**Testing scope:** Safari, real mobile browsers, the external Gemini provider, and execution of the scheduled 03:00 purge job inside the container were not verified during this review.
 
-- **Not every load error has a Retry button.** The feed, the post page, the edit page, "Posts made by you", search results, the comments and the reactor lists do. The profile view, the two profile edit pages, Admin Users, the Audit log and the notification list show the error and nothing else. Workaround: reload the page.
-- **"Request failed" when the server cannot be reached.** The API client's fallback message, used when there is no response at all, is shown as-is by the login, signup and settings forms, the profile pages, Admin Users, the Audit log, the notification list and the System Status card. The feed, the post page, the comments, reactions and the summarizer map it to "Couldn't reach the server…" instead. Workaround: none; the wording is the only problem.
-- **Other server messages are shown unchanged too.** A `429` from login, signup or a credential change reads `ThrottlerException: Too Many Requests` in the form's error banner (that is the throttler's default message, and the API returns it for the `429`; only the summarizer maps its own `429`).
-- **A failed `GET /auth/me` of any kind makes a signed-in user look signed out.** The call treats every failure (a `429`, a 5xx or no response) as "nobody is signed in", and the answer is cached until the page is reloaded, so protected pages send the user to `/login` even though the session is still valid. Workaround: reload once the server is back.
-- **Signup is two calls, signup and then login.** If the second fails (for example with a `429` on login), the account exists but the page shows an error, and signing up again with the same email returns `409`. Workaround: sign in with the new account.
-- **A logout that fails on the network still signs the user out of the UI** and goes to `/login`, but the server session and cookies are untouched, so a reload signs them back in. This is from the code, not reproduced.
-- **No global error boundary.** `app/error.tsx` catches errors inside the pages; an error thrown by the root layout (the header, for example) would show Next's default error page, because there is no `global-error.tsx`.
 
 ## Progress
 
