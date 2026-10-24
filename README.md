@@ -1,96 +1,37 @@
+
 # Developer Community Platform
 
-A full-stack platform where developers sign up, keep a profile, publish posts, discuss them in threaded comments, and react to content. The NestJS API stores data in MongoDB, and a Next.js frontend consumes it. Admins moderate content, and every admin override is audit-logged and notified to the affected member. This repository is the v1.0.0 release candidate.
+A full-stack social platform where developers can create profiles, share posts, participate in threaded discussions, and engage with the community.
 
-**Features**
+### Key Features
 
-- Authentication with roles (`admin` and `user`), httpOnly session cookies and refresh tokens
-- Developer profiles: headline, bio, skills, experience and portfolio projects
-- Posts with ownership, cursor pagination, soft delete and admin moderation
-- Threaded comments with replies, edit, and cascade delete
-- Like and dislike reactions with optimistic updates and a "who reacted" list
-- Top, Latest and Most Discussed feeds, with URL-driven sorting and full-text search
-- An AI post summarizer (a deterministic mock by default, Gemini optional)
-- An admin panel with a user list, an audit trail and in-app notifications
-- Swagger API docs, automated tests, and Docker Compose
+- **Authentication & Authorization** — JWT-based authentication with HTTP-only cookies and role-based access control.
+- **Developer Profiles** — Manage skills, experience, bio, and portfolio projects.
+- **Posts & Feeds** — Create and manage posts, browse paginated feeds, and explore ranked content.
+- **Threaded Comments** — Reply to comments with nested discussions and permission-based editing and deletion.
+- **Reactions** — Like and dislike posts and comments with concurrency-safe counters.
+- **Search & AI Summarization** — Search posts by text and generate post summaries.
+- **Admin Moderation** — Manage users, moderate content, and review audit logs.
+- **Notifications** — Receive in-app notifications for relevant administrative actions.
+- **Automated Testing** — Backend unit and E2E tests, plus frontend component tests.
+- **Docker Support** — Run the application and MongoDB using Docker Compose.
 
-**API docs:** Swagger UI at `http://localhost:3000/docs` once the backend is running.
-
-## Table of contents
-
-- [Quick start (Docker)](#quick-start-docker)
-- [Stack](#stack)
-- [Project structure](#project-structure)
-- [Getting started (without Docker)](#getting-started)
-- [Running with Docker Compose](#running-with-docker-compose)
-- [Testing](#testing)
-- [Environment variables](#environment-variables)
-- [Backend overview](#backend-overview)
-- [Authentication and roles](#authentication-and-roles)
-- [API reference](#api-reference)
-- [Admin capabilities](#admin-capabilities)
-- [Frontend guide](#frontend-guide)
-- [Demo](#demo)
-- [Next improvements](#next-improvements)
-- [Known limitations](#known-limitations)
-- [Progress log](#progress)
-
-## Quick start (Docker)
-
-Needs only Docker with Compose v2, and ports 3000, 3001 and 27017 free. Use Chrome, Edge or Firefox. Details, cleanup and troubleshooting are in [Running with Docker Compose](#running-with-docker-compose).
-
-1. Create the root `.env` with two different JWT secrets of at least 32 characters. In PowerShell, from the repo root:
-
-   ```powershell
-   $rng = [Security.Cryptography.RandomNumberGenerator]::Create()
-   function New-Secret { $b = New-Object byte[] 36; $rng.GetBytes($b); [Convert]::ToBase64String($b) }
-   Set-Content -Path .env -Encoding ascii -Value @("JWT_SECRET=$(New-Secret)", "JWT_REFRESH_SECRET=$(New-Secret)")
-   ```
-
-   In a POSIX shell: `printf 'JWT_SECRET=%s
-JWT_REFRESH_SECRET=%s
-' "$(openssl rand -base64 36)" "$(openssl rand -base64 36)" > .env`
-
-2. Build and start (the first build takes several minutes):
-
-   ```bash
-   docker compose up -d --build
-   docker compose ps
-   ```
-
-3. Create the first admin (signup only creates regular members). Pass the credentials from the shell for this one command; do not put them in `.env`:
-
-   ```powershell
-   $env:ADMIN_FULLNAME = "Admin"
-   $env:ADMIN_EMAIL = "admin@example.com"
-   $env:ADMIN_PASSWORD = "<a strong password>"
-   docker compose run --rm --build seed
-   Remove-Item Env:ADMIN_FULLNAME, Env:ADMIN_EMAIL, Env:ADMIN_PASSWORD
-   ```
-
-| What | URL |
-|---|---|
-| Frontend | `http://localhost:3001` |
-| Backend API | `http://localhost:3000` |
-| Swagger docs | `http://localhost:3000/docs` |
-| Health check | `http://localhost:3000/health` |
-
-Use `localhost`, not `127.0.0.1`. To run both apps without Docker instead, see [Getting started](#getting-started).
+This project follows a 20-day development plan. See the [Progress](#progress) section for implementation milestones and engineering decisions.
 
 
 ## Stack
 
-- **Backend:** NestJS 12, MongoDB via Mongoose 9 (Atlas, or the `mongo:8` container in Docker Compose), class-validator/class-transformer, Passport-JWT, bcrypt, Swagger, Jest.
-- **Frontend:** Next.js 16 (App Router), React 19, TanStack Query, React Hook Form, Zod, axios, Tailwind CSS v4, Jest and React Testing Library.
-- **Deployment:** Docker and Docker Compose (MongoDB 8, the backend and the frontend).
+- **Backend:** NestJS 12, MongoDB via Mongoose 9 (Atlas, or the `mongo:8` container in Docker Compose), class-validator/class-transformer, Passport-JWT, bcrypt, Swagger.
+- **Frontend:** Next.js 16 (App Router), React 19, TanStack Query, axios, Tailwind CSS v4.
 
 ## Project structure
 
 - `backend/` — NestJS API (`src/<feature>/` modules: `auth`, `users`, `profiles`, `posts`, `comments`, `reactions`, `summarizer`, `audit`, `notifications`, `health`; shared code in `src/common/`).
 - `frontend/` — Next.js app, all source under `frontend/src/`: `app/` (thin routes), `features/<name>/` (auth, posts, comments, reactions, profile, users, audit, notifications, health), `services/api/` (the only code that calls the backend), `lib/`, `components/`, `hooks/`, `providers/`, `constants/`. The layout and data flow are described under Day 8 in Progress.
 - `compose.yaml` and `.env.example` (repo root) — Docker Compose for MongoDB, the backend and the frontend, plus a one-off `seed` service for the first admin. See Running with Docker Compose.
-- `docs/demo-script.md` — the 15-minute demo script (workflows, one failure scenario, two technical decisions).
-- `AI_USAGE.md` — how AI tooling was used on this project, and what was reviewed and caught by hand.
+- `docs/` — per-day spec and plan files, and a product requirements doc (local reference, not part of the public repo).
+- `PROJECT_REPORT.md` — a detailed architecture and decisions write-up of the system as it stands today.
+- `AI_USAGE.md` — how I used AI tooling on this project, and what I personally reviewed and caught.
 
 ## Getting started
 
@@ -197,11 +138,11 @@ docker compose ps
 
 The first build takes several minutes. When it is done, `docker compose ps` shows `mongo`, `backend` and `frontend` as `Up … (healthy)`; a start with the images already built takes about 15 to 30 seconds. The order is enforced: the backend waits for a healthy Mongo and the frontend waits for a healthy backend.
 
-| What         | URL                            |
-| ------------ | ------------------------------ |
-| Frontend     | `http://localhost:3001`        |
-| Backend API  | `http://localhost:3000`        |
-| Swagger docs | `http://localhost:3000/docs`   |
+| What | URL |
+|---|---|
+| Frontend | `http://localhost:3001` |
+| Backend API | `http://localhost:3000` |
+| Swagger docs | `http://localhost:3000/docs` |
 | Health check | `http://localhost:3000/health` |
 
 Use `localhost`, not `127.0.0.1`: the backend allows exactly the origin `http://localhost:3001`.
@@ -254,23 +195,26 @@ If a port is already taken, Docker refuses to start that container with a "ports
 - A different backend port also needs the `NEXT_PUBLIC_API_URL` build argument of the frontend to be the new browser URL (for example `http://localhost:3005`), and then `docker compose up -d --build`.
 - A different Mongo port only matters for tools on your machine, such as the e2e `MONGODB_URI` above.
 
-### Limits of the Compose setup
 
-- It works over `http://localhost` only. In production mode the backend forces `Secure` cookies and refuses `COOKIE_SECURE=false`. Chrome, Edge and Firefox accept `Secure` cookies from `http://localhost`; Safari rejects them over plain HTTP, so sign-in does not stick there. A real deployment needs HTTPS and a `FRONTEND_ORIGIN` that matches it.
-- `http://127.0.0.1:3001` does not work: the backend answers every origin with the `http://localhost:3001` origin, so the browser rejects it.
-- The summarizer runs on the built-in mock, because no Gemini key is passed through. Add `SUMMARIZER_PROVIDER` and `SUMMARIZER_API_KEY` to the backend's `environment:` in `compose.yaml` to use Gemini.
-- The rest of the list is under Known limitations, in the Day 19 subsection.
+### Limits of the Compose Setup
+
+- **Local browser compatibility:** Use `http://localhost:3001` in Chrome, Edge, or Firefox. Safari sign-in over plain HTTP is not supported by the current setup. A real deployment requires HTTPS and a matching `FRONTEND_ORIGIN`.
+- **Summarizer:** The Compose setup uses the built-in mock summarizer unless an external provider is configured. See [Environment variables](#environment-variables).
+- **Network binding:** The frontend and backend ports are published on all interfaces by default. For local-only access, bind their host ports to `127.0.0.1` in `compose.yaml`.
+
+See [Docker Release Candidate](#docker-release-candidate-day-19) for the review scope and remaining deployment considerations.
+
 
 ## Testing
 
 Run each command from the app's own folder, after `npm ci` (or `npm install`). Nothing in this table needs Docker.
 
-|                          | Backend (`backend/`)                          | Frontend (`frontend/`)                      |
-| ------------------------ | --------------------------------------------- | ------------------------------------------- |
-| Lint                     | `npm run lint` (oxlint on `src/` and `test/`) | `npm run lint` (eslint)                     |
-| Unit and component tests | `npm test` (Jest)                             | `npm test` (Jest and React Testing Library) |
-| Production build         | `npm run build` (`nest build`)                | `npm run build` (`next build`)              |
-| End-to-end tests         | `npm run test:e2e`, with `RUN_E2E=1`          | none                                        |
+| | Backend (`backend/`) | Frontend (`frontend/`) |
+|---|---|---|
+| Lint | `npm run lint` (oxlint on `src/` and `test/`) | `npm run lint` (eslint) |
+| Unit and component tests | `npm test` (Jest) | `npm test` (Jest and React Testing Library) |
+| Production build | `npm run build` (`nest build`) | `npm run build` (`next build`) |
+| End-to-end tests | `npm run test:e2e`, with `RUN_E2E=1` | none |
 
 At Day 19 that was 360 backend unit tests in 19 suites, 315 backend e2e tests in 17 suites, and 624 frontend tests in 60 suites, with lint and both builds clean.
 
@@ -286,7 +230,6 @@ At Day 19 that was 360 backend unit tests in 19 suites, 315 backend e2e tests in
   ```
 
   In a POSIX shell, put `RUN_E2E=1 MONGODB_URI=… ` in front of `npm run test:e2e`.
-
 - **Run the e2e suite on its own.** It runs one file at a time (`maxWorkers: 1`) with a 60-second timeout per hook and test, and a run alongside other work against the same database can exceed that.
 
 ## Environment variables
@@ -296,53 +239,6 @@ Real `.env` files are gitignored in both apps. Use the committed example files a
 - `backend/.env.example` — `MONGODB_URI`, `PORT`, `NODE_ENV`, `JWT_SECRET`, `JWT_EXPIRES_IN`, `JWT_REFRESH_SECRET`, `JWT_REFRESH_EXPIRES_IN`, `COOKIE_SECURE`, `COOKIE_REFRESH_PATH`, `FRONTEND_ORIGIN`, the first-admin variables `ADMIN_FULLNAME`, `ADMIN_EMAIL` and `ADMIN_PASSWORD`, plus four optional summarizer settings: `SUMMARIZER_PROVIDER` (`mock` or `gemini`), `SUMMARIZER_API_KEY`, `SUMMARIZER_MODEL` (default `gemini-3.5-flash-lite`) and `SUMMARIZER_TIMEOUT_MS` (default 10000, allowed 1000-15000). With no key the app uses the built-in mock summarizer, so nothing needs configuring to run it. Three more optional settings control the post purge job (Day 19): `POST_PURGE_ENABLED` (default `true`), `POST_PURGE_RETENTION_DAYS` (whole days, 1-365, default 7) and `POST_PURGE_CRON` (a cron expression with 5 or 6 fields, default `0 3 * * *`, so every day at 03:00 server time). An invalid value, including a cron expression that doesn't parse, stops the app at startup.
 - `frontend/.env.example` — `NEXT_PUBLIC_API_URL`.
 - `.env.example` (repo root) — `JWT_SECRET` and `JWT_REFRESH_SECRET` for Docker Compose, which does not read the two files above. The first-admin variables `ADMIN_FULLNAME`, `ADMIN_EMAIL` and `ADMIN_PASSWORD` are read only by the seed script (`backend/.env.example` documents them).
-
-## Backend overview
-
-### Modules
-
-Each feature is one Nest module under `backend/src/<feature>/` (module, controller, service, `schemas/`, `dto/`), plus a `<feature>.swagger.ts` holding that controller's Swagger decorators.
-
-| Module          | What it owns                                                                                                                 |
-| --------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `auth`          | Signup, login, refresh, logout, `GET/PATCH /auth/me`; the global `JwtAuthGuard` and `RolesGuard`; `@Public()` and `@Roles()` |
-| `users`         | The `User` schema and account administration (list, delete)                                                                  |
-| `profiles`      | Headline, bio, skills, experiences and portfolio projects, with owner-or-admin writes                                        |
-| `posts`         | Posts CRUD, ranked feeds, full-text search, and the scheduled purge of old soft-deleted posts                                |
-| `comments`      | Threaded comments, cascade delete, edit                                                                                      |
-| `reactions`     | Like/dislike toggle on posts and comments, and the "who reacted" lists                                                       |
-| `summarizer`    | `POST /posts/:id/summarize` behind a swappable provider (mock or Gemini)                                                     |
-| `audit`         | Append-only audit log of admin overrides                                                                                     |
-| `notifications` | In-app notifications for the affected member                                                                                 |
-| `health`        | `GET /health`, with database connectivity                                                                                    |
-
-Shared code is in `src/common/` (response interceptor, exception filter, Swagger helpers) and `src/config/env.validation.ts` (the Zod-validated environment).
-
-### Database models
-
-Six MongoDB collections, defined with Mongoose under `backend/src/<feature>/schemas/`. The relationships between them:
-
-```mermaid
-erDiagram
-    USER ||--o{ POST : writes
-    USER ||--o{ COMMENT : writes
-    POST ||--o{ COMMENT : has
-    COMMENT ||--o{ COMMENT : "replies to"
-    USER ||--o{ REACTION : makes
-    POST ||--o{ REACTION : "receives (targetType = post)"
-    COMMENT ||--o{ REACTION : "receives (targetType = comment)"
-    USER ||--o{ NOTIFICATION : receives
-    USER ||--o{ AUDITLOG : "acts in (admin) or is affected by"
-```
-
-| Collection      | Key fields                                                                                                                                                        | Notes                                                                                                                                                                                         |
-| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `users`         | `fullName`, unique `email`, `passwordHash`, `refreshTokenHashes`, `role` (`admin` or `user`), `skills`, `experiences[]`, `headline`, `bio`, `portfolioProjects[]` | `passwordHash` and `refreshTokenHashes` are `select: false` and stripped again in `toJSON`. Experiences and portfolio projects are sub-documents with their own `_id`. Optimistic concurrency |
-| `posts`         | `authorId`, `title` (1-200), `body` (1-20000), `likeCount`, `dislikeCount`, `commentCount`, `deletedAt`                                                           | Soft delete. Optimistic concurrency. Indexes for the latest feed, one author's posts, the `discussed` sort, and a weighted text index (title 10, body 1) for search                           |
-| `comments`      | `postId`, `authorId`, `parentCommentId` (`null` for a top-level comment), `ancestorIds`, `body`, `likeCount`, `dislikeCount`, `deletedAt`                         | `ancestorIds` is a materialized path, so a delete cascades in one operation. Index on `{postId, deletedAt, _id}`                                                                              |
-| `reactions`     | `userId`, `targetType` (`post` or `comment`), `targetId`, `type` (`like` or `dislike`)                                                                            | Unique index on `{userId, targetType, targetId}`: one reaction per user per target, enforced by the database. A second index on `{targetType, targetId, createdAt}` serves the reactor lists  |
-| `auditlogs`     | `adminId`, `targetUserId` (with their names copied in), `action`, `previousState`, `newState`, optional `reason`                                                  | One entry per admin override. Never purged                                                                                                                                                    |
-| `notifications` | `userId` (the recipient), `message`, `read`                                                                                                                       | One per admin override on a member's data                                                                                                                                                     |
 
 ## Authentication and roles
 
@@ -357,49 +253,49 @@ Every response follows one shape: `{success: true, data}` on success, or `{succe
 
 ### Health
 
-| Method & path | Access                                         |
-| ------------- | ---------------------------------------------- |
-| `GET /`       | Public                                         |
+| Method & path | Access |
+|---|---|
+| `GET /` | Public |
 | `GET /health` | Public — reports API and database connectivity |
 
 ### Auth (`/auth`)
 
-| Method & path        | Access                                    | Notes                                                                                                                                                                               |
-| -------------------- | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `POST /auth/signup`  | Public                                    | Throttled                                                                                                                                                                           |
-| `POST /auth/login`   | Public                                    | Sets the `access_token` and `refresh_token` cookies; throttled (5 a minute per IP)                                                                                                  |
+| Method & path | Access | Notes |
+|---|---|---|
+| `POST /auth/signup` | Public | Throttled |
+| `POST /auth/login` | Public | Sets the `access_token` and `refresh_token` cookies; throttled (5 a minute per IP) |
 | `POST /auth/refresh` | Public (needs the `refresh_token` cookie) | Sets a new `access_token` cookie; the refresh token is not rotated. A missing, invalid, expired or revoked token is a `401` and clears both cookies; throttled (20 a minute per IP) |
-| `POST /auth/logout`  | Public                                    | Clears both cookies and revokes this device's refresh token; always succeeds                                                                                                        |
-| `GET /auth/me`       | Authenticated                             | Current user, read fresh from the database                                                                                                                                          |
-| `PATCH /auth/me`     | Authenticated                             | Change password / full name / (admin-only) email; requires `currentPassword`                                                                                                        |
+| `POST /auth/logout` | Public | Clears both cookies and revokes this device's refresh token; always succeeds |
+| `GET /auth/me` | Authenticated | Current user, read fresh from the database |
+| `PATCH /auth/me` | Authenticated | Change password / full name / (admin-only) email; requires `currentPassword` |
 
 ### Profiles (`/profile`)
 
-| Method & path                                   | Access         | Notes                                                                         |
-| ----------------------------------------------- | -------------- | ----------------------------------------------------------------------------- |
-| `GET /profile/me`                               | Authenticated  | Your own full profile: headline, bio, skills, experiences, portfolio projects |
-| `PATCH /profile/me`                             | Authenticated  | Update your own headline/bio/skills/portfolioProjects                         |
-| `GET /profile/:id`                              | Authenticated  | View any member's full profile                                                |
-| `PATCH /profile/:id/skills`                     | Owner or admin | Full replace                                                                  |
-| `PATCH /profile/:id/headline`                   | Owner or admin |                                                                               |
-| `PATCH /profile/:id/bio`                        | Owner or admin |                                                                               |
-| `PATCH /profile/:id/portfolio-projects`         | Owner or admin | Full replace                                                                  |
-| `POST /profile/:id/experiences`                 | Owner or admin | Adds one experience entry                                                     |
-| `PATCH /profile/:id/experiences/:experienceId`  | Owner or admin | Partial update of one entry                                                   |
-| `DELETE /profile/:id/experiences/:experienceId` | Owner or admin |                                                                               |
+| Method & path | Access | Notes |
+|---|---|---|
+| `GET /profile/me` | Authenticated | Your own full profile: headline, bio, skills, experiences, portfolio projects |
+| `PATCH /profile/me` | Authenticated | Update your own headline/bio/skills/portfolioProjects |
+| `GET /profile/:id` | Authenticated | View any member's full profile |
+| `PATCH /profile/:id/skills` | Owner or admin | Full replace |
+| `PATCH /profile/:id/headline` | Owner or admin | |
+| `PATCH /profile/:id/bio` | Owner or admin | |
+| `PATCH /profile/:id/portfolio-projects` | Owner or admin | Full replace |
+| `POST /profile/:id/experiences` | Owner or admin | Adds one experience entry |
+| `PATCH /profile/:id/experiences/:experienceId` | Owner or admin | Partial update of one entry |
+| `DELETE /profile/:id/experiences/:experienceId` | Owner or admin | |
 
 An admin acting on someone else's profile through any of the write routes above is audit-logged and the affected user is notified; editing your own profile produces neither. No profile route ever accepts `email`, `password`, or `role`.
 
 ### Posts (`/posts`)
 
-| Method & path               | Access                              | Notes                                                                                                                                                                                                                                                                                                                      |
-| --------------------------- | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `POST /posts`               | Regular members only                | Author is always the caller, never client-supplied. An admin gets `403` — admins moderate but don't author                                                                                                                                                                                                                 |
-| `GET /posts`                | Public                              | Cursor-paginated feed; `?limit=` (1-50, default 10), `?cursor=`, optional `?authorId=` (one author's posts, used by "Posts made by you"), and `?sort=latest\|top\|discussed` (default `latest`)                                                                                                                            |
-| `GET /posts/search`         | Public                              | Full-text search of titles and bodies: `?q=` (required, 1-100 characters) and `?limit=` (1-20); returns `{items, hasMore}`; throttled (40 a minute per IP)                                                                                                                                                                 |
-| `GET /posts/:id`            | Public                              | A soft-deleted post 404s the same as a nonexistent one                                                                                                                                                                                                                                                                     |
-| `PATCH /posts/:id`          | Owner or admin                      | Partial update — at least one of `title`/`body` required                                                                                                                                                                                                                                                                   |
-| `DELETE /posts/:id`         | Owner or admin                      | Soft delete (`deletedAt`) — excluded from every read path afterward, and hard-deleted by the purge job once it has been deleted for 7 days (Day 19)                                                                                                                                                                        |
+| Method & path | Access | Notes |
+|---|---|---|
+| `POST /posts` | Regular members only | Author is always the caller, never client-supplied. An admin gets `403` — admins moderate but don't author |
+| `GET /posts` | Public | Cursor-paginated feed; `?limit=` (1-50, default 10), `?cursor=`, optional `?authorId=` (one author's posts, used by "Posts made by you"), and `?sort=latest\|top\|discussed` (default `latest`) |
+| `GET /posts/search` | Public | Full-text search of titles and bodies: `?q=` (required, 1-100 characters) and `?limit=` (1-20); returns `{items, hasMore}`; throttled (40 a minute per IP) |
+| `GET /posts/:id` | Public | A soft-deleted post 404s the same as a nonexistent one |
+| `PATCH /posts/:id` | Owner or admin | Partial update — at least one of `title`/`body` required |
+| `DELETE /posts/:id` | Owner or admin | Soft delete (`deletedAt`) — excluded from every read path afterward, and hard-deleted by the purge job once it has been deleted for 7 days (Day 19) |
 | `POST /posts/:id/summarize` | Any signed-in user, admins included | Returns `{summary, tags, truncated, source}` (`source` is `mock` or `gemini`). `422` for a body under 200 characters, `400`/`404` for a bad or missing/soft-deleted post, `429` over 10 a minute per IP, `502`/`503`/`504` when the summarizer returns something unusable, is unavailable, or times out. Nothing is stored |
 
 The list response shape is `{items, nextCursor}` — pass the previous response's `nextCursor` as `?cursor=` to get the next page; `nextCursor: null` means there are no more posts. Every write on `PATCH`/`DELETE` uses optimistic concurrency: a genuine conflicting concurrent edit returns `409`, never a silent overwrite. An admin editing or deleting someone else's post is audit-logged (identifying the specific post, not just the author) and the author is notified; a self-edit or self-delete produces neither.
@@ -408,23 +304,23 @@ The list response shape is `{items, nextCursor}` — pass the previous response'
 
 ### Comments (`/posts/:postId/comments`, `/comments/:id`)
 
-| Method & path                  | Access                                         | Notes                                                                                                                                                                                                                                    |
-| ------------------------------ | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `POST /posts/:postId/comments` | Regular members only                           | Creates a top-level comment, or a reply when `parentCommentId` is given. A reply is accepted at any depth — there's no creation-time limit on how many times people can reply to each other                                              |
-| `GET /posts/:postId/comments`  | Public                                         | The whole tree for the post: top-level comments newest-first, each with its full reply thread (oldest-first) nested up to 2 levels; anything deeper still appears, flattened under its thread's root, keeping its real `parentCommentId` |
-| `DELETE /comments/:id`         | Comment author, the post's author, or an admin | Cascade: deletes the comment and every reply beneath it in one operation. An admin deleting someone else's comment is audit-logged and the author is notified; a post's own author removing someone else's comment is not                |
-| `PATCH /comments/:id`          | Comment author only                            | Edits the body. No admin or post-owner override, unlike delete — nobody else may rewrite someone's words. Returns `{id, body, updatedAt}`, not the full comment                                                                          |
+| Method & path | Access | Notes |
+|---|---|---|
+| `POST /posts/:postId/comments` | Regular members only | Creates a top-level comment, or a reply when `parentCommentId` is given. A reply is accepted at any depth — there's no creation-time limit on how many times people can reply to each other |
+| `GET /posts/:postId/comments` | Public | The whole tree for the post: top-level comments newest-first, each with its full reply thread (oldest-first) nested up to 2 levels; anything deeper still appears, flattened under its thread's root, keeping its real `parentCommentId` |
+| `DELETE /comments/:id` | Comment author, the post's author, or an admin | Cascade: deletes the comment and every reply beneath it in one operation. An admin deleting someone else's comment is audit-logged and the author is notified; a post's own author removing someone else's comment is not |
+| `PATCH /comments/:id` | Comment author only | Edits the body. No admin or post-owner override, unlike delete — nobody else may rewrite someone's words. Returns `{id, body, updatedAt}`, not the full comment |
 
 Comments never expose the internal `ancestorIds` path or `deletedAt`. `Post.commentCount` is kept accurate through create and delete, including under concurrent requests. Deleting a post soft-deletes all of its own comments too.
 
 ### Reactions (`/posts/:id/reaction`, `/comments/:id/reaction`)
 
-| Method & path                 | Access               | Notes                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| ----------------------------- | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `POST /posts/:id/reaction`    | Regular members only | Body `{ "type": "like" \| "dislike" }`. One toggle for every change: no reaction creates it, the same type again removes it, the opposite type switches it in place (one counter down, the other up). Returns `{likeCount, dislikeCount, myReaction}` — the counts after the change and the caller's own reaction (`null` after a remove). `404` for a missing or deleted post, `403` for an admin.                                |
-| `POST /comments/:id/reaction` | Regular members only | Same body, behaviour and response, for a comment.                                                                                                                                                                                                                                                                                                                                                                                  |
-| `GET /posts/:id/reactions`    | Public               | Who reacted: `{ items: [{ user: { id, fullName, headline }, type }], likeCount, dislikeCount }`. Most recent reaction first, at most 50. `?type=like` or `?type=dislike` narrows the list. The two counts are the post's true totals, unaffected by the filter or the cap, so a client can say "showing 50 of 812". `404` for a missing or deleted post, `400` for a malformed id, an unknown `type` or any other query parameter. |
-| `GET /comments/:id/reactions` | Public               | Same list, parameters and response, for a comment.                                                                                                                                                                                                                                                                                                                                                                                 |
+| Method & path | Access | Notes |
+|---|---|---|
+| `POST /posts/:id/reaction` | Regular members only | Body `{ "type": "like" \| "dislike" }`. One toggle for every change: no reaction creates it, the same type again removes it, the opposite type switches it in place (one counter down, the other up). Returns `{likeCount, dislikeCount, myReaction}` — the counts after the change and the caller's own reaction (`null` after a remove). `404` for a missing or deleted post, `403` for an admin. |
+| `POST /comments/:id/reaction` | Regular members only | Same body, behaviour and response, for a comment. |
+| `GET /posts/:id/reactions` | Public | Who reacted: `{ items: [{ user: { id, fullName, headline }, type }], likeCount, dislikeCount }`. Most recent reaction first, at most 50. `?type=like` or `?type=dislike` narrows the list. The two counts are the post's true totals, unaffected by the filter or the cap, so a client can say "showing 50 of 812". `404` for a missing or deleted post, `400` for a malformed id, an unknown `type` or any other query parameter. |
+| `GET /comments/:id/reactions` | Public | Same list, parameters and response, for a comment. |
 
 The reactor lists are public because the post or comment they belong to is public. Only a user's id, name and headline are returned (the same fields an author already exposes), and an account that has since been deleted shows as the `Deleted user` placeholder. They are served by a second index on `{targetType, targetId, createdAt}`; the unique index starts with `userId`, so it cannot serve a lookup by target.
 
@@ -434,24 +330,24 @@ It is a `POST` that returns `200`, not an idempotent `PUT`: sending the same req
 
 ### Users / admin (`/users`)
 
-| Method & path       | Access     | Notes                                                           |
-| ------------------- | ---------- | --------------------------------------------------------------- |
-| `GET /users`        | Admin only | Full user list                                                  |
+| Method & path | Access | Notes |
+|---|---|---|
+| `GET /users` | Admin only | Full user list |
 | `DELETE /users/:id` | Admin only | Refuses to delete any admin account, including by another admin |
 
 ### Admin (`/admin`)
 
-| Method & path          | Access                                      |
-| ---------------------- | ------------------------------------------- |
+| Method & path | Access |
+|---|---|
 | `GET /admin/audit-log` | Admin only — full audit trail, newest first |
 
 ### Notifications (`/notifications`)
 
-| Method & path                     | Access        | Notes                       |
-| --------------------------------- | ------------- | --------------------------- |
-| `GET /notifications`              | Authenticated | Your own notifications only |
-| `GET /notifications/unread-count` | Authenticated | Your own count only         |
-| `PATCH /notifications/:id/read`   | Authenticated | 404s if the id isn't yours  |
+| Method & path | Access | Notes |
+|---|---|---|
+| `GET /notifications` | Authenticated | Your own notifications only |
+| `GET /notifications/unread-count` | Authenticated | Your own count only |
+| `PATCH /notifications/:id/read` | Authenticated | 404s if the id isn't yours |
 
 ## Admin capabilities
 
@@ -464,166 +360,25 @@ Beyond the base member experience, an admin can:
 
 Every admin-override action creates one audit-log entry (who, what changed, before/after state, optional reason) and one in-app notification for the affected member.
 
-## Frontend guide
 
-### Routing
 
-Routes live in `frontend/src/app/` and every `page.tsx` only renders a feature component. Every internal URL is referenced through `frontend/src/constants/routes.ts` (`ROUTES.POSTS`, `ROUTES.post(id)`), never typed as a string. `frontend/src/middleware.ts` only checks that the `access_token` cookie exists on the protected paths; the backend is the real boundary.
 
-| Route                                                 | Purpose                                                                | Sign-in | Admin |
-| ----------------------------------------------------- | ---------------------------------------------------------------------- | ------- | ----- |
-| `/`                                                   | System Status page (live `/health` check)                              | No      | No    |
-| `/login`, `/signup`                                   | Auth forms                                                             | No      | No    |
-| `/posts`                                              | Feed with sort dropdown and search (`?sort=`, `?q=`)                   | No      | No    |
-| `/posts/[id]`                                         | Post, summarizer, reactions and comments                               | No      | No    |
-| `/posts/create`                                       | Create a post (regular members only)                                   | Yes     | No    |
-| `/posts/mine`                                         | "Posts made by you"                                                    | Yes     | No    |
-| `/posts/[id]/edit`                                    | Edit a post (its author, or an admin moderating)                       | Yes     | No    |
-| `/profile/[id]`                                       | A member's full profile                                                | Yes     | No    |
-| `/profile/edit/[id]`, `/profile/edit/[id]/experience` | Profile and experience forms (owner, or an admin editing someone else) | Yes     | No    |
-| `/settings`                                           | Change password, full name, (admin-only) email                         | Yes     | No    |
-| `/admin/users`                                        | User list with delete                                                  | Yes     | Yes   |
-| `/admin/audit-log`                                    | Audit trail                                                            | Yes     | Yes   |
 
-### Forms
+## Docker Release Candidate
 
-React Hook Form with a Zod schema in `features/<name>/schemas/`; the form type comes from `z.infer`, never a hand-written copy. The schemas mirror the backend DTOs (same limits). The profile form uses `useFieldArray` for portfolio projects, and the post form serves both create and edit.
+The Docker Compose setup was tested from a fresh clone of the `beta` branch on October 6, 2026.
 
-### TanStack Query patterns
+- **Docker Compose:** Backend, frontend, and MongoDB started successfully, with health checks passing.
+- **Automated tests:** All 360 backend unit tests, 315 backend E2E tests, and 624 frontend tests passed during the review. Lint checks and production builds also passed.
+- **Authentication and networking:** Login, refresh, logout, cookie attributes, CORS, authorization, and rate limiting were checked.
+- **Database resilience:** The backend recovered automatically after MongoDB restarted, without requiring a backend restart.
+- **Known limitations:** Local HTTP browser compatibility, mock summarization by default, access-token validity after logout, and mobile layout constraints remain.
+- **Production readiness:** Dependency audit findings, including critical-severity vulnerabilities, require investigation before production deployment.
 
-- Data flow is one way: page, feature component, query or mutation hook, `services/api/<resource>.ts`, the axios client. Components never import `axios`, and an ESLint rule fails the lint if they try.
-- Query keys sit in the feature's queries file (`postKeys`, `profileKeys`, and so on). The feed has one cache entry per sort (`postKeys.feed(sort)`), and the search term is part of its key.
-- The query client (`lib/tanstack/`) uses a 30-second `staleTime`, no refetch on window focus, no retry on a `4xx` (except `408` and `429`), and up to two retries on a `5xx` or a network error.
-- Mutations either patch the cache directly (create, edit and delete of a post, a comment edit) or invalidate and refetch (comment create and delete, because the tree's shape changes). Reactions are optimistic: the cache is written before the response, and `onError` restores the exact snapshot.
-- The current user is the cache entry `authKeys.me`, read with `useAuth()`. There is no auth context. Login, signup and logout reset every other cached query so one user's data never shows for the next.
-- The axios interceptor turns every failure into an `ApiError`. On a `401` it starts one shared `POST /auth/refresh`, retries the request once, and only a failed refresh redirects to `/login?reason=session-expired`.
+**Not verified:** Safari, real mobile browsers, the external Gemini provider in the Compose environment, and the scheduled purge job firing inside the container.
 
-### Testing and Docker
-
-Tests are Jest and React Testing Library, next to the file they cover (`post-card.test.tsx`). The commands and counts are in Testing above. The frontend image is built from `frontend/Dockerfile` (Next.js `output: "standalone"`, non-root user) and run by `compose.yaml`; `NEXT_PUBLIC_API_URL` is a build argument. See Running with Docker Compose.
-
-## Demo
-
-`docs/demo-script.md` is the script for the 15-minute demo: the primary workflows, one failure scenario, and one frontend and one backend technical decision.
-
-## Next improvements
-
-If I carried on, in this order:
-
-1. **Server-side hardening for a real deployment:** HTTPS with a reverse proxy (and `trust proxy`, so the per-IP rate limits see the real client), refresh-token rotation with reuse detection, and a "log out everywhere" button.
-2. **Per-request logging and error tracking**, so a production 500 can be diagnosed from its log.
-3. **A `503` for a database outage** on the read routes, instead of the raw 500 `GET /posts` gives now.
-4. **Pagination** for the admin user list, the audit log, the notification list and a post's comment tree, plus an excerpt field so the feed does not carry every full post body.
-5. **Email verification and password reset.**
-6. **A comment and reply notification**, and a push channel (server-sent events) instead of 45-second polling.
-7. **Frontend error handling:** a Retry button on every load error, mapping the "Request failed" fallback to a proper "can't reach the server" message, a `global-error.tsx`, and the `middleware` to `proxy` rename.
-8. **Transactions** (a replica set) around the admin-override audit write and the reaction-plus-counter write.
-
-## Known limitations
-
-**Launch blockers: none found** (Day 19 release-candidate review). The ones that matter most for a real deployment:
-
-- The Docker setup runs over `http://localhost` only. A real deployment needs HTTPS and a matching `FRONTEND_ORIGIN`; Safari rejects `Secure` cookies over plain HTTP.
-- The refresh token is not rotated and there is no "log out everywhere" button; a copied access token stays valid for its 15 minutes.
-- Rate limits are per IP and `trust proxy` is not set, so behind a reverse proxy every client would share one bucket.
-- No email verification or password reset, and notifications are polled every 45 seconds rather than pushed.
-- A database outage gives `GET /posts` a 500 instead of a 503, and there is no per-request logging.
-- Not tested: Safari, real phone browsers, the Gemini provider, and the 03:00 purge job firing in the container.
-
-<details>
-<summary>Full list of known limitations, including the Day 19 review and the frontend error and loading states</summary>
-
-- No "log out everywhere" button. Logging out revokes that device's refresh token, and a password or credentials change revokes every other device's, but an access token someone has copied stays valid until its 15 minutes run out. Deleting an account ends its sessions at once, since every request re-reads the account from the database.
-- No in-app way to promote a user to admin — the only path is the one-time `seed:admin` script (under Docker, the `seed` service: `docker compose run --rm --build seed`) or a direct database edit.
-- No pagination on the admin user list, the audit log, or the notification list.
-- No email verification on signup and no password-reset flow.
-- Notifications are polled (every 45 seconds while the app is open and the tab is visible), not pushed in real time.
-- No search or filtering on the admin user list or profile viewing — the full list is returned and any narrowing happens client-side, if at all.
-- The posts list response carries every post's full `body` (there's no excerpt field), so a page of long posts is a large response; the feed cards only truncate visually.
-- The feed API has `sort=latest|top|discussed` (Day 13) with a dropdown to choose between them (Day 14), plus a debounced, cancellable search box (Day 15) — no filtering beyond that. `commentCount` is accurate and rendered, in the comments section's "Comments (N)" heading.
-- `sort=top` scores every matching post live in a Mongo aggregation rather than from a stored/indexed field, so it's a full collection scan past the `authorId` case (which does narrow via an index before scoring runs). Fine at this project's scale; a denormalized `rankScore` updated alongside the existing like/dislike/comment counters is the future optimization, not built.
-- `sort=discussed` combined with `?authorId=` uses its index for ordering but isn't selective for one author — cost scales with the total post count, not that author's.
-- `sort=top` has no time-decay term by design (`sort=latest` covers recency separately), so a highly-engaged old post can permanently outrank a fresh one with fewer votes under `sort=top`.
-- `frontend/src/middleware.ts` still uses Next.js 16's deprecated `middleware` name (the current name is `proxy`); it works, and the rename is deliberately left as its own change.
-- Soft-deleted posts are hard-deleted by a scheduled job once they have been deleted for 7 days (Day 19; see its entry under Progress). There is no restore path, so the 7 days is only a safety net for someone with database access. The job's limitations are listed with that entry.
-- Admin-override actions (profile edits, post edits/deletes) aren't wrapped in a database transaction — if the audit-log/notification write fails after the underlying change already saved, the change persists with no audit trail. Not yet hit in practice; the guard that does fire (optimistic concurrency on a genuine conflicting edit) correctly returns `409`, not `500`.
-- Server errors are logged thinly. For any response with a status of 500 or above, the global exception filter writes one line, `METHOD path -> status ErrorName`, plus the error's `code` when it has one. It deliberately leaves out the message, the stack, the query string and the body, because a driver's message can hold user data (a duplicate-key error quotes the email), and the client gets a generic message for an unexpected error. A genuine production bug therefore usually has to be reproduced, since the log names the error type but not its cause. There is no per-request logging.
-- `GET /posts/:postId/comments` returns the whole tree with no pagination, so the response is unbounded on a very active post.
-- Editing a comment keeps no history — only the current body is stored, and the "edited" signal is just `createdAt` differing from `updatedAt`.
-- A reply created at the exact instant a concurrent delete cascades past it can end up live under a deleted parent: invisible in the tree but still counted, so `commentCount` can read one higher than what's shown. The count itself isn't wrong; fixing this fully needs multi-document transactions, which this backend doesn't have configured.
-- Two deletes of the same comment subtree that truly overlap can each return a partial `deletedCount`, though the total decrement to `commentCount` is always exact (measured by forcing six simultaneous deletes together 25 times).
-- When a post's own author removes someone else's comment, there's no audit entry and the comment's author isn't told — only an admin's removal is logged.
-- No notification yet when someone comments or replies on a post.
-- The comment routes have no route-specific rate limit. Only the global default applies: 100 requests a minute per IP, counted separately for each route.
-- Deleting a user account doesn't yet remove or reassign their comments — they still show up, with the author shown as "Deleted user".
-- Reactions from a deleted account stay in the database and keep counting toward the counters; nothing removes them. Reactions on a soft-deleted post and on its comments stay for the 7 days before the purge job removes them with the post; reactions on a comment that was soft-deleted on its own, under a post that is still live, are never removed.
-- The reaction row and its counter are two separate writes with no transaction, so a server crash between them can leave a counter one off. A counter whose update fails while the server is running is repaired by a recount from the reaction rows; a crash is not.
-- A counter that has drifted below zero is shown as `0` but is not corrected in storage.
-- Signed-in reads (feed, post, comment tree) cost one extra user lookup for the session check, plus one reactions query per page or thread.
-- Two reactions that settle in the same tick can each see the other as still in flight, and both skip the extra refetch after settling. The server's counts written on success keep the cache correct, so this only delays a reconcile.
-- A failed reaction restores the snapshot taken when it started, so a change made to the same cache entry during that one request (for example a new post added to the feed) is not kept by the rollback.
-- A reaction made in another browser or account does not appear until the feed is refetched: there is no polling or push, `refetchOnWindowFocus` is off, and posts go stale after 30 seconds. To test with two accounts, use two different browsers, because the session cookie is shared between tabs.
-- The "who reacted" lists are capped at the 50 most recent, with no way to page further; the overlay says "Showing the 50 most recent of N" when there are more. They are ordered by when someone first reacted, so switching from like to dislike does not move them up.
-- The "who reacted" lists are public, so who disliked a post or comment is visible to anyone who can read it. Making them sign-in only is a one-line change (drop `@Public()` on the two routes) if that turns out to matter.
-- The summary line above the buttons ("You and 15 others reacted.") never names anyone: the list of people is only fetched when the overlay opens, so a name would need it fetched up front.
-- If a reader's session expires while a comment composer or reply form is already open, the `401` on submit hard-redirects to `/login` before the typed text can be saved anywhere — fixed by Day 18's refresh-token flow.
-- `ConfirmDialog`'s focus-restore on close is guarded against a removed element, but doesn't pick a replacement target itself — that's each caller's job. Comment delete does this (focuses the parent comment, or the heading for a root); deleting a post from "Posts made by you" doesn't yet.
-- Summaries are never stored: every `POST /posts/:id/summarize` is computed fresh, so repeated clicks repeat the call (and spend model quota). I chose that over a cached field so an edited post can't show a stale summary and a manipulated one can't persist for every reader; the cost is only limited by the throttle.
-- Without a key, the "summary" is the first two sentences of the post and the tags come from a fixed keyword list. That is extractive text matching, not a model, which is why the response carries `source: "mock"`. The keyword match is crude: a post that uses the verb "react" gets a React tag.
-- A body over 8000 characters is cut to its first 8000 before summarizing (`truncated: true`), so anything later in a long post is never seen. A body under 200 characters is rejected with `422` rather than summarized.
-- A tag from the summarizer that fails the checks (1-30 characters; letters, digits, space and `. + # / -`) is dropped silently, and only the first 5 valid tags are kept. The response is rejected (`502`) only when the summary is unusable or no valid tag is left. Dropped tags are counted in the server log, not shown to the user.
-- The post body is untrusted text sent to a model, so it can try to steer the summary. I reduced that (the post is sent as JSON data after fixed instructions, no tools or secrets are in play, output is validated, and the result is rendered as plain text and shown only to the requester) but it can't be ruled out.
-- Gemini's quota is shared by the whole project, not per user, so the 10-a-minute-per-IP throttle cannot guarantee it is never exceeded. When Google answers `429` (a per-minute limit or the day's quota used up, which resets at midnight Pacific), the endpoint returns `503` "temporarily unavailable". A retry right away may not help.
-- For a post that is random text with nothing to summarize, the model is told to answer exactly "This post contains random and no meaningful content" with the tag `general`. That is an instruction to the model, not a check on my side, so the wording can still vary on a given call, and the mock summarizer cannot tell gibberish apart at all (it just returns the post's first sentences).
-- On Gemini's free tier, Google may use submitted content to improve its products. Only a post's title and body are sent, never the author or the caller, but those are still sent.
-- Leaving the page while a summary is being generated discards the result on the client, but the server call still completes and still counts against the quota.
-- The frontend splits the summary into bullets by sentence ends, so an abbreviation such as "e.g. " ends up as two bullets. The API sends the summary as one plain string, and I kept that contract rather than change the backend for the layout.
-- At Day 17 the 5-a-minute limit on signup and login was not covered by any automated test: the shared e2e app replaces the throttler's storage with one that never counts, so a `429` could not be provoked there, and I had only checked it by hand. Day 18 added `test/rate-limits.e2e-spec.ts`, which runs its own app with the real throttler and covers the `429` on login, signup, refresh, credential changes, search and summarize.
-- At Day 17 the e2e login test checked the cookie's `HttpOnly`, `SameSite=Lax` and `Max-Age` flags but not `Secure`, because the controller then set `secure: false` for local http. Since Day 18 `Secure` follows `NODE_ENV` (on in production, and `COOKIE_SECURE=false` is rejected there), and `test/cookies-secure.e2e-spec.ts` covers it on login, refresh, credential changes and logout.
-- A summarize request that times out and being offline look the same to the frontend (both arrive with no HTTP status), so one message covers both. A summarizer that is slow, as opposed to the server being unreachable, comes back as the server's own `504` and gets its own message.
-
-### Docker release candidate (Day 19)
-
-**Launch blockers: none found** (final check from a fresh clone of `beta`, 2026-10-06; written up 2026-10-07). Everything below is a known limitation, with its impact and a workaround.
-
-- **HTTP on localhost only.** Compose runs the backend in production mode, which forces `Secure` cookies. Chrome, Edge and Firefox accept them from `http://localhost`; Safari rejects them over plain HTTP, so sign-in does not stick there. `http://127.0.0.1:3001` is blocked by CORS: the backend answers every origin with the `http://localhost:3001` origin, so a browser on any other origin rejects the response. Workaround: use `http://localhost:3001` in Chrome, Edge or Firefox. A real deployment needs HTTPS and a matching `FRONTEND_ORIGIN`.
-- **The summarizer is the mock in Compose.** No Gemini key is passed through, so summaries are the extractive mock ones (`source: mock`). Workaround: add `SUMMARIZER_PROVIDER` and `SUMMARIZER_API_KEY` to the backend's `environment:` in `compose.yaml`.
-- **No per-request logging.** Neither service logs a line per request; the backend logs startup and server errors, the frontend its start. Impact: harder to see what happened when debugging. No workaround yet.
-- **`POST /auth/refresh` re-issues only the access cookie.** The refresh token is not rotated, which matches the Swagger text. Impact: a stolen refresh token stays usable for its 7 days unless the user logs out.
-- **Signup does not sign the user in, and a duplicate signup says so.** A second signup with the same email returns `409 Email already in use`, which reveals that an email is registered; login gives the same `401` for an unknown email and a wrong password. The frontend signs the new user in with a login call right after signup. Workaround: none needed for this project's scope.
-- **Logout does not revoke the access token.** It revokes the refresh token and clears both cookies, but an access token someone copied earlier stays valid until its 15-minute JWT expires.
-- **A database outage gives `GET /posts` a 500.** It logs a raw `MongoServerSelectionError` instead of returning 503, while `GET /health` correctly returns 503. The backend reconnects on its own about 13 seconds after Mongo returns, with no restart.
-- **Docker flags the backend unhealthy only about a minute after Mongo goes away** (5 failed checks, 15 seconds apart). `/health` itself turns 503 within seconds.
-- **Ports 3000 and 3001 are published on all interfaces.** Mongo is bound to `127.0.0.1` only. Anything on the same network can reach the app. Workaround: put `127.0.0.1:` in front of those two mappings in `compose.yaml`.
-- **Rate limits are per IP.** Login is 5 a minute (a 429 with `Retry-After: 60`), so clients behind one host or NAT share a bucket.
-- **Fixed project name and ports.** `devcommunity` and 3000, 3001 and 27017 cannot be changed without editing `compose.yaml` (see Running with Docker Compose). Two checkouts cannot run together.
-- **Leftovers accumulate.** `docker compose down` does not remove the anonymous `/data/configdb` volumes, the tagged seed image, or a stale `:build` image tag from a manual build. Workaround: the cleanup commands in Running with Docker Compose.
-- **Backend e2e can time out under load.** Run alongside other work that hits the same Mongo, the first spec can exceed its 60-second hook timeout. It did not reproduce on a cold clone (315 of 315 passed in 87 seconds), so run it alone.
-- **`npm audit` reports 29 backend and 27 frontend vulnerabilities** (one critical on each side). I have not investigated them.
-- **`next build` prints the `middleware` to `proxy` deprecation warning.** The rename is deliberately left for a change of its own.
-- **Responsive.** Below the `sm` breakpoint the Create Post button is hidden from the header (it is in the avatar menu). At 320px the search box is about 58px wide and the signed-out header is tight. The Admin Users and Audit log tables scroll sideways inside their container, so on a phone the last column (Edit and Delete, View details) needs a sideways scroll.
-- **Not tested:** Safari, real phone browsers, the Gemini provider, and the 03:00 purge job firing in the container.
-
-### Frontend error and loading states (release-candidate review)
-
-These come from reading the frontend code for the Day 19 review; none is a launch blocker. They have not been reproduced in a browser unless it says so.
-
-- **Not every load error has a Retry button.** The feed, the post page, the edit page, "Posts made by you", search results, the comments and the reactor lists do. The profile view, the two profile edit pages, Admin Users, the Audit log and the notification list show the error and nothing else. Workaround: reload the page.
-- **"Request failed" when the server cannot be reached.** The API client's fallback message, used when there is no response at all, is shown as-is by the login, signup and settings forms, the profile pages, Admin Users, the Audit log, the notification list and the System Status card. The feed, the post page, the comments, reactions and the summarizer map it to "Couldn't reach the server…" instead. Workaround: none; the wording is the only problem.
-- **Other server messages are shown unchanged too.** A `429` from login, signup or a credential change reads `ThrottlerException: Too Many Requests` in the form's error banner (that is the throttler's default message, and the API returns it for the `429`; only the summarizer maps its own `429`).
-- **A failed `GET /auth/me` of any kind makes a signed-in user look signed out.** The call treats every failure (a `429`, a 5xx or no response) as "nobody is signed in", and the answer is cached until the page is reloaded, so protected pages send the user to `/login` even though the session is still valid. Workaround: reload once the server is back.
-- **Signup is two calls, signup and then login.** If the second fails (for example with a `429` on login), the account exists but the page shows an error, and signing up again with the same email returns `409`. Workaround: sign in with the new account.
-- **A logout that fails on the network still signs the user out of the UI** and goes to `/login`, but the server session and cookies are untouched, so a reload signs them back in. This is from the code, not reproduced.
-- **No global error boundary.** `app/error.tsx` catches errors inside the pages; an error thrown by the root layout (the header, for example) would show Next's default error page, because there is no `global-error.tsx`.
-
-</details>
 
 ## Progress
-
-The day-by-day record of the 20-day build, kept for reference.
-
-<details>
-<summary>Progress log, Days 1 to 20</summary>
 
 ### Day 1 — Project setup and request lifecycle
 
@@ -729,7 +484,7 @@ frontend/src/
 ### Day 9 — Threaded comments API
 
 - Added the `Comment` schema (`postId`, `authorId`, `parentCommentId` — explicitly `null` for a top-level comment, never absent — `ancestorIds` as a materialized path, `body`, `deletedAt`, full timestamps) and built `CommentsModule`: create a top-level comment or a reply, list a post's comments as a tree, cascade delete, and edit.
-- A reply is accepted at **any** depth — creating one is never rejected for how deep the thread already runs. What's bounded is the _returned tree_: it only ever nests 2 levels deep, and anything past that attaches, flattened, under its thread's depth-1 root instead of nesting further, in chronological order, while still carrying its true `parentCommentId`.
+- A reply is accepted at **any** depth — creating one is never rejected for how deep the thread already runs. What's bounded is the *returned tree*: it only ever nests 2 levels deep, and anything past that attaches, flattened, under its thread's depth-1 root instead of nesting further, in chronological order, while still carrying its true `parentCommentId`.
 - `DELETE /comments/:id` soft-deletes the comment and every reply beneath it in one atomic operation (matching on the target's id or its presence in a descendant's `ancestorIds`), not a "find then mark" two-step, so a reply created mid-delete can't slip through with a live parent. Allowed for the comment's author, the post's author, or an admin; only an admin's deletion of someone else's comment is audit-logged (`delete_comment`) and notified.
 - `Post.commentCount` is kept accurate through concurrent creates and deletes: an atomic `$inc` on create, a clamped decrement pipeline on delete (so a drifted count can never go negative), and a self-healing recount if either write fails. Verified by forcing bursts of ~20 concurrent creates and deletes, and by mutation-testing each safety rule (temporarily breaking it and confirming the test suite catches it, then reverting).
 - Deleting a post now cascades to soft-delete all of its own comments too, wired through `PostsModule` importing `CommentsModule` — a one-way dependency (`CommentsService` never imports `PostsService`), so no cycle forms.
@@ -856,17 +611,17 @@ Added on top of the Day 12 reaction interface: a line above the like/dislike but
 - Proof the tests protect something: I broke the code on purpose, one change at a time, and confirmed the matching test failed before restoring it. Removing the duplicate-email check failed the service spec and the e2e 409; flipping `includes` in `RolesGuard` failed its spec; dropping `@Roles('user')` on `POST /posts` failed the e2e admin 403; loosening the signup `refine` failed the schema and form tests; dropping the `@Public()` bypass failed its spec and most of the auth e2e; passing `role` through the service failed the unit spec, and turning `forbidNonWhitelisted` off failed the e2e 400.
 - Results: backend unit 277 tests in 17 suites, the full e2e suite 266 tests in 12 suites, frontend 543 tests in 54 suites; `tsc --noEmit`, oxlint and eslint clean. The new specs gave the same result on repeated runs, including a single test run with `-t`.
 
-| Area               | Scenario                                                                                             | Result                                                        |
-| ------------------ | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| Auth service       | duplicate email 409, hash stored (cost 12), role never taken from the dto                            | pass                                                          |
-| Auth service       | login: same 401 for unknown email and wrong password, token payload                                  | pass                                                          |
-| Auth service       | `updateCredentials`: 400, 403, 409, `VersionError` 409, other errors rethrown                        | pass                                                          |
-| Guards             | `RolesGuard` 403 cases; `JwtAuthGuard` protected by default, `@Public()` bypass                      | pass                                                          |
-| Auth API (e2e)     | signup, login cookie flags, `/auth/me`, `POST /posts` with and without the cookie, admin 403, logout | pass                                                          |
-| Reactions, ranking | toggle, unique index, concurrency; ranking function and feed (earlier days)                          | pass                                                          |
-| Frontend schemas   | login, signup, update-credentials, profile and portfolio rules                                       | pass                                                          |
-| Frontend forms     | field errors, disabled while pending, server error, redirect; integration through the real hook      | pass                                                          |
-| Rate limiting      | 429 on signup and login                                                                              | not covered at Day 17; Day 18 added `rate-limits.e2e-spec.ts` |
+| Area | Scenario | Result |
+|---|---|---|
+| Auth service | duplicate email 409, hash stored (cost 12), role never taken from the dto | pass |
+| Auth service | login: same 401 for unknown email and wrong password, token payload | pass |
+| Auth service | `updateCredentials`: 400, 403, 409, `VersionError` 409, other errors rethrown | pass |
+| Guards | `RolesGuard` 403 cases; `JwtAuthGuard` protected by default, `@Public()` bypass | pass |
+| Auth API (e2e) | signup, login cookie flags, `/auth/me`, `POST /posts` with and without the cookie, admin 403, logout | pass |
+| Reactions, ranking | toggle, unique index, concurrency; ranking function and feed (earlier days) | pass |
+| Frontend schemas | login, signup, update-credentials, profile and portfolio rules | pass |
+| Frontend forms | field errors, disabled while pending, server error, redirect; integration through the real hook | pass |
+| Rate limiting | 429 on signup and login | not covered at Day 17; Day 18 added `rate-limits.e2e-spec.ts` |
 
 ### Day 18 — Security and session hardening
 
@@ -915,13 +670,6 @@ Added on top of the Day 12 reaction interface: a line above the like/dislike but
 - **Configuration:** the backend's settings are in `compose.yaml`; the two JWT secrets come from a root `.env` and `docker compose` fails fast if either is missing. `NEXT_PUBLIC_API_URL` is a build argument (`http://localhost:3000`, the browser's address for the API, not the service name), and the frontend Dockerfile fails the build if it is empty.
 - **Responsive fix:** at 375px the signed-in header, the feed's sort menu and the account menu overflowed the screen. Create Post is now hidden below `sm` (it is also in the avatar menu), and both dropdowns are anchored to their button's right edge with a width cap. Measured in a real 375px viewport before and after: page width now equals the viewport at 375, 360, 320, 768 and 1280, with both menus closed and open.
 - **Verified from a fresh clone of `beta`:** all three services healthy; backend lint, 360 unit tests and build; backend e2e 315 of 315 (17 suites) against the Compose Mongo; frontend lint, 624 tests (60 suites) and `next build`. By curl: cookie attributes, CORS, login, refresh and logout, authorization, the post, comment and reaction flow, validation (including a 413), and the 429 with `Retry-After`. Persistence across `down` and `up`, Mongo stopped and restarted (the backend recovers on its own in about 13 seconds), backend stopped (the frontend keeps serving), and `restart` of everything. The images contain no `.env` file and no secret, and the logs contain no secret, token, password or email.
-- **Known limitations:** listed under Known limitations, in the Day 19 subsection. Launch blockers: none found.
 
-### Day 20 — Documentation, demo and reflection
+- **Review outcome:** No launch blockers were identified during this review. See [Docker Release Candidate](#docker-release-candidate) for the review summary and remaining limitations.
 
-- Documentation only; no code, API, schema or Swagger change.
-- **README:** added the Backend overview (modules and database models), the Frontend guide (routing, forms, TanStack Query patterns, testing and Docker), a Demo pointer and a Next improvements list. Setup, environment variables, authentication, the API reference, Swagger, testing and Docker were already here from earlier days. I checked the environment variables against `env.validation.ts` and left those sections as they were.
-- **Demo script:** `docs/demo-script.md`, a 15-minute run with one failure scenario and one frontend and one backend decision to explain.
-- **Release:** `v1.0.0` is tagged only after mentor approval; that step is manual.
-
-</details>
