@@ -20,6 +20,7 @@
     "test:debug": "node --inspect-brk --experimental-vm-modules -r tsconfig-paths/register node_modules/jest/bin/jest.js --runInBand",
     "test:e2e": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config ./test/jest-e2e.json",
     "seed:admin": "ts-node -r tsconfig-paths/register scripts/seed-admin.ts",
+    "seed:demo": "ts-node -r tsconfig-paths/register scripts/seed-demo-data.ts",
     "seed:ranking": "ts-node -r tsconfig-paths/register scripts/seed-ranking-data.ts",
     "seed:purge": "ts-node -r tsconfig-paths/register scripts/seed-purge-data.ts"
   },
