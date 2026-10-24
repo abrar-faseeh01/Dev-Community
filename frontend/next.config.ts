@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output: "standalone",
+  // Docker er jonno standalone, Vercel e dorkar nai
+  ...(process.env.VERCEL ? {} : { output: "standalone" as const }),
 
   async rewrites() {
     return [
