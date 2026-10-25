@@ -21,6 +21,13 @@ function isProtected(pathname: string): boolean {
 }
 
 export function middleware(req: NextRequest) {
+  if (req.nextUrl.pathname === ROUTES.HOME) {
+    const destination = req.cookies.has("access_token")
+      ? ROUTES.POSTS
+      : ROUTES.SIGNUP;
+    return NextResponse.redirect(new URL(destination, req.url));
+  }
+
   if (!isProtected(req.nextUrl.pathname)) return NextResponse.next();
 
   // Presence check only — actual validity is checked server-side via /auth/me.
@@ -34,6 +41,7 @@ export function middleware(req: NextRequest) {
 
 export const config = {
   matcher: [
+    "/",
     "/dashboard/:path*",
     "/settings/:path*",
     "/profile/:path*",
