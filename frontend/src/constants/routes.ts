@@ -9,6 +9,7 @@ export const ROUTES = {
   LOGIN: "/login",
   LOGIN_SESSION_EXPIRED: `/login?${LOGIN_REASON_PARAM}=${LOGIN_REASON_SESSION_EXPIRED}`,
   SIGNUP: "/signup",
+  HEALTH: "/health",
   SETTINGS: "/settings",
   POSTS: "/posts",
   POSTS_CREATE: "/posts/create",

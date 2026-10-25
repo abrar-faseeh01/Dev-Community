@@ -2,7 +2,7 @@
  * @jest-environment node
  */
 import { NextRequest } from "next/server";
-import { middleware } from "./middleware";
+import { config, middleware } from "./middleware";
 
 // The middleware only checks that the `access_token` cookie EXISTS; it never
 // reads or verifies it (the backend is the real boundary). That is what lets
@@ -61,7 +61,7 @@ describe("middleware", () => {
     expect(redirectTarget(res)).toBe("/login");
   });
 
-  it.each(["/", "/login", "/signup", "/posts", "/posts/abc123"])(
+  it.each(["/login", "/signup", "/posts", "/posts/abc123", "/health"])(
     "leaves the public page %s alone with no cookie",
     (path) => {
       const res = middleware(request(path));
@@ -70,4 +70,18 @@ describe("middleware", () => {
       expect(res.headers.get("x-middleware-next")).toBe("1");
     },
   );
+
+  it("redirects the exact home path to posts when an access_token cookie is present", () => {
+    expect(
+      redirectTarget(middleware(request("/", { access_token: "any-value" }))),
+    ).toBe("/posts");
+  });
+
+  it("redirects the exact home path to signup when no access_token cookie is present", () => {
+    expect(redirectTarget(middleware(request("/")))).toBe("/signup");
+  });
+
+  it("includes the exact home path in the middleware matcher", () => {
+    expect(config.matcher).toContain("/");
+  });
 });
